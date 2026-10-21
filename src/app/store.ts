@@ -172,6 +172,13 @@ export const useApp = create<AppState>((set, get) => ({
     if (!report) return;
     const wrong = report.steps.find((s) => s.verdict === 'wrong' || s.verdict === 'shape');
     set({ guess: id, revealed: wrong?.id ?? null, selectedStep: id });
+    // the fixes of the row the user pointed at
+    const { source, settings, explanations } = get();
+    if (explanations[id]) return;
+    const step = report.steps.find((s) => s.id === id);
+    if (!step) return;
+    if (step.verdict !== 'wrong' && step.verdict !== 'shape') return;
+    runExplain(source, id, settings);
   },
 
   select: (id) => {
