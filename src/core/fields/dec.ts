@@ -12,6 +12,8 @@ export class DecField implements Field<Decimal> {
   readonly name = 'decimal(50)';
   readonly zero: Decimal;
   readonly one: Decimal;
+  /** pi, to fifty digits */
+  readonly pi: Decimal;
 
   readonly precision: number;
 
@@ -20,6 +22,9 @@ export class DecField implements Field<Decimal> {
     Decimal.set({ precision, rounding: Decimal.ROUND_HALF_EVEN });
     this.zero = new Decimal(0);
     this.one = new Decimal(1);
+    this.pi = new Decimal(
+      '3.14159265358979323846264338327950288419716939937510582097494459231',
+    );
   }
 
   add(a: Decimal, b: Decimal): Decimal {

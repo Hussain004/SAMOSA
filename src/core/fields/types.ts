@@ -33,6 +33,8 @@ export interface Field<T> {
   tanh(a: T): T;
   /** Converts back to a plain number, for reporting and for the real fields. */
   toNumber(a: T): number;
+  /** The best available image of pi, for the normalising constants. */
+  readonly pi: T;
   /** A uniformly random element of the field. */
   random(rng: () => number): T;
   /** A random element from the standard normal distribution. */

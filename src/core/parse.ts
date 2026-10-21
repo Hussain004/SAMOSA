@@ -206,6 +206,19 @@ export class Parser {
     return { text: t.type === 'cmd' ? `\\${t.value}` : t.value, span: { from: t.from, to: t.to } };
   }
 
+  /**
+   * Reads the variable of a proportionality, the subscript of \\propto.
+   *
+   * It returns the name of the variable and how many tokens it took, so the
+   * caller can drop them from the right hand side.
+   */
+  readProportionalityVariable(): { name: string; tokens: number } {
+    const start = this.pos;
+    this.pos++; // the underscore
+    const sub = this.readSubscript();
+    return { name: sub.text, tokens: this.pos - start };
+  }
+
   /** Reads a subscript, which may be a group or a single token. */
   private readSubscript(): { text: string; span: Span } {
     if (this.kind() === 'lbrace') return this.rawGroupText();
@@ -1222,7 +1235,17 @@ export function parseRow(
   for (let i = 0; i < rels.length; i++) {
     const rel = rels[i];
     const lhsSeg = i === 0 ? tokens.slice(bounds[0], bounds[1]) : [];
-    const rhsSeg = tokens.slice(bounds[2 * i + 2], bounds[2 * i + 3]);
+    let rhsSeg = tokens.slice(bounds[2 * i + 2], bounds[2 * i + 3]);
+    let proportionalTo: string | undefined;
+
+    // \propto_x says which variable the proportionality is taken in
+    if (rel.relation === 'propto' && rhsSeg[0]?.type === 'sub') {
+      const parser = new Parser(rhsSeg, '', knownFns ? { knownFns } : {});
+      const read = parser.readProportionalityVariable();
+      proportionalTo = read.name;
+      rhsSeg = rhsSeg.slice(read.tokens);
+    }
+
     const lhs = (lhsSeg.length ? parseNode(lhsSeg, knownFns) : null) ?? undefined;
     const rhs = (rhsSeg.length ? parseNode(rhsSeg, knownFns) : null) ?? undefined;
     parts.push({
@@ -1233,6 +1256,7 @@ export function parseRow(
       span: { from: offset, to: offset + rowText.length },
       lhsSpan: lhs?.span,
       rhsSpan: rhs?.span,
+      proportionalTo,
     });
   }
 

@@ -5,6 +5,7 @@ export class F64Field implements Field<number> {
   readonly name = 'f64';
   readonly zero = 0;
   readonly one = 1;
+  readonly pi = Math.PI;
 
   add(a: number, b: number): number {
     return a + b;

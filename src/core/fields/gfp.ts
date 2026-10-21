@@ -16,11 +16,14 @@ export class GFpField implements Field<number> {
   readonly name = 'GF(p)';
   readonly zero = 0;
   readonly one = 1;
+  /** pi is not in a finite field, so this is a rational approximation of it */
+  readonly pi: number;
 
   readonly p: number;
 
   constructor(p: number) {
     this.p = p;
+    this.pi = this.mul(314159265, this.inv(100000000));
   }
 
   /** Reduce to the canonical representative in [0, p). */

@@ -22,6 +22,7 @@ export class DualField<F extends Field<any>> implements Field<DualValue> {
   readonly name: string;
   readonly zero: DualValue;
   readonly one: DualValue;
+  readonly pi: DualValue;
 
   readonly base: F;
 
@@ -30,6 +31,7 @@ export class DualField<F extends Field<any>> implements Field<DualValue> {
     this.name = `dual(${base.name})`;
     this.zero = { v: base.zero, t: base.zero };
     this.one = { v: base.one, t: base.zero };
+    this.pi = { v: base.pi, t: base.zero };
   }
 
   add(a: DualValue, b: DualValue): DualValue {

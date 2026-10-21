@@ -80,6 +80,8 @@ export interface RowPart extends Assertion {
   /** set when the row reads "premise => conclusion" */
   premise?: Assertion;
   conclusion?: Assertion;
+  /** for a proportionality, the variable it is taken in */
+  proportionalTo?: string;
 }
 
 export interface ParsedRow {

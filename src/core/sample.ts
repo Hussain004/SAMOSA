@@ -52,6 +52,16 @@ export class Sampler<T> {
     if (has('triu')) return { k: 'm', m: this.sampleTriangular(r, c, true) };
     if (has('tril')) return { k: 'm', m: this.sampleTriangular(r, c, false) };
     if (has('skew')) return { k: 'm', m: this.sampleSkew(r, c) };
+    if (has('spd') && !(this.field instanceof GFpField)) {
+      // over the reals a positive definite matrix is sampled as B B' + r I, so
+      // that the densities and the square roots are well defined
+      const f = this.field;
+      const b = this.sampleGeneral(r, r);
+      const bb = matMul(f, b, transpose(b));
+      const eye = identity<T>(r, f.one, f.zero);
+      const scaled = matScale(f, f.fromRational(r, 1), eye);
+      return { k: 'm', m: matAdd(f, bb, scaled) };
+    }
     if (has('sym') || has('spd') || has('psd')) return { k: 'm', m: this.sampleSymmetric(r, c) };
     return { k: 'm', m: this.sampleGeneral(r, c) };
   }

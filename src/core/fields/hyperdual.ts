@@ -24,6 +24,7 @@ export class HyperDualField<F extends Field<any>> implements Field<HyperDualValu
   readonly name: string;
   readonly zero: HyperDualValue;
   readonly one: HyperDualValue;
+  readonly pi: HyperDualValue;
 
   readonly base: F;
 
@@ -32,6 +33,7 @@ export class HyperDualField<F extends Field<any>> implements Field<HyperDualValu
     this.name = `hyperdual(${base.name})`;
     this.zero = { v: base.zero, e1: base.zero, e2: base.zero, e12: base.zero };
     this.one = { v: base.one, e1: base.zero, e2: base.zero, e12: base.zero };
+    this.pi = { v: base.pi, e1: base.zero, e2: base.zero, e12: base.zero };
   }
 
   add(a: HyperDualValue, b: HyperDualValue): HyperDualValue {
