@@ -1,24 +1,19 @@
 import { chromium } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, rmSync } from 'node:fs';
+import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 /**
  * The three GIFs of the README (the plan, section 8.1).
  *
  * They are recorded from the real app, so they cannot show anything the
- * product does not do.
+ * product does not do. The recording is a real screen capture, so the motion
+ * is smooth, and the still moments are held long enough to read.
  */
 
 const OUT = resolve(process.cwd(), 'public/gifs');
+const WORK = resolve(process.cwd(), '.gifs');
 const BASE = process.env.SAMOSA_URL ?? 'http://localhost:4173';
-
-const KALMAN = String.raw`\begin{align*}
-J_t &:= \tfrac12 (z_t - C_t x_t)^\top Q_t^{-1} (z_t - C_t x_t) + \tfrac12 (x_t - \bar\mu_t)^\top \bar\Sigma_t^{-1} (x_t - \bar\mu_t) \\
-\frac{\partial J_t}{\partial x_t} &= -C_t^\top Q_t^{-1}(z_t - C_t x_t) + \bar\Sigma_t^{-1}(x_t - \bar\mu_t) \\
-K_t &:= \Sigma_t C_t^\top Q_t^{-1} \\
-K_t &= \bar\Sigma_t C_t^\top \left(C_t \bar\Sigma_t C_t^\top + Q_t\right)^{-1}
-\end{align*}`;
 
 const KALMAN_BUG = String.raw`\begin{align*}
 J_t &:= \tfrac12 (z_t - C_t x_t)^\top Q_t^{-1} (z_t - C_t x_t) + \tfrac12 (x_t - \bar\mu_t)^\top \bar\Sigma_t^{-1} (x_t - \bar\mu_t) \\
@@ -37,72 +32,67 @@ const DECLS = 'x_t, \\bar\\mu_t: n; z_t: m; C_t: m×n; Q_t: spd m; \\bar\\Sigma_
 
 async function main() {
   rmSync(OUT, { recursive: true, force: true });
+  rmSync(WORK, { recursive: true, force: true });
   mkdirSync(OUT, { recursive: true });
+  mkdirSync(WORK, { recursive: true });
 
-  const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width: 980, height: 620 } });
-
-  // 1. the transposed product, the squiggle, the counterexample and the fix
-  await record(page, 'transpose', async (shot) => {
+  // 1. the transposed product: the squiggle, the counterexample, the fix
+  await record('transpose', async (page) => {
     await open(page, 'A, B: n×n');
     await type(page, 'A^\\top B = (A B)^\\top');
-    await page.waitForTimeout(1800);
-    await shot();
+    await page.waitForTimeout(1600);
     await clickBadRow(page);
-    await page.waitForTimeout(2600);
-    await shot();
+    await page.waitForTimeout(2200);
     const apply = page.getByRole('button', { name: 'apply' }).first();
     if (await apply.count()) {
       await apply.click();
-      await page.waitForTimeout(2200);
-      await shot();
+      await page.waitForTimeout(2400);
     }
   });
 
   // 2. the Kalman update, with the missing noise term
-  await record(page, 'kalman', async (shot) => {
+  await record('kalman', async (page) => {
     await open(page, DECLS);
     await type(page, KALMAN_BUG);
-    await page.waitForTimeout(2200);
-    await shot();
+    await page.waitForTimeout(1800);
     await clickBadRow(page);
-    await page.waitForTimeout(3000);
-    await shot();
+    await page.waitForTimeout(2600);
   });
 
   // 3. the gradient in the wrong layout
-  await record(page, 'gradient', async (shot) => {
+  await record('gradient', async (page) => {
     await open(page, 'X: m×n; a: m; b: n');
     await type(page, GRADIENT);
-    await page.waitForTimeout(2000);
-    await shot();
+    await page.waitForTimeout(1600);
     await clickBadRow(page);
-    await page.waitForTimeout(2600);
-    await shot();
+    await page.waitForTimeout(2200);
   });
 
-  await browser.close();
   console.log('the GIFs are in public/gifs');
 }
 
-/** Records the frames of one GIF. */
-async function record(page, name, script) {
-  const dir = resolve(OUT, `.${name}`);
+/** Records one GIF, with a real screen capture. */
+async function record(name, script) {
+  const dir = resolve(WORK, name);
   mkdirSync(dir, { recursive: true });
-  let index = 0;
-  const shot = async () => {
-    index += 1;
-    await page.screenshot({ path: resolve(dir, `frame${String(index).padStart(3, '0')}.png`) });
-  };
-  await script(shot);
+  const context = await chromium.launchPersistentContext('', {
+    recordVideo: { dir, size: { width: 1100, height: 680 } },
+    viewport: { width: 1100, height: 680 },
+  });
+  const page = await context.newPage();
+  await script(page);
+  await page.waitForTimeout(600);
+  const video = page.video();
+  await context.close();
+  const raw = await video.path();
+
+  // the GIF: a palette, a modest size, and enough frames to be smooth
   execFileSync('ffmpeg', [
     '-y',
-    '-framerate',
-    '6',
     '-i',
-    resolve(dir, 'frame%03d.png'),
+    raw,
     '-vf',
-    'scale=980:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=128[p];[s1][p]paletteuse=dither=bayer',
+    'fps=14,scale=760:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=96[p];[s1][p]paletteuse=dither=bayer:bayer_scale=3',
     '-loop',
     '0',
     resolve(OUT, `${name}.gif`),
@@ -134,7 +124,7 @@ async function open(page, decls) {
   await page.waitForTimeout(400);
   // close the settings again, so the panes fill the window
   await page.getByRole('button', { name: 'Presets' }).click();
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(400);
 }
 
 /** Types a derivation into the editor. */
@@ -147,3 +137,7 @@ async function type(page, text) {
 }
 
 await main();
+
+void readdirSync;
+void readFileSync;
+void writeFileSync;

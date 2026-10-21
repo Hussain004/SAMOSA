@@ -72,6 +72,13 @@ checks it, exactly, and it also finds the two ways you can get it wrong.
 
 ## See it work
 
+**Nineteen seconds.** The line everybody writes and nobody checks, and what
+happens when a machine reads it.
+
+[Watch the nineteen second tour](public/brag.mp4) (or
+[download it](public/brag.mp4))
+
+
 **A transposed product.** The squiggle, the counterexample, and the fix that
 takes one keystroke.
 

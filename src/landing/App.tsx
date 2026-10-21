@@ -21,6 +21,7 @@ export function Landing() {
         <Hero />
         <Intro />
         <AgentDemo />
+        <Tour />
         <Features />
         <Divider />
         <HallOfBugs />
@@ -220,6 +221,29 @@ function AgentDemo() {
             </li>
           </ul>
         </div>
+      </div>
+    </section>
+  );
+}
+
+function Tour() {
+  return (
+    <section className="border-y border-[var(--color-line)] bg-[var(--color-panel)]">
+      <div className="mx-auto max-w-[1180px] px-6 py-16">
+        <SectionHead
+          eyebrow="nineteen seconds"
+          title="The line nobody checks"
+          body="The moment every derivation has: after some algebraic manipulation, we may obtain. SAMOSA reads that line, evaluates it over a finite field, and brings a counterexample you can read."
+        />
+        <video
+          className="mt-8 w-full rounded-lg border border-[var(--color-line)]"
+          src="/brag.mp4"
+          poster="/brag.jpg"
+          autoPlay
+          muted
+          loop
+          playsInline
+        />
       </div>
     </section>
   );
