@@ -1,0 +1,150 @@
+{
+  "kalman": {
+    "rows": [
+      {
+        "row": 1,
+        "verdict": "defined",
+        "mode": null,
+        "message": "defined: J_t",
+        "relation": "defined"
+      },
+      {
+        "row": 2,
+        "verdict": "ok",
+        "mode": "exact",
+        "message": "holds at every size tested",
+        "relation": "=",
+        "bound": 5.418460044792529e-51,
+        "degree": 9
+      },
+      {
+        "row": 3,
+        "verdict": "ok",
+        "mode": "exact",
+        "message": "holds at every size tested",
+        "relation": "=",
+        "bound": 2.6727647847683796e-51,
+        "degree": 8
+      },
+      {
+        "row": 4,
+        "verdict": "defined",
+        "mode": null,
+        "message": "defined: \\Sigma_t",
+        "relation": "defined"
+      },
+      {
+        "row": 5,
+        "verdict": "ok",
+        "mode": "exact",
+        "message": "the implication holds at every size tested",
+        "relation": "=>"
+      },
+      {
+        "row": 6,
+        "verdict": "defined",
+        "mode": null,
+        "message": "defined: K_t",
+        "relation": "defined"
+      },
+      {
+        "row": 7,
+        "verdict": "wrong",
+        "mode": "exact",
+        "message": "the two sides are not equal",
+        "relation": "=",
+        "bound": 0,
+        "degree": 0
+      },
+      {
+        "row": 8,
+        "verdict": "ok",
+        "mode": "exact",
+        "message": "holds at every size tested",
+        "relation": "=",
+        "bound": 2.25983138666078e-46,
+        "degree": 53
+      }
+    ],
+    "okRows": 4,
+    "wrongRows": 1,
+    "total": 8,
+    "wrongRow": 7,
+    "fixTitle": "an inverse where there should be none, or the other way round",
+    "shareUrl": ""
+  },
+  "joseph": {
+    "wrongRow": 4,
+    "fixTitle": "this step is off by exactly + K_t Q_t {K_t}^\\top",
+    "fixEdit": "I - K_t C_t \\bar\\Sigma_t {I - K_t C_t}^\\top + + K_t Q_t {K_t}^\\top",
+    "counterexample": {
+      "dims": {
+        "n": 1,
+        "m": 1
+      },
+      "values": {
+        "C_t": [
+          1
+        ],
+        "Q_t": [
+          5
+        ],
+        "\\bar\\Sigma_t": [
+          5
+        ],
+        "I": [
+          1
+        ]
+      },
+      "derived": {
+        "\\Sigma_t": 2.5,
+        "K_t": 0.5
+      },
+      "numpy": "import numpy as np\ns0 = np.array([[1]])\ns1 = np.array([[5]])\ns2 = np.array([[5]])\ns3 = np.array([[1]])\n\n# the symbols the derivation defines, computed by SAMOSA from the values above\nd0 = 2.5  # \\Sigma_t\nd1 = 0.5  # K_t\n\n# the two sides of the step, with these values\n# lhs - rhs is not zero"
+    },
+    "rows": [
+      {
+        "row": 1,
+        "verdict": "defined",
+        "mode": null,
+        "message": "defined: \\Sigma_t",
+        "relation": "defined"
+      },
+      {
+        "row": 2,
+        "verdict": "defined",
+        "mode": null,
+        "message": "defined: K_t",
+        "relation": "defined"
+      },
+      {
+        "row": 3,
+        "verdict": "ok",
+        "mode": "exact",
+        "message": "holds at every size tested",
+        "relation": "=",
+        "bound": 1.099025998641461e-46,
+        "degree": 47
+      },
+      {
+        "row": 4,
+        "verdict": "wrong",
+        "mode": "exact",
+        "message": "the two sides are not equal",
+        "relation": "=",
+        "bound": 0,
+        "degree": 0
+      }
+    ],
+    "total": 4
+  },
+  "shape": {
+    "row": 3,
+    "message": "in a product: the sizes n and m do not match",
+    "fixTitle": "a transpose is missing"
+  },
+  "layout": {
+    "row": 2,
+    "message": "this is the numerator layout: SAMOSA uses the denominator layout, where the gradient has the shape of the variable it is taken with respect to"
+  }
+}

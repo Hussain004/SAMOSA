@@ -4,6 +4,7 @@ import { AsciiSamosa } from './AsciiSamosa.tsx';
 import { TypedDemo } from './typed-demo.tsx';
 import { MENU } from '../../corpus/menu.ts';
 import { PRESETS } from '../core/index.ts';
+import { MOCKS } from './demo-scripts.ts';
 
 /**
  * The landing page.
@@ -311,26 +312,44 @@ function Features() {
 function CounterexampleMock() {
   return (
     <Mock>
-      <MockLine tone="bad">✗ row 12 · the two sides are not equal</MockLine>
+      <MockLine tone="bad">
+        ✗ row {MOCKS.counterexample.row} · the two sides are not equal
+      </MockLine>
       <pre className="mt-2 text-[11px] leading-relaxed text-[var(--color-muted)]">
-        {`C  = [[1, 0]]
-Sb = [[1, 0], [0, 2]]
-K  = Sb @ C.T @ inv(C @ Sb @ C.T + Q)
-lhs = [[1, 0], [0, 0.5]]
-rhs = [[0.75, 0], [0, 0.25]]
-diff = [[0.25, 0], [0, 0.25]]`}
+        {formatValues(MOCKS.counterexample.values, MOCKS.counterexample.derived)}
       </pre>
     </Mock>
   );
 }
 
+/** The values of a counterexample, as the engine found them. */
+function formatValues(
+  values: Record<string, number[] | number>,
+  derived: Record<string, number[] | number>,
+): string {
+  const lines: string[] = [];
+  const show = (name: string, value: number[] | number) => {
+    if (typeof value === 'number') {
+      lines.push(`${name} = ${value}`);
+      return;
+    }
+    const size = Math.max(1, Math.round(Math.sqrt(value.length)));
+    lines.push(`${name} =`);
+    for (let i = 0; i < value.length; i += size) {
+      lines.push(`  [ ${value.slice(i, i + size).join(', ')} ]`);
+    }
+  };
+  for (const [name, value] of Object.entries(values)) show(name, value);
+  for (const [name, value] of Object.entries(derived)) show(`${name} (computed)`, value);
+  return lines.join('\n');
+}
+
 function FixMock() {
   return (
     <Mock>
-      <MockLine tone="plain">off by exactly + K_t Q_t K_tᵀ</MockLine>
+      <MockLine tone="plain">{MOCKS.fix.title}</MockLine>
       <pre className="mt-2 text-[11px] leading-relaxed text-[var(--color-muted)]">
-        {`- (I - K_t C_t) \\bar\\Sigma_t
-+ (I - K_t C_t) \\bar\\Sigma_t + K_t Q_t K_t^\\top`}
+        {MOCKS.fix.edit}
       </pre>
     </Mock>
   );
@@ -339,13 +358,14 @@ function FixMock() {
 function ShapeMock() {
   return (
     <Mock>
-      <MockLine tone="bad">⊘ row 11 · the sizes n and m do not match</MockLine>
+      <MockLine tone="bad">
+        ⊘ row {MOCKS.shape.row} · {MOCKS.shape.message}
+      </MockLine>
       <pre className="mt-2 text-[11px] leading-relaxed text-[var(--color-muted)]">
         {`C_t is m by n
-Σ̄_t C_t is (n×n)(m×n)
-the inner sizes n ≠ m
+the inner sizes do not match
 
-did you mean C_t^\\top?`}
+${MOCKS.shape.fix ?? ''}`}
       </pre>
     </Mock>
   );
@@ -354,7 +374,7 @@ did you mean C_t^\\top?`}
 function GradientMock() {
   return (
     <Mock>
-      <MockLine tone="bad">✗ row 3 · this is the numerator layout gradient</MockLine>
+      <MockLine tone="bad">✗ row {MOCKS.layout.row} · the numerator layout</MockLine>
       <pre className="mt-2 text-[11px] leading-relaxed text-[var(--color-muted)]">
         {`the gradient has the shape
 of the variable it is taken with

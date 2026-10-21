@@ -59,11 +59,26 @@ export interface GuaranteeCard {
 
 export interface Counterexample {
   dims: Record<string, number>;
+  /** the values of the free symbols, the small integers a person can read */
   values: Record<string, unknown>;
+  /** the values of the symbols the derivation defines, computed */
+  derived?: Record<string, unknown>;
   lhs: unknown;
   rhs: unknown;
   diff: unknown;
   numpy: string;
+  /**
+   * The raw residues of the finite field.
+   *
+   * They are exact but unreadable, so they are kept out of the way: the
+   * shrunk counterexample is what a person or an agent reads.
+   */
+  debug?: {
+    residues: Record<string, unknown>;
+    lhs: unknown;
+    rhs: unknown;
+    diff: unknown;
+  };
 }
 
 export interface Fix {
@@ -1491,9 +1506,9 @@ function buildCounterexample<T>(
 ): Counterexample {
   const dims: Record<string, number> = {};
   for (const [k, v] of setting) dims[k] = v;
-  const values: Record<string, unknown> = {};
+  const residues: Record<string, unknown> = {};
   for (const [name, val] of sampled) {
-    values[name] = val.k === 's' ? val.v : val.m.d;
+    residues[name] = val.k === 's' ? val.v : val.m.d;
   }
   const lhsVal = lhs.k === 's' ? lhs.v : lhs.m.d;
   const rhsVal = rhs.k === 's' ? rhs.v : rhs.m.d;
@@ -1503,7 +1518,17 @@ function buildCounterexample<T>(
       : lhs.k === 'm' && rhs.k === 'm'
         ? lhs.m.d.map((x, i) => field.sub(x, rhs.m.d[i]))
         : null;
-  return { dims, values, lhs: lhsVal, rhs: rhsVal, diff, numpy: '' };
+  // The residues are exact but unreadable, so they live under the debug key.
+  // The values a person reads come from the shrinker.
+  return {
+    dims,
+    values: {},
+    lhs: null,
+    rhs: null,
+    diff: null,
+    numpy: '',
+    debug: { residues, lhs: lhsVal, rhs: rhsVal, diff },
+  };
 }
 
 // ------------------------------------------------------------- implications
