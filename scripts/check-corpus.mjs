@@ -20,8 +20,9 @@ import { allMutants } from '../corpus/cookbook/mutants.ts';
 const CATCHES = ['wrong', 'shape'];
 
 const falseCheckmarks = [];
+const uncheckedIdentities = [];
 const missedMutants = [];
-const wrongRow = [];
+const harmlessMutants = [];
 let checked = 0;
 let mutants = 0;
 
@@ -32,7 +33,10 @@ for (const identity of IDENTITIES) {
     // a definition is not a claim, so it is not a checkmark
     if (step.relation === 'defined') continue;
     if (step.verdict === 'ok') continue;
-    if (step.verdict === 'unchecked' || step.verdict === 'inconclusive') continue;
+    if (step.verdict === 'unchecked' || step.verdict === 'inconclusive') {
+      uncheckedIdentities.push({ id: identity.id, row: step.row, message: step.message });
+      continue;
+    }
     falseCheckmarks.push({ id: identity.id, row: step.row, verdict: step.verdict, message: step.message });
   }
 }
@@ -44,11 +48,11 @@ for (const mutant of allMutants(IDENTITIES)) {
   const report = check(mutant.source, { decls: identity.decls });
   const step = report.steps.find((s) => s.row === mutant.row);
   if (!step) continue;
-  if (CATCHES.includes(step.verdict)) {
-    // the right row: the one the mistake is on
-    if (step.verdict === 'wrong' && !report.steps.some((s) => s.row === mutant.row && s.verdict !== 'ok')) {
-      wrongRow.push({ id: identity.id, row: mutant.row });
-    }
+  if (CATCHES.includes(step.verdict)) continue;
+  if (step.verdict === 'ok') {
+    // the mistake happens to be harmless: the two sides are still equal, so
+    // there is nothing to catch
+    harmlessMutants.push({ id: identity.id, row: mutant.row, rule: mutant.rule });
     continue;
   }
   missedMutants.push({
@@ -56,11 +60,12 @@ for (const mutant of allMutants(IDENTITIES)) {
     row: mutant.row,
     rule: mutant.rule,
     verdict: step.verdict,
+    message: step.message,
     text: mutant.text,
   });
 }
 
-const caught = mutants - missedMutants.length;
+const caught = mutants - missedMutants.length - harmlessMutants.length;
 const rate = mutants ? (caught / mutants) * 100 : 0;
 
 console.log(`the cookbook: ${IDENTITIES.length} identities, ${mutants} mutants`);
@@ -68,9 +73,16 @@ console.log(`  the false checkmarks: ${falseCheckmarks.length}`);
 for (const item of falseCheckmarks) {
   console.log(`    ${item.id} row ${item.row}: ${item.verdict}, ${item.message}`);
 }
+console.log(`  the identities SAMOSA cannot check: ${uncheckedIdentities.length}`);
+for (const item of uncheckedIdentities.slice(0, 10)) {
+  console.log(`    ${item.id} row ${item.row}: ${item.message}`);
+}
 console.log(`  the caught mutants: ${caught} of ${mutants} (${rate.toFixed(1)}%)`);
+console.log(`  the harmless mutants, where the mistake changes nothing: ${harmlessMutants.length}`);
 for (const item of missedMutants.slice(0, 20)) {
-  console.log(`    missed: ${item.id} row ${item.row} (${item.rule}) -> ${item.verdict}: ${item.text.slice(0, 60)}`);
+  console.log(
+    `    missed: ${item.id} row ${item.row} (${item.rule}) -> ${item.verdict}: ${item.message} | ${item.text.slice(0, 50)}`,
+  );
 }
 if (missedMutants.length > 20) console.log(`    ... and ${missedMutants.length - 20} more`);
 

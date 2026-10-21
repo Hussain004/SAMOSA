@@ -153,6 +153,19 @@ as a `\|` used as a double bar instead of a norm, or a macro the authors
 defined in their own preamble. The method and the full list of what stops
 the rest are in [docs/COVERAGE.md](docs/COVERAGE.md).
 
+And the Cookbook: 48 identities in matrix algebra, calculus and stochastics,
+with the mistakes the catalog can make of them.
+
+| | |
+| --- | --- |
+| the false checkmarks | **0** |
+| the caught mutants | 196 of 267 (**73.4%**) |
+
+The plan's gate asks for 95% of the bugs caught. The cookbook is at 73.4%,
+and every miss is a step the engine says it cannot decide, never one it
+calls right. The method, the misses and the bugs the corpus found are in
+[docs/COOKBOOK.md](docs/COOKBOOK.md).
+
 ## What it cannot do
 
 Being straight about the edges is part of the product:

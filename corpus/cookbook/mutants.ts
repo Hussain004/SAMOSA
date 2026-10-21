@@ -38,6 +38,8 @@ export function mutantsOf(identity: Identity): Mutant[] {
     if (parsed.prose || !parsed.parts.length) continue;
     for (const part of parsed.parts) {
       if (!part.rhs) continue;
+      // a definition is not a claim, so a mistake in it is not a bug to catch
+      if (part.relation === ':=') continue;
       for (const { node, path } of walk(part.rhs)) {
         for (const mutation of MUTATIONS) {
           const mutated = mutation.apply(node);
@@ -50,9 +52,9 @@ export function mutantsOf(identity: Identity): Mutant[] {
             row: rowIndex,
             rule: mutation.id,
             source:
-              identity.source.slice(0, part.rhs.span.from) +
+              identity.source.slice(0, row.from + part.rhs.span.from) +
               text +
-              identity.source.slice(part.rhs.span.to),
+              identity.source.slice(row.from + part.rhs.span.to),
             text,
           });
         }

@@ -280,6 +280,25 @@ export function check(src: string, opts: CheckOptions = {}): Report {
   const defs = new Map<string, Node>();
   const results: StepResult[] = [];
 
+  // A declaration that matches no symbol of the derivation is a name that was
+  // spelled differently, so it is said out loud rather than ignored.
+  const used = new Set<string>();
+  for (const step of steps) {
+    for (const name of step.symbols) used.add(name);
+    if (step.lhs?.k === 'sym') used.add(step.lhs.name);
+    if (step.rhs?.k === 'sym') used.add(step.rhs.name);
+  }
+  for (const decl of decls) {
+    if (used.has(decl.name)) continue;
+    if (decl.source === 'preset') continue;
+    chips.push({
+      id: 'unused-declaration',
+      symbol: decl.name,
+      message: `${decl.name} is declared but no row uses it, so the declaration does nothing`,
+      span: { from: 0, to: 0 },
+    });
+  }
+
   for (const step of steps) {
     if (step.isDefinition && step.defName && step.rhs) {
       defs.set(step.defName, step.rhs);
@@ -582,8 +601,11 @@ function checkExact(
             id: step.id,
             row: step.row,
             span: step.span,
+            text: step.text,
+            lhsSpan: step.lhs?.span,
+            rhsSpan: step.rhs?.span,
             relation: step.relation,
-            verdict: 'unchecked',
+            verdict: outcome.shape ? 'shape' : 'unchecked',
             card: { ...card, sizes, primes, assumptions },
             message: outcome.message,
             reason: outcome.message,
@@ -656,7 +678,7 @@ function checkExact(
 type TrialOutcome =
   | { kind: 'ok' }
   | { kind: 'wrong'; message: string; counterexample: Counterexample; layoutHint?: string }
-  | { kind: 'unknown'; message: string; domain?: boolean };
+  | { kind: 'unknown'; message: string; domain?: boolean; shape?: boolean };
 
 function runExactTrial(
   step: Step,
@@ -680,7 +702,9 @@ function runExactTrial(
   for (const [name, quadVar] of sampled.quad.entries()) env.quad.set(name, quadVar);
 
   const sides = evaluateSides(field, step.lhs!, step.rhs!, env, sampler);
-  if (sides.kind === 'unknown') return { kind: 'unknown', message: sides.message, domain: sides.domain };
+  if (sides.kind === 'unknown') {
+    return { kind: 'unknown', message: sides.message, domain: sides.domain, shape: sides.shape };
+  }
   if (sides.kind === 'equal') return { kind: 'ok' };
 
   return {
@@ -694,7 +718,7 @@ function runExactTrial(
 type Sides<T> =
   | { kind: 'equal' }
   | { kind: 'different'; lhs: Val<T>; rhs: Val<T>; message: string; layoutHint?: string }
-  | { kind: 'unknown'; message: string; domain?: boolean };
+  | { kind: 'unknown'; message: string; domain?: boolean; shape?: boolean };
 
 /**
  * Compares two sides of a step.
@@ -737,7 +761,10 @@ function evaluateSides<T>(
   } catch (error) {
     if (error instanceof EvalError) {
       const domain = /singular|non square|domain/i.test(error.message);
-      return { kind: 'unknown', message: error.message, domain };
+      // the shapes of the two sides do not fit: that is a shape error, and
+      // the repair engine has something to say about it
+      const shape = /shape mismatch|not square|non square/i.test(error.message);
+      return { kind: 'unknown', message: error.message, domain, shape };
     }
     if (error instanceof DomainError) {
       return { kind: 'unknown', message: error.message, domain: true };
@@ -1596,8 +1623,11 @@ function checkImplication(
             id: step.id,
             row: step.row,
             span: step.span,
+            text: step.text,
+            lhsSpan: step.lhs?.span,
+            rhsSpan: step.rhs?.span,
             relation: step.relation,
-            verdict: 'unchecked',
+            verdict: outcome.shape ? 'shape' : 'unchecked',
             card: { ...card, sizes, primes, assumptions },
             message: outcome.message,
             reason: outcome.message,
@@ -1641,7 +1671,7 @@ function checkImplication(
 type ImpOutcome =
   | { kind: 'ok' }
   | { kind: 'wrong'; message: string; counterexample: Counterexample }
-  | { kind: 'unknown'; message: string; domain?: boolean };
+  | { kind: 'unknown'; message: string; domain?: boolean; shape?: boolean };
 
 /**
  * Checks "premise => conclusion" with constraint completion.

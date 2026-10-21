@@ -50,6 +50,20 @@ async function main(): Promise<void> {
 
   console.log(`${ids.length} papers to fetch`);
 
+  // When the listing cannot be fetched, the papers that are already in the
+  // cache are the sample: the measurement is the same one, and it does not
+  // need the network to be run again.
+  if (!ids.length) {
+    for (const name of readdirSync(cache)) {
+      const dir = resolve(cache, name);
+      if (!statSync(dir).isDirectory()) continue;
+      const tarball = resolve(dir, 'source.tar.gz');
+      if (!existsSync(tarball)) continue;
+      ids.push(name);
+    }
+    console.log(`the listing is unreachable, so the ${ids.length} cached papers are the sample`);
+  }
+
   const rows: Row[] = [];
   let fetched = 0;
   for (const id of ids.slice(0, PAPER_COUNT)) {

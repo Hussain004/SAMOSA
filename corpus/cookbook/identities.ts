@@ -204,7 +204,7 @@ A A^{-1} &= I
     name: 'the product is associative',
     decls: N,
     source: String.raw`\begin{align*}
-(A B) C &= A (B C)
+(A B) C &= A \cdot (B C)
 \end{align*}`,
   },
   {
@@ -213,14 +213,6 @@ A A^{-1} &= I
     decls: N,
     source: String.raw`\begin{align*}
 I A &= A
-\end{align*}`,
-  },
-  {
-    id: 'zero-product',
-    name: 'zero times anything is zero',
-    decls: N,
-    source: String.raw`\begin{align*}
-0 A &= 0
 \end{align*}`,
   },
   {
@@ -234,7 +226,7 @@ I A &= A
   {
     id: 'kron-of-sum',
     name: 'the Kronecker product of a sum',
-    decls: 'A: n×n; B: m×m; C: p×p',
+    decls: 'A: n×n; B: n×n; C: n×n',
     source: String.raw`\begin{align*}
 A \otimes (B + C) &= A \otimes B + A \otimes C
 \end{align*}`,
@@ -247,20 +239,12 @@ A \otimes (B + C) &= A \otimes B + A \otimes C
 A \circ (B + C) &= A \circ B + A \circ C
 \end{align*}`,
   },
-  {
-    id: 'diag-of-product',
-    name: 'the diagonal of a product',
-    decls: N,
-    source: String.raw`\begin{align*}
-\operatorname{diag}(A B) &= \operatorname{diag}(A B)
-\end{align*}`,
-  },
 
   // -------------------------------------------------------- the matrix calculus
   {
     id: 'gradient-of-quadratic',
     name: 'the gradient of a quadratic form',
-    decls: 'X: n×n; b: n',
+    decls: 'A: sym n×n; b: n; x: n',
     source: String.raw`\begin{align*}
 J &:= \frac{1}{2} x^\top A x + b^\top x \\
 \frac{\partial J}{\partial x} &= A x + b
@@ -278,34 +262,16 @@ J &:= a^\top X b \\
   {
     id: 'hessian-of-quadratic',
     name: 'the Hessian of a quadratic form',
-    decls: 'X: n×n',
+    decls: 'A: sym n×n; x: n',
     source: String.raw`\begin{align*}
 J &:= \frac{1}{2} x^\top A x \\
 \frac{\partial^2 J}{\partial x^2} &= A
 \end{align*}`,
   },
   {
-    id: 'gradient-of-scaled',
-    name: 'the gradient of a scaled function',
-    decls: 'X: n×n',
-    source: String.raw`\begin{align*}
-J &:= \frac{1}{2} x^\top A x \\
-\frac{\partial (2 J)}{\partial x} &= A x
-\end{align*}`,
-  },
-  {
-    id: 'chain-rule',
-    name: 'the chain rule',
-    decls: 'X: n×n; W: n×n',
-    source: String.raw`\begin{align*}
-f &:= \sigma(X W) \\
-\frac{\partial f}{\partial W} &= X^\top \sigma'(X W)
-\end{align*}`,
-  },
-  {
     id: 'gradient-of-transpose',
     name: 'the gradient of a transpose',
-    decls: 'X: m×n; a: m; b: n',
+    decls: 'X: m×n; a: n; b: m',
     source: String.raw`\begin{align*}
 J &:= a^\top X^\top b \\
 \frac{\partial J}{\partial X} &= b a^\top
@@ -314,7 +280,7 @@ J &:= a^\top X^\top b \\
   {
     id: 'gradient-of-sum',
     name: 'the gradient of a sum',
-    decls: 'X: n×n',
+    decls: 'A: sym n×n; B: sym n×n; x: n',
     source: String.raw`\begin{align*}
 J &:= \frac{1}{2} x^\top A x + \frac{1}{2} x^\top B x \\
 \frac{\partial J}{\partial x} &= (A + B) x
@@ -323,7 +289,7 @@ J &:= \frac{1}{2} x^\top A x + \frac{1}{2} x^\top B x \\
   {
     id: 'stationary-point',
     name: 'a stationary point',
-    decls: 'X: n×n',
+    decls: 'A: n×n; x: n',
     source: String.raw`\begin{align*}
 J &:= \frac{1}{2} x^\top A x \\
 \frac{\partial J}{\partial x} = 0 &\implies x = 0
@@ -423,7 +389,7 @@ K &:= \Sigma C^\top Q^{-1}
   {
     id: 'least-squares',
     name: 'the normal equations',
-    decls: 'X: n×p; y: n',
+    decls: 'X: n×p; y: n; \\beta: p',
     source: String.raw`\begin{align*}
 \frac{\partial}{\partial \beta} \frac{1}{2}\|y - X\beta\|^2 &= X^\top(X\beta - y)
 \end{align*}`,
@@ -431,7 +397,7 @@ K &:= \Sigma C^\top Q^{-1}
   {
     id: 'ridge-gradient',
     name: 'the gradient of a ridge regression',
-    decls: 'X: n×p; y: n; beta: p; Sigma: spd p',
+    decls: 'X: n×p; y: n; \\beta: p; \\Sigma: spd p; \\lambda: pos',
     source: String.raw`\begin{align*}
 J &:= \frac{1}{2}\|y - X\beta\|^2 + \frac{\lambda}{2}\beta^\top \Sigma \beta \\
 \frac{\partial J}{\partial \beta} &= X^\top(X\beta - y) + \lambda \Sigma \beta

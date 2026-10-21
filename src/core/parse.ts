@@ -543,10 +543,13 @@ export class Parser {
         return scripted;
       }
       case 'lparen': {
+        // the span covers the parentheses as well, so that an edit over this
+        // node replaces the whole group and not only what is inside it
+        const open = this.tokens[this.pos];
         this.pos++;
         const inner = this.parseExpression();
         const close = this.expect('rparen', ')');
-        return { ...inner, span: { from: inner.span.from, to: close.to } };
+        return { ...inner, span: { from: open.from, to: close.to } };
       }
       case 'lbrace': {
         return this.parseGroupAsExpression();
