@@ -16,9 +16,14 @@ export default defineConfig({
       },
       output: {
         manualChunks(id: string) {
-          if (id.includes('katex')) return 'katex';
-          if (id.includes('@codemirror') || id.includes('@lezer')) return 'codemirror';
-          if (id.includes('decimal.js')) return 'decimal';
+          // only the JavaScript goes in these chunks: the style sheets have a
+          // life of their own, and a landing page that only needs the style
+          // should not pull the library in with it
+          if (id.includes('katex') && id.endsWith('.js')) return 'katex';
+          if ((id.includes('@codemirror') || id.includes('@lezer')) && id.endsWith('.js')) {
+            return 'codemirror';
+          }
+          if (id.includes('decimal.js') && id.endsWith('.js')) return 'decimal';
         },
       },
     },

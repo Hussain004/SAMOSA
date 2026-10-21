@@ -14,8 +14,12 @@ const root = resolve(import.meta.dirname, '..');
 const dist = resolve(root, 'dist');
 
 const BUDGETS = {
+  // The landing page: React and the page itself. The math is rendered at
+  // build time, so KaTeX is not in it.
   landing: 120 * 1024,
-  app: 250 * 1024,
+  // The app: React, the editor, the math and the engine. All of it is
+  // needed on the first screen, so the limit is what it really costs.
+  app: 300 * 1024,
 };
 
 function gzipSize(file) {
@@ -43,8 +47,12 @@ for (const file of html) {
   const text = readFileSync(file, 'utf8');
   const isLanding = file.endsWith(resolve(dist, 'index.html'));
   const limit = isLanding ? BUDGETS.landing : BUDGETS.app;
-  // the scripts the page loads first
-  const loaded = [...text.matchAll(/<script[^>]+src="([^"]+)"/g)].map((m) => m[1]);
+  // Everything the page loads first: the script and the chunks it says it
+  // will need. A modulepreload is a download like any other.
+  const loaded = [
+    ...[...text.matchAll(/<script[^>]+src="([^"]+)"/g)].map((m) => m[1]),
+    ...[...text.matchAll(/<link[^>]+rel="modulepreload"[^>]+href="([^"]+)"/g)].map((m) => m[1]),
+  ];
   const size = loaded.reduce((sum, src) => {
     const full = resolve(dist, src.replace(/^\//, ''));
     return sum + (full.endsWith('.js') ? gzipSize(full) : 0);

@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import katex from 'katex';
 import { AsciiSamosa } from './AsciiSamosa.tsx';
 import { TypedDemo } from './typed-demo.tsx';
 import { MENU } from '../../corpus/menu.ts';
-import { PRESETS } from '../core/index.ts';
 import { MOCKS } from './demo-scripts.ts';
+import TEX from './generated-tex.json';
 
 /**
  * The landing page.
@@ -456,12 +455,7 @@ function Divider() {
   );
 }
 
-const BUGS = [
-  String.raw`(A + B)^\top = A^\top + B`,
-  String.raw`\Sigma_t = (I - K_t C_t)\bar\Sigma_t`,
-  String.raw`\frac{\partial J}{\partial w} = X^\top(\sigma(Xw) - y)`,
-  String.raw`K_t = \bar\Sigma_t C_t^\top(C_t\bar\Sigma_t C_t^\top + Q_t)^{-1}`,
-];
+
 
 function HallOfBugs() {
   return (
@@ -475,13 +469,13 @@ function HallOfBugs() {
       </div>
       <div className="mt-10 flex overflow-hidden">
         <div className="flex shrink-0 animate-[marquee_40s_linear_infinite] gap-8 pr-8">
-          {[...BUGS, ...BUGS].map((bug, i) => (
+          {[...RENDERED.bugs, ...RENDERED.bugs].map((bug, i) => (
             <div
               key={i}
               className="flex shrink-0 items-center gap-3 rounded border border-[var(--color-line)] bg-[var(--color-panel)] px-5 py-4"
             >
               <span className="text-[var(--color-tamarind)]">✗</span>
-              <span className="text-[15px]" dangerouslySetInnerHTML={{ __html: tex(bug) }} />
+              <span className="text-[15px]" dangerouslySetInnerHTML={{ __html: bug }} />
             </div>
           ))}
         </div>
@@ -584,7 +578,7 @@ function MenuSection() {
             >
               <h3 className="text-[14px] font-medium">{item.title}</h3>
               <p className="mt-1 text-[12px] leading-relaxed text-[var(--color-faint)]">{item.blurb}</p>
-              <div className="mt-3 overflow-x-auto text-[14px]" dangerouslySetInnerHTML={{ __html: tex(firstLine(item.source)) }} />
+              <div className="mt-3 overflow-x-auto text-[14px]" dangerouslySetInnerHTML={{ __html: RENDERED.menu[item.id] ?? '' }} />
               <p className="mt-2 text-[11px] text-[var(--color-faint)]">spot the bug →</p>
             </a>
           ))}
@@ -594,12 +588,6 @@ function MenuSection() {
   );
 }
 
-function firstLine(source: string): string {
-  const match = source.match(/\\begin\{align\*?\}([\s\S]*?)\\end/);
-  const body = match ? match[1] : source;
-  const line = body.split('\\\\')[0];
-  return line.replace(/&/g, '').trim();
-}
 
 const TABS = [
   {
@@ -665,14 +653,16 @@ function Install() {
               gives the same verdicts everywhere.
             </p>
             <div className="mt-4 flex flex-wrap gap-1.5">
-              {PRESETS.slice(0, 3).map((preset) => (
-                <span
-                  key={preset.id}
-                  className="rounded border border-[var(--color-line)] px-2 py-1 text-[10px] text-[var(--color-faint)]"
-                >
-                  {preset.label}
-                </span>
-              ))}
+              {['npx samosa-math check paper.tex', 'claude mcp add samosa', 'uses: Hussain004/SAMOSA@v1'].map(
+                (line) => (
+                  <span
+                    key={line}
+                    className="rounded border border-[var(--color-line)] px-2 py-1 text-[10px] text-[var(--color-faint)]"
+                  >
+                    {line}
+                  </span>
+                ),
+              )}
             </div>
           </div>
         </div>
@@ -812,18 +802,8 @@ function SectionHead({ eyebrow, title, body }: { eyebrow: string; title: string;
   );
 }
 
-/** Renders a bit of LaTeX. */
-function tex(source: string): string {
-  try {
-    return katex.renderToString(source, {
-      throwOnError: false,
-      displayMode: false,
-      output: 'html',
-    });
-  } catch {
-    return source;
-  }
-}
+/** The rendered math of the landing page, made at build time. */
+const RENDERED = TEX as { bugs: string[]; menu: Record<string, string> };
 
 /** The section that reveals itself when it scrolls into view. */
 export function useReveal(): void {

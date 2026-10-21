@@ -195,7 +195,7 @@ export function writeDemo(): void {
 
 // the script writes the file when it is run, and the test imports it to
 // compare what the engine says today with what the landing page shows
-if (process.argv[1]?.endsWith('gen-demo.ts')) {
+if (process.argv.includes('--write')) {
   writeDemo();
 }
 
