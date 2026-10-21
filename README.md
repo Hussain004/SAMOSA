@@ -78,7 +78,6 @@ happens when a machine reads it.
 [Watch the nineteen second tour](public/brag.mp4) (or
 [download it](public/brag.mp4))
 
-
 **A transposed product.** The squiggle, the counterexample, and the fix that
 takes one keystroke.
 
