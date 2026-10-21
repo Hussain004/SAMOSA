@@ -76,6 +76,11 @@ function parseArgs(argv: string[]): Args {
         process.exit(0);
         break;
       default:
+        // a single dash means the standard input
+        if (arg === '-') {
+          args.files.push(arg);
+          continue;
+        }
         if (arg.startsWith('-')) {
           fail(`unknown option ${arg}`);
         }
