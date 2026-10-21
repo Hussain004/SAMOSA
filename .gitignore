@@ -1,0 +1,10 @@
+node_modules
+dist
+pkg/dist
+.DS_Store
+*.local
+.vite
+playwright-report
+test-results
+coverage
+.samosa-cache

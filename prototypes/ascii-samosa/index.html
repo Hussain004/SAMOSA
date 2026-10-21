@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SAMOSA — ASCII hero prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@300;400;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --ink: #0b0a08; --panel: #14120f; --line: #2a251e; --text: #ede6da; --muted: #8c8273;
+    --gold: #e8b04b; --saffron: #f28c28; --chutney: #5bc27a; --tamarind: #e0533d;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--ink); color: var(--text); font-family: "Geist Mono", ui-monospace, monospace; }
+  body {
+    min-height: 100vh;
+    background-image: radial-gradient(circle at 1px 1px, #ffffff0d 1px, transparent 0);
+    background-size: 24px 24px;
+  }
+  header { display: flex; align-items: center; justify-content: space-between; padding: 18px 28px; border-bottom: 1px solid var(--line); }
+  .brand { color: var(--gold); font-weight: 600; letter-spacing: .04em; }
+  nav { display: flex; gap: 22px; font-size: 13px; color: var(--muted); }
+  nav a { color: inherit; text-decoration: none; } nav a:hover { color: var(--text); }
+  .open { color: var(--ink); background: var(--gold); padding: 7px 12px; border-radius: 6px; font-weight: 600; }
+  main { max-width: 1180px; margin: 0 auto; padding: 56px 28px; display: grid; grid-template-columns: 1fr 1.15fr; gap: 24px; align-items: center; }
+  h1 { font-weight: 300; font-size: clamp(44px, 6vw, 78px); line-height: .98; letter-spacing: -.04em; margin: 0 0 28px; }
+  h1 span { color: var(--muted); }
+  ul { list-style: none; padding: 0; margin: 0 0 32px; font-size: 15px; color: var(--muted); }
+  li { padding: 4px 0; } li::before { content: "› "; color: var(--chutney); }
+  .cta { display: flex; gap: 12px; flex-wrap: wrap; }
+  .btn { background: var(--gold); color: var(--ink); padding: 12px 18px; border-radius: 8px; font-weight: 600; text-decoration: none; }
+  .chip { border: 1px solid var(--line); background: var(--panel); padding: 12px 14px; border-radius: 8px; color: var(--text); cursor: pointer; font: inherit; font-size: 13px; }
+  .chip:hover { border-color: var(--gold); }
+  .stage { position: relative; display: grid; place-items: center; cursor: grab; user-select: none; }
+  .stage:active { cursor: grabbing; }
+  pre#samosa {
+    margin: 0; font-family: "Geist Mono", ui-monospace, monospace; font-size: clamp(7px, 1.05vw, 13px); line-height: 1;
+    font-variant-ligatures: none; white-space: pre;
+    background: linear-gradient(180deg, #fff2c8 0%, var(--gold) 30%, var(--saffron) 70%, #a5501c 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 10px #e8b04b40);
+  }
+  .hint { position: absolute; bottom: -6px; font-size: 11px; color: var(--muted); }
+  .status { position: fixed; left: 0; right: 0; bottom: 0; border-top: 1px solid var(--line); background: #0b0a08e6; backdrop-filter: blur(8px);
+            font-size: 12px; color: var(--muted); padding: 8px 28px; display: flex; gap: 18px; }
+  .status b { color: var(--chutney); font-weight: 400; }
+  @media (max-width: 860px) { main { grid-template-columns: 1fr; } .stage { order: -1; } nav a:not(.open) { display: none; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">∇ SAMOSA</div>
+  <nav><a href="#">How it works</a><a href="#">Menu</a><a href="#">Docs</a><a href="#">★ GitHub</a><a class="open" href="#">Open app →</a></nav>
+</header>
+<main>
+  <section>
+    <h1>Derive more.<br /><span>Doubt less.</span></h1>
+    <ul id="phrases" aria-label="Features"></ul>
+    <div class="cta">
+      <a class="btn" href="#">Open SAMOSA →</a>
+      <button class="chip" id="copy">$ npx samosa-math check paper.tex</button>
+    </div>
+  </section>
+  <section class="stage" id="stage" aria-label="A rotating ASCII-art samosa shaped like the nabla symbol">
+    <pre id="samosa" aria-hidden="true"></pre>
+    <div class="hint">drag to spin · click for snack mode</div>
+  </section>
+</main>
+<div class="status"><span>● <b>all checks local</b>, nothing uploaded</span><span id="fps"></span></div>
+
+<script type="module">
+  import { createSamosa } from "./ascii-samosa.mjs";
+
+  const pre = document.getElementById("samosa"), stage = document.getElementById("stage");
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const size = () => innerWidth < 860 ? [52, 26] : [80, 38];
+  const s = createSamosa({ w: size()[0], h: size()[1], aspect: 0.55 });
+  addEventListener("resize", () => s.resize(...size()));
+
+  // Drag to spin with inertia; light leans toward the pointer.
+  let dragging = false, lastX = 0, light = [-0.45, 0.55, -0.75], snack = false, moved = 0;
+  stage.addEventListener("pointerdown", (e) => { dragging = true; lastX = e.clientX; moved = 0; stage.setPointerCapture(e.pointerId); });
+  stage.addEventListener("pointermove", (e) => {
+    const r = stage.getBoundingClientRect();
+    light = [((e.clientX - r.left) / r.width - 0.5) * 1.6, 0.6 - ((e.clientY - r.top) / r.height - 0.5) * 1.2, -0.75];
+    if (dragging) { const dx = e.clientX - lastX; lastX = e.clientX; moved += Math.abs(dx); s.state.vyaw += dx * 0.004; }
+  });
+  stage.addEventListener("pointerup", () => { dragging = false; if (moved < 4) snack = !snack; });
+
+  // Phrase list types itself in.
+  const phrases = ["every step, checked", "counterexamples, not vibes", "no AI in the verdict", "runs in your browser", "your agent can use it too"];
+  const ul = document.getElementById("phrases");
+  (async () => {
+    for (const p of phrases) {
+      const li = document.createElement("li"); ul.appendChild(li);
+      for (const ch of p) { li.textContent += ch; if (!reduce) await new Promise((r) => setTimeout(r, 22 + Math.random() * 30)); }
+      if (!reduce) await new Promise((r) => setTimeout(r, 180));
+    }
+  })();
+  document.getElementById("copy").onclick = (e) => {
+    navigator.clipboard?.writeText("npx samosa-math check paper.tex");
+    e.target.textContent = "✓ copied"; setTimeout(() => (e.target.textContent = "$ npx samosa-math check paper.tex"), 1200);
+  };
+
+  // Render loop: pause offscreen / hidden; adaptive frame rate.
+  let visible = true, last = 0, avg = 4, frames = 0, fpsT = performance.now();
+  new IntersectionObserver(([en]) => (visible = en.isIntersecting)).observe(stage);
+  const fpsEl = document.getElementById("fps");
+  function frame(now) {
+    requestAnimationFrame(frame);
+    if (!visible || document.hidden) return;
+    const minGap = avg > 12 ? 50 : 0;
+    if (now - last < minGap) return;
+    const dt = Math.min(0.1, (now - (last || now)) / 1000); last = now;
+    s.state.vyaw *= 0.94;
+    s.state.yaw += dt * 0.5 + s.state.vyaw;
+    const t0 = performance.now();
+    let out = s.render(now / 1000, { light });
+    if (snack) out = out.replace(/^(.*)$/m, (l) => l.slice(0, -10) + "  ✓ crispy");
+    pre.textContent = out;
+    avg = avg * 0.9 + (performance.now() - t0) * 0.1;
+    if (++frames % 30 === 0) { fpsEl.textContent = `${(30000 / (now - fpsT)).toFixed(0)} fps · ${avg.toFixed(1)} ms/frame`; fpsT = now; }
+  }
+  if (reduce) pre.textContent = s.render(0, { steam: false });
+  else requestAnimationFrame(frame);
+</script>
+</body>
+</html>
