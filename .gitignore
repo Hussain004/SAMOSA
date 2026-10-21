@@ -11,6 +11,7 @@ coverage
 # private working files, they are not part of the public repository
 IMPLEMENTATION_PLAN.md
 AGENTS.md
+REVIEW.md
 spikes/
 prototypes/
 public/docs

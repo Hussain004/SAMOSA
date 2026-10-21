@@ -31,7 +31,7 @@ export { createContext, inferType, degreeOf, shapeText } from './types.ts';
 export type { Chip, Deg, SymbolInfo, Ty } from './types.ts';
 export type { Node, Relation, RowPart, Span } from './ir.ts';
 export { renderNode } from './render.ts';
-export { shrinkCounterexample, numpySnippet } from './shrink.ts';
+export { shrinkCounterexample } from './shrink.ts';
 export type { ShrunkInstance } from './shrink.ts';
 
 import { check, type CheckOptions, type Fix, type StepResult } from './verdict.ts';
@@ -149,17 +149,28 @@ export function explain(src: string, stepId: string, opts: CheckOptions = {}): E
   inferType(ctx, step.lhs);
   inferType(ctx, step.rhs);
   const dimVars = collectDimVarsFor(ctx, step.lhs, step.rhs, defs);
-  const sizes = new Map<string, number>();
-  for (const v of dimVars) sizes.set(v, 3);
 
   const kind = step.relation === '=' ? 'wrong' : 'shape';
   const fixes = repairs(ctx, step.lhs, step.rhs, defs, opts.seed ?? 0x5a305a, dimVars, kind);
 
+  // The counterexample is looked for at the smallest sizes first, so the one
+  // a person reads is the one that still breaks the step with the fewest
+  // numbers in it.
   let counterexample: ShrunkInstance | undefined;
-  try {
-    counterexample = shrinkCounterexample(ctx, step.lhs, step.rhs, defs, sizes, opts.seed ?? 0x5a305a) ?? undefined;
-  } catch {
-    counterexample = undefined;
+  const deadline = Date.now() + 600;
+  for (const size of [1, 2, 3]) {
+    const sizes = new Map<string, number>();
+    // the sizes are keyed by the root of the dimension variable, the way the
+    // evaluator looks them up
+    for (const v of dimVars) sizes.set(ctx.dims.find(v), size);
+    const left = Math.max(50, deadline - Date.now());
+    try {
+      counterexample = shrinkCounterexample(ctx, step.lhs, step.rhs, defs, sizes, opts.seed ?? 0x5a305a, left) ?? undefined;
+    } catch {
+      counterexample = undefined;
+    }
+    if (counterexample) break;
+    if (Date.now() > deadline) break;
   }
 
   return { fixes, counterexample };

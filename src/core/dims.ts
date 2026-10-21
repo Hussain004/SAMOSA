@@ -62,13 +62,24 @@ export function collectDimVarsFor(
       }
     }
   }
+
+  // An internal dimension, the one the identity matrix or a product brings
+  // with it, can end up as the root of a declared one. The name a person
+  // wrote is the one that is reported.
+  const named = new Map<string, string>();
+  for (const declared of ctx.dimVars) {
+    const root = ctx.dims.find(declared);
+    if (!named.has(root)) named.set(root, declared);
+  }
+
   const out: string[] = [];
   for (const declared of ctx.dimVars) {
     const root = ctx.dims.find(declared);
-    if (roots.has(root) && !out.includes(root)) out.push(root);
+    if (roots.has(root) && !out.includes(declared)) out.push(declared);
   }
   for (const root of roots) {
-    if (!out.includes(root) && !root.startsWith('#')) out.push(root);
+    const name = named.get(root) ?? root;
+    if (!out.includes(name) && !name.startsWith('#')) out.push(name);
   }
   return out;
 }

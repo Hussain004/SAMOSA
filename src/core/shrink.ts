@@ -1,4 +1,6 @@
+import Decimal from 'decimal.js';
 import { GFpField } from './fields/gfp.ts';
+import { DecField } from './fields/dec.ts';
 import { matInv, matMul, matSub, type Mat } from './linalg.ts';
 import { evalNode, makeEnv } from './evaluate.ts';
 import { Sampler } from './sample.ts';
@@ -30,8 +32,10 @@ import { dimSizeOf } from './types.ts';
 
 export interface ShrunkInstance {
   dims: Record<string, number>;
-  /** the values of the symbols, row major */
+  /** the values of the free symbols, row major: the inputs of the counterexample */
   values: Record<string, number[] | number>;
+  /** the values of the symbols the derivation defines, computed from the inputs */
+  derived: Record<string, number[] | number>;
   lhs: number[] | number;
   rhs: number[] | number;
   diff: number[] | number;
@@ -44,6 +48,8 @@ interface ShrinkCtx {
   rhs: Node;
   defs: Map<string, Node>;
   symbolNames: string[];
+  /** the names the derivation defines, so they are computed and not sampled */
+  derivedNames: string[];
   sizes: Map<string, number>;
   propOf: (name: string) => Prop[];
 }
@@ -59,9 +65,12 @@ export function shrinkCounterexample(
   budgetMs = 200,
 ): ShrunkInstance | null {
   const started = Date.now();
+  // A symbol the derivation defines is not an input: it is computed from the
+  // definitions, so sampling it would give an instance that does not satisfy
+  // the derivation at all.
   const names = [...ctx.symbols.keys()].filter((name) => {
     const info = ctx.symbols.get(name);
-    return info && info.ty.t === 'mat';
+    return info && info.ty.t === 'mat' && !defs.has(name);
   });
 
   const shrinkCtx: ShrinkCtx = {
@@ -70,6 +79,7 @@ export function shrinkCounterexample(
     rhs,
     defs,
     symbolNames: names,
+    derivedNames: [...defs.keys()],
     sizes,
     propOf: (name) => ctx.symbols.get(name)?.props ?? [],
   };
@@ -100,7 +110,7 @@ export function shrinkCounterexample(
     const l = evalNode(field, lhs, env);
     const r = evalNode(field, rhs, env);
     if (!equal(field, l, r)) {
-      return describe(ctx, sizes, values, l, r, field);
+      return describe(ctx, sizes, values, derivedValues(field, env, defs), l, r, field, true);
     }
   } catch {
     // fall through, the caller keeps the original counterexample
@@ -108,13 +118,38 @@ export function shrinkCounterexample(
   return null;
 }
 
+/**
+ * The values of the symbols the derivation defines.
+ *
+ * They are computed from the definitions with the sampled inputs, so a person
+ * who recomputes them gets the same numbers.
+ */
+function derivedValues<T>(
+  field: Field<T>,
+  env: ReturnType<typeof makeEnv<T>>,
+  defs: Map<string, Node>,
+): Map<string, Val<T>> {
+  const out = new Map<string, Val<T>>();
+  for (const [name, node] of defs) {
+    try {
+      out.set(name, evalNode(field, node, env));
+    } catch {
+      // a definition that cannot be computed is simply not reported
+    }
+  }
+  return out;
+}
+
 function searchSmallIntegers(sh: ShrinkCtx, range: number, seed: number): ShrunkInstance | null {
-  const field = new GFpField(2147483647);
+  // The search runs over the decimals, so the numbers a person reads are the
+  // ones they wrote: an inverse of five is a fifth and not a residue of
+  // nineteen billion.
+  const field = new DecField(50);
   const rng = rngFor(seed, 'small', range);
   const { ctx, sizes } = sh;
 
   for (let attempt = 0; attempt < 40; attempt++) {
-    const values = new Map<string, Val<number>>();
+    const values = new Map<string, Val<Decimal>>();
     for (const name of sh.symbolNames) {
       const info = ctx.symbols.get(name);
       if (!info || info.ty.t !== 'mat') continue;
@@ -134,7 +169,7 @@ function searchSmallIntegers(sh: ShrinkCtx, range: number, seed: number): Shrunk
       const l = evalNode(field, sh.lhs, env);
       const r = evalNode(field, sh.rhs, env);
       if (equal(field, l, r)) continue;
-      return describe(ctx, sizes, values, l, r, field);
+      return describe(ctx, sizes, values, derivedValues(field, env, sh.defs), l, r, field, false);
     } catch {
       continue;
     }
@@ -142,27 +177,53 @@ function searchSmallIntegers(sh: ShrinkCtx, range: number, seed: number): Shrunk
   return null;
 }
 
-/** A matrix with small integer entries, respecting the structure it claims. */
+/**
+ * A matrix with small integer entries, respecting the structure it claims.
+ *
+ * A symmetric matrix is built from its upper triangle and mirrored, and a
+ * positive definite one is built as `L Lᵀ + I`, so the numbers a person sees
+ * are a genuine positive definite matrix over the reals and not just
+ * something with a positive diagonal.
+ */
 function smallMatrix(
-  field: GFpField,
+  field: Field<any>,
   r: number,
   c: number,
   props: Prop[],
   rng: () => number,
   range: number,
-): Mat<number> | null {
+): Mat<any> | null {
   const has = (p: string) => props.some((x) => x === p);
-  const entry = () => {
-    const v = Math.floor(rng() * (2 * range + 1)) - range;
-    return field.mod(v);
-  };
-  const d = new Array<number>(r * c);
+  // the entries are plain small integers, so the structure survives the trip
+  // into the field
+  const entry = () => Math.floor(rng() * (2 * range + 1)) - range;
+
+  if ((has('spd') || has('psd')) && r === c) {
+    // L Lᵀ + I, with L lower triangular
+    const l = new Array<number>(r * r).fill(0);
+    for (let i = 0; i < r; i++) {
+      for (let j = 0; j <= i; j++) l[i * r + j] = entry();
+    }
+    const d = new Array<number>(r * c).fill(0);
+    for (let i = 0; i < r; i++) {
+      for (let j = 0; j < r; j++) {
+        let sum = 0;
+        for (let k = 0; k < r; k++) sum += l[i * r + k] * l[j * r + k];
+        d[i * c + j] = sum + (i === j ? 1 : 0);
+      }
+    }
+    return { r, c, d: d.map((x) => field.fromRational(x, 1)) };
+  }
+
+  const d = new Array<number>(r * c).fill(0);
   for (let i = 0; i < r; i++) {
     for (let j = 0; j < c; j++) {
-      if (has('sym') || has('spd') || has('psd')) {
-        d[i * c + j] = i <= j ? d[j * c + i] ?? entry() : d[j * c + i];
+      if (has('sym') || has('psd')) {
+        // the upper triangle is drawn, the lower one is its mirror
+        d[i * c + j] = i <= j ? d[j * c + i] || entry() : d[j * c + i];
+        if (i > j) d[i * c + j] = d[j * c + i];
       } else if (has('skew')) {
-        d[i * c + j] = i === j ? 0 : i < j ? entry() : field.neg(d[j * c + i]);
+        d[i * c + j] = i === j ? 0 : i < j ? entry() : -d[j * c + i];
       } else if (has('diag')) {
         d[i * c + j] = i === j ? entry() : 0;
       } else if (has('ident')) {
@@ -176,14 +237,7 @@ function smallMatrix(
       }
     }
   }
-  const m: Mat<number> = { r, c, d };
-  if ((has('spd') || has('psd')) && r === c) {
-    // a symmetric matrix with a positive diagonal, so it can be positive definite
-    for (let i = 0; i < r; i++) {
-      d[i * c + i] = field.add(d[i * c + i], Math.max(1, r));
-      for (let j = 0; j < i; j++) d[i * c + j] = d[j * c + i];
-    }
-  }
+  const m: Mat<any> = { r, c, d: d.map((x) => field.fromRational(x, 1)) };
   if (r === c && (has('orth') || has('idem') || has('proj'))) return null;
   return m;
 }
@@ -200,24 +254,39 @@ function equal<T>(field: Field<T>, a: Val<T>, b: Val<T>): boolean {
 
 /** Turns a set of values into something a person can read, plus NumPy. */
 function describe<T>(
-  _ctx: TypeContext,
+  ctx: TypeContext,
   sizes: Map<string, number>,
   values: Map<string, Val<T>>,
+  derived: Map<string, Val<T>>,
   lhs: Val<T>,
   rhs: Val<T>,
   field: Field<T>,
+  residue: boolean,
 ): ShrunkInstance {
+  // The sizes are keyed by the root of a dimension variable. A person should
+  // see the name they wrote, and never an internal one.
   const dims: Record<string, number> = {};
-  for (const [k, v] of sizes) dims[k] = v;
+  for (const [root, size] of sizes) {
+    const declared = ctx.dimVars.find((d) => ctx.dims.find(d) === root);
+    if (declared) dims[declared] = size;
+    else if (!root.startsWith('#')) dims[root] = size;
+  }
 
-  // the field elements are shown as the small signed integers they are
+  // A residue of a finite field is shown as the small signed integer it is.
+  // A decimal is shown as the decimal it is.
   const signed = (x: number): number => {
+    if (!residue) return x;
     const p = 2147483647;
     return x > p / 2 ? x - p : x;
   };
   const plain: Record<string, number[] | number> = {};
   for (const [name, val] of values) {
     plain[name] = val.k === 's' ? signed(field.toNumber(val.v)) : val.m.d.map((x) => signed(field.toNumber(x)));
+  }
+  const derivedPlain: Record<string, number[] | number> = {};
+  for (const [name, val] of derived) {
+    derivedPlain[name] =
+      val.k === 's' ? signed(field.toNumber(val.v)) : val.m.d.map((x) => signed(field.toNumber(x)));
   }
   const lhsPlain = lhs.k === 's' ? signed(field.toNumber(lhs.v)) : lhs.m.d.map((x) => signed(field.toNumber(x)));
   const rhsPlain = rhs.k === 's' ? signed(field.toNumber(rhs.v)) : rhs.m.d.map((x) => signed(field.toNumber(x)));
@@ -231,15 +300,20 @@ function describe<T>(
   return {
     dims,
     values: plain,
+    derived: derivedPlain,
     lhs: lhsPlain,
     rhs: rhsPlain,
     diff: diffPlain,
-    numpy: toNumpy(plain, dims),
+    numpy: toNumpy(plain, dims, derivedPlain),
   };
 }
 
 /** A self contained NumPy snippet that reproduces the counterexample. */
-export function toNumpy(values: Record<string, number[] | number>, _dims: Record<string, number>): string {
+export function toNumpy(
+  values: Record<string, number[] | number>,
+  _dims: Record<string, number>,
+  derived: Record<string, number[] | number> = {},
+): string {
   const lines: string[] = ['import numpy as np'];
   const names = Object.keys(values);
   names.forEach((name, i) => {
@@ -256,41 +330,28 @@ export function toNumpy(values: Record<string, number[] | number>, _dims: Record
       lines.push(`${pyName} = np.array([${rows.join(', ')}])`);
     }
   });
+  const derivedNames = Object.keys(derived);
+  if (derivedNames.length) {
+    lines.push('');
+    lines.push('# the symbols the derivation defines, computed by SAMOSA from the values above');
+    derivedNames.forEach((name, i) => {
+      const v = derived[name];
+      const pyName = `d${i}`;
+      if (typeof v === 'number') {
+        lines.push(`${pyName} = ${v}  # ${name}`);
+      } else {
+        const rows: string[] = [];
+        const c = Math.max(1, Math.round(Math.sqrt(v.length)));
+        for (let i = 0; i < v.length; i += c) {
+          rows.push(`[${v.slice(i, i + c).map((x) => Number(x.toFixed(6))).join(', ')}]`);
+        }
+        lines.push(`${pyName} = np.array([${rows.join(', ')}])  # ${name}`);
+      }
+    });
+  }
   lines.push('');
   lines.push('# the two sides of the step, with these values');
   lines.push('# lhs - rhs is not zero');
-  return lines.join('\n');
-}
-
-/** The NumPy snippet for a counterexample that names the symbols. */
-export function numpySnippet(
-  values: Record<string, number[] | number>,
-  dims: Record<string, number>,
-  lhsText: string,
-  rhsText: string,
-): string {
-  const lines: string[] = ['import numpy as np'];
-  const map: Record<string, string> = {};
-  Object.keys(values).forEach((name, i) => {
-    const v = values[name];
-    const pyName = `s${i}`;
-    map[name] = pyName;
-    if (typeof v === 'number') {
-      lines.push(`${pyName} = ${Number(v.toFixed(6))}`);
-    } else {
-      const rows: string[] = [];
-      const c = Math.max(1, Math.round(Math.sqrt(v.length)));
-      for (let i = 0; i < v.length; i += c) {
-        rows.push(`[${v.slice(i, i + c).map((x) => Number(x.toFixed(6))).join(', ')}]`);
-      }
-      lines.push(`${pyName} = np.array([${rows.join(', ')}])`);
-    }
-  });
-  lines.push('');
-  lines.push(`# ${lhsText} - ${rhsText} is not zero with these values`);
-  lines.push(`# sizes: ${Object.entries(dims).map(([k, v]) => `${k}=${v}`).join(', ')}`);
-  lines.push('# the values above are the ones SAMOSA found; the two sides differ with them');
-  void map;
   return lines.join('\n');
 }
 

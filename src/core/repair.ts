@@ -63,9 +63,35 @@ export function repairs(
 
   out.push(...residualRepairs(sh));
 
-  // the smallest edit first, then the order the rules were tried in
-  out.sort((a, b) => editSize(a) - editSize(b));
-  return out.slice(0, 3);
+  // The same fix is only offered once, and the order is by how much the fix
+  // says: a change to the expression first, then the missing term, then the
+  // missing assumption.
+  const deduped: Fix[] = [];
+  const seen = new Set<string>();
+  for (const fix of out) {
+    const key = `${fix.kind}|${fix.title}|${fix.edit?.insert ?? ''}|${fix.addDecl ?? ''}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(fix);
+  }
+  deduped.sort((a, b) => priority(a) - priority(b) || editSize(a) - editSize(b));
+  return deduped.slice(0, 3);
+}
+
+/** The order the kinds of fix are offered in. */
+function priority(fix: Fix): number {
+  switch (fix.kind) {
+    case 'mutation':
+      return 0;
+    case 'residual':
+      return 1;
+    case 'shape':
+      return 2;
+    case 'assumption':
+      return 3;
+    default:
+      return 4;
+  }
 }
 
 // ------------------------------------------------------------- mutations
@@ -387,6 +413,9 @@ const ASSUMPTION_TRIES: Array<{ props: Prop[]; text: string }> = [
  * If a step only holds once a matrix is known to be symmetric, that is the
  * repair to offer, because a hidden assumption is what turns a checkmark
  * into a lie.
+ *
+ * A property that the shape cannot have is never offered: a matrix that is
+ * not square cannot be symmetric, so the suggestion would be nonsense.
  */
 function assumptionRepairs(sh: RepairCtx): Fix[] {
   const out: Fix[] = [];
@@ -395,6 +424,7 @@ function assumptionRepairs(sh: RepairCtx): Fix[] {
   );
   for (const symbol of candidates) {
     for (const attempt of ASSUMPTION_TRIES) {
+      if (!canHave(sh.ctx, symbol.name, attempt.props)) continue;
       if (holdsWithProps(sh, symbol.name, attempt.props)) {
         out.push({
           kind: 'assumption',
@@ -407,6 +437,19 @@ function assumptionRepairs(sh: RepairCtx): Fix[] {
     }
   }
   return out;
+}
+
+/** Can a matrix of this shape have this property at all? */
+function canHave(ctx: TypeContext, name: string, props: Prop[]): boolean {
+  const info = ctx.symbols.get(name);
+  if (!info || info.ty.t !== 'mat') return false;
+  const r = info.ty.r;
+  const c = info.ty.c;
+  const square =
+    typeof r === 'number' && typeof c === 'number' ? r === c : typeof r !== 'number' && typeof c !== 'number' && r.v === c.v;
+  // symmetry, orthogonality and diagonality all need a square matrix
+  if (props.includes('sym') || props.includes('orth') || props.includes('diag')) return square;
+  return true;
 }
 
 function dimText(ctx: TypeContext, name: string): string {
@@ -484,6 +527,10 @@ function typeChecks(sh: RepairCtx, rhs: Node): boolean {
  * When the step is off by exactly one term, that term can be found: the
  * difference between the two sides is a small rational multiple of a term
  * built from the symbols of the step.
+ *
+ * The terms are the sandwiches: `X Xᵀ` and `X Y Xᵀ`, because that is the
+ * shape a missing noise term has. The Joseph form, for instance, is off by
+ * exactly `K_t Q_t K_tᵀ`.
  */
 function residualRepairs(sh: RepairCtx): Fix[] {
   const out: Fix[] = [];
@@ -512,21 +559,7 @@ function residualRepairs(sh: RepairCtx): Fix[] {
   }
   if (diffs.length < 2) return out;
 
-  // the candidate terms: the sandwich products of the symbols
-  const terms = new Map<string, Node>();
-  for (const { node } of walk(sh.lhs).concat(walk(sh.rhs))) {
-    if (node.k === 'sym') {
-      const sandwich: Node = {
-        k: 'op',
-        op: 'mul',
-        args: [
-          { k: 'op', op: 'mul', args: [node, { k: 'op', op: 'T', args: [node], span: node.span }], span: node.span },
-        ],
-        span: node.span,
-      };
-      terms.set(renderNode(sandwich), sandwich);
-    }
-  }
+  const terms = candidateTerms(sh);
 
   for (const [text, term] of terms) {
     const scale = matchesScale(field, term, sh, diffs);
@@ -541,6 +574,66 @@ function residualRepairs(sh: RepairCtx): Fix[] {
     if (out.length >= 3) break;
   }
   return out;
+}
+
+/**
+ * The terms a residual can be.
+ *
+ * A sandwich `X Xᵀ` and a sandwich with a middle `X Y Xᵀ`, built from the
+ * symbols of the step. The same term is only kept once.
+ */
+function candidateTerms(sh: RepairCtx): Map<string, Node> {
+  const terms = new Map<string, Node>();
+  const symbols: Node[] = [];
+  const seen = new Set<string>();
+  const collect = (node: Node) => {
+    if (node.k !== 'sym') return;
+    if (seen.has(node.name)) return;
+    seen.add(node.name);
+    symbols.push(node);
+  };
+  for (const { node } of walk(sh.lhs).concat(walk(sh.rhs))) collect(node);
+  // a symbol the step brings with it, a defined one, brings its definition
+  // and the symbols that definition is written with: the noise term of the
+  // Kalman filter is written with a symbol that never appears in the step
+  for (const name of [...seen]) {
+    const def = sh.defs.get(name);
+    if (!def) continue;
+    for (const { node } of walk(def)) collect(node);
+  }
+
+  const add = (node: Node) => {
+    const text = renderNode(node);
+    if (!terms.has(text)) terms.set(text, node);
+  };
+
+  for (const x of symbols) {
+    const xt = { k: 'op' as const, op: 'T' as const, args: [x], span: x.span };
+    add({
+      k: 'op',
+      op: 'mul',
+      args: [x, xt],
+      span: x.span,
+    });
+  }
+
+  // the sandwiches with a middle: X Y Xᵀ
+  for (const x of symbols) {
+    for (const y of symbols) {
+      if (x === y) continue;
+      const xt = { k: 'op' as const, op: 'T' as const, args: [x], span: x.span };
+      add({
+        k: 'op',
+        op: 'mul',
+        args: [
+          { k: 'op', op: 'mul', args: [x, y], span: x.span },
+          xt,
+        ],
+        span: x.span,
+      });
+    }
+  }
+  return terms;
 }
 
 function matchesScale(
@@ -567,20 +660,24 @@ function matchesScale(
   }
   if (termValues.length !== diffs[0].length) return null;
 
-  // the scale c with |a|, |b| <= 12, such that diff = c * term
+  // The scale is read off one entry and then checked against all of them, so
+  // the search is over the small rationals and not over the entries.
+  const scale = niceScale(field, field.div(diffs[0][0], termValues[0]));
+  if (scale === null) return null;
+
+  for (const diff of diffs) {
+    for (let i = 0; i < diff.length; i++) {
+      if (field.mul(field.fromRational(scale.n, scale.d), termValues[i]) !== diff[i]) return null;
+    }
+  }
+  return scale.n / scale.d;
+}
+
+/** The small rational a field element stands for, if it is one. */
+function niceScale(field: GFpField, value: number): { n: number; d: number } | null {
   for (let a = -12; a <= 12; a++) {
     for (let b = 1; b <= 12; b++) {
-      let ok = true;
-      for (const diff of diffs) {
-        for (let i = 0; i < diff.length; i++) {
-          if (field.mul(field.fromRational(a, b), termValues[i]) !== diff[i]) {
-            ok = false;
-            break;
-          }
-        }
-        if (!ok) break;
-      }
-      if (ok) return a / b;
+      if (field.fromRational(a, b) === value) return { n: a, d: b };
     }
   }
   return null;
