@@ -6477,10 +6477,16 @@ var NON_OPERAND_COMMANDS = /* @__PURE__ */ new Set([
   "cline"
 ]);
 var EOF_TOKEN = { type: "eof", value: "", from: 0, to: 0 };
+var DIVERGENCES = /* @__PURE__ */ new Set(["d", "kl", "d_kl", "dkl", "div", "chi"]);
+function plainName(name) {
+  return name.replace(/^(\\[A-Za-z]+)+/, "").toLowerCase();
+}
 var Parser = class _Parser {
   pos = 0;
   /** is the next factor the first of its product? */
   firstFactor = false;
+  /** is the parser inside the arguments of a divergence? */
+  inDivergence = false;
   tokens;
   opts;
   constructor(tokens, _src, opts = {}) {
@@ -6861,16 +6867,20 @@ var Parser = class _Parser {
         const sym = this.makeSym([], t.value, null, null, { from: t.from, to: t.to });
         const scripted = this.applyScripts(sym, [], t.value);
         if (this.kind() === "lparen" && scripted.k === "sym" && this.looksLikeCall(t.value)) {
+          const wasDivergence = this.inDivergence;
+          this.inDivergence = DIVERGENCES.has(plainName(t.value));
           const args = this.parseArgs();
+          this.inDivergence = wasDivergence;
           return { k: "call", fn: t.value, args, span: { from: t.from, to: args.at(-1)?.span.to ?? t.to } };
         }
         return scripted;
       }
       case "lparen": {
+        const open = this.tokens[this.pos];
         this.pos++;
         const inner2 = this.parseExpression();
         const close = this.expect("rparen", ")");
-        return { ...inner2, span: { from: inner2.span.from, to: close.to } };
+        return { ...inner2, span: { from: open.from, to: close.to } };
       }
       case "lbrace": {
         return this.parseGroupAsExpression();
@@ -6945,6 +6955,15 @@ var Parser = class _Parser {
         if (this.kind() === "comma" || this.kind() === "semi") {
           this.pos++;
           continue;
+        }
+        if (this.kind() === "csym" && this.cur.value === "\\|" && this.inDivergence) {
+          this.pos++;
+          args.push(this.parseExpression());
+          if (this.kind() === "comma" || this.kind() === "semi") {
+            this.pos++;
+            continue;
+          }
+          break;
         }
         break;
       }
@@ -9148,6 +9167,22 @@ function check(src, opts = {}) {
   }
   const defs = /* @__PURE__ */ new Map();
   const results = [];
+  const used = /* @__PURE__ */ new Set();
+  for (const step of steps) {
+    for (const name of step.symbols) used.add(name);
+    if (step.lhs?.k === "sym") used.add(step.lhs.name);
+    if (step.rhs?.k === "sym") used.add(step.rhs.name);
+  }
+  for (const decl of decls) {
+    if (used.has(decl.name)) continue;
+    if (decl.source === "preset") continue;
+    chips.push({
+      id: "unused-declaration",
+      symbol: decl.name,
+      message: `${decl.name} is declared but no row uses it, so the declaration does nothing`,
+      span: { from: 0, to: 0 }
+    });
+  }
   for (const step of steps) {
     if (step.isDefinition && step.defName && step.rhs) {
       defs.set(step.defName, step.rhs);
@@ -9384,8 +9419,11 @@ function checkExact(step, ctx, defs, opts, card) {
             id: step.id,
             row: step.row,
             span: step.span,
+            text: step.text,
+            lhsSpan: step.lhs?.span,
+            rhsSpan: step.rhs?.span,
             relation: step.relation,
-            verdict: "unchecked",
+            verdict: outcome.shape ? "shape" : "unchecked",
             card: { ...card, sizes, primes, assumptions },
             message: outcome.message,
             reason: outcome.message,
@@ -9464,7 +9502,9 @@ function runExactTrial(step, ctx, defs, setting, p, rng) {
   for (const [name, value] of sampled.values.entries()) env.values.set(name, value);
   for (const [name, quadVar] of sampled.quad.entries()) env.quad.set(name, quadVar);
   const sides = evaluateSides(field, step.lhs, step.rhs, env, sampler);
-  if (sides.kind === "unknown") return { kind: "unknown", message: sides.message, domain: sides.domain };
+  if (sides.kind === "unknown") {
+    return { kind: "unknown", message: sides.message, domain: sides.domain, shape: sides.shape };
+  }
   if (sides.kind === "equal") return { kind: "ok" };
   return {
     kind: "wrong",
@@ -9489,7 +9529,8 @@ function evaluateSides(field, lhsNode, rhsNode, env, sampler) {
   } catch (error) {
     if (error instanceof EvalError) {
       const domain = /singular|non square|domain/i.test(error.message);
-      return { kind: "unknown", message: error.message, domain };
+      const shape = /shape mismatch|not square|non square/i.test(error.message);
+      return { kind: "unknown", message: error.message, domain, shape };
     }
     if (error instanceof DomainError) {
       return { kind: "unknown", message: error.message, domain: true };
@@ -10188,8 +10229,11 @@ function checkImplication(step, ctx, defs, opts, card) {
             id: step.id,
             row: step.row,
             span: step.span,
+            text: step.text,
+            lhsSpan: step.lhs?.span,
+            rhsSpan: step.rhs?.span,
             relation: step.relation,
-            verdict: "unchecked",
+            verdict: outcome.shape ? "shape" : "unchecked",
             card: { ...card, sizes, primes, assumptions },
             message: outcome.message,
             reason: outcome.message,
@@ -10426,13 +10470,13 @@ function renderOp(node) {
   const a = node.args.map(renderNode);
   switch (node.op) {
     case "add":
-      return `${a[0]} + ${a[1]}`;
+      return `${operand(node.args[0])} + ${operand(node.args[1])}`;
     case "sub":
-      return `${a[0]} - ${a[1]}`;
+      return `${operand(node.args[0])} - ${operand(node.args[1])}`;
     case "neg":
-      return `-${a[0]}`;
+      return `-${operand(node.args[0])}`;
     case "mul":
-      return `${a[0]} ${a[1]}`;
+      return `${operand(node.args[0])} ${operand(node.args[1])}`;
     case "div":
       return `\\frac{${a[0]}}{${a[1]}}`;
     case "pow":
@@ -10468,6 +10512,14 @@ function renderOp(node) {
     case "sqrtm":
       return `\\sqrt{${a[0]}}`;
   }
+}
+function operand(node) {
+  if (!node) return "";
+  const text = renderNode(node);
+  if (node.k === "op" && (node.op === "add" || node.op === "sub" || node.op === "mul" || node.op === "neg")) {
+    return `{${text}}`;
+  }
+  return text;
 }
 
 // src/core/shrink.ts
@@ -11117,7 +11169,7 @@ function residualRepairs(sh) {
     out.push({
       kind: "residual",
       title: `this step is off by exactly ${scaleText(scale)} ${text}`,
-      edit: { span: sh.rhs.span, insert: `${renderNode(sh.rhs)} + ${scaleText(scale)} ${text}` },
+      edit: { span: sh.rhs.span, insert: `${renderNode(sh.rhs)} ${scaleText(scale)} ${text}` },
       verified: false,
       detail: text
     });

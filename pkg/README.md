@@ -76,23 +76,25 @@ checks it, exactly, and it also finds the two ways you can get it wrong.
 **Nineteen seconds.** The line everybody writes and nobody checks, and what
 happens when a machine reads it.
 
-[Watch the nineteen second tour](https://raw.githubusercontent.com/Hussain004/SAMOSA/master/public/brag.mp4) (or
-[download it](https://raw.githubusercontent.com/Hussain004/SAMOSA/master/public/brag.mp4))
+![The nineteen second tour: the derivation types in, the wrong row gets its badge, the counterexample arrives](https://raw.githubusercontent.com/Hussain004/SAMOSA/master/public/brag.webp)
 
 **A transposed product.** The squiggle, the counterexample, and the fix that
 takes one keystroke.
 
-![A transposed product is flagged, the counterexample is small, and the fix applies](https://raw.githubusercontent.com/Hussain004/SAMOSA/master/public/gifs/transpose.gif)
+![A transposed product is flagged, the counterexample is small, and the fix applies](https://raw.githubusercontent.com/Hussain004/SAMOSA/master/public/gifs/transpose.webp)
 
 **The Kalman update, with the missing noise term.** The row everybody writes
 from memory, and the term that is not there.
 
-![The Kalman measurement update, with the row that is wrong](https://raw.githubusercontent.com/Hussain004/SAMOSA/master/public/gifs/kalman.gif)
+![The Kalman measurement update, with the row that is wrong](https://raw.githubusercontent.com/Hussain004/SAMOSA/master/public/gifs/kalman.webp)
 
 **A gradient in the wrong layout.** The numerator layout is a transpose away
 from the right answer, and SAMOSA says so.
 
-![A gradient in the numerator layout, with the hint](https://raw.githubusercontent.com/Hussain004/SAMOSA/master/public/gifs/gradient.gif)
+![A gradient in the numerator layout, with the hint](https://raw.githubusercontent.com/Hussain004/SAMOSA/master/public/gifs/gradient.webp)
+
+The same three, as videos: [the transposed product](https://raw.githubusercontent.com/Hussain004/SAMOSA/master/public/gifs/transpose.mp4),
+[the Kalman update](https://raw.githubusercontent.com/Hussain004/SAMOSA/master/public/gifs/kalman.mp4), [the layout](https://raw.githubusercontent.com/Hussain004/SAMOSA/master/public/gifs/gradient.mp4).
 
 ## Quick start
 
@@ -143,13 +145,26 @@ cs.RO and stat.ML, 1498 rows:
 
 | | |
 | --- | --- |
-| rows SAMOSA can parse | 1173 (**78.3%**) |
-| rows SAMOSA reads with no unknown construct | 818 (**54.6%**) |
+| rows SAMOSA can parse | 1300 (**86.8%**) |
+| rows SAMOSA reads with no unknown construct | 749 (**50.0%**) |
 
 The gap is rows that parse but contain something SAMOSA does not know, such
-as a `\|` used as a double bar instead of a norm, or a macro the authors
-defined in their own preamble. The method and the full list of what stops
-the rest are in [docs/COVERAGE.md](https://raw.githubusercontent.com/Hussain004/SAMOSA/master/docs/COVERAGE.md).
+as a `\mid` used as a conditional bar, or a macro the authors defined in
+their own preamble. The method and the full list of what stops the rest are
+in [docs/COVERAGE.md](https://raw.githubusercontent.com/Hussain004/SAMOSA/master/docs/COVERAGE.md).
+
+And the Cookbook: 48 identities in matrix algebra, calculus and stochastics,
+with the mistakes the catalog can make of them.
+
+| | |
+| --- | --- |
+| the false checkmarks | **0** |
+| the caught mutants | 196 of 267 (**73.4%**) |
+
+The plan's gate asks for 95% of the bugs caught. The cookbook is at 73.4%,
+and every miss is a step the engine says it cannot decide, never one it
+calls right. The method, the misses and the bugs the corpus found are in
+[docs/COOKBOOK.md](https://raw.githubusercontent.com/Hussain004/SAMOSA/master/docs/COOKBOOK.md).
 
 ## What it cannot do
 
