@@ -5,6 +5,7 @@
   "license": "MIT",
   "type": "module",
   "bin": {
+    "samosa-math": "dist/cli.mjs",
     "samosa": "dist/cli.mjs",
     "samosa-mcp": "dist/mcp.mjs"
   },

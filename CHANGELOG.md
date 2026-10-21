@@ -32,6 +32,8 @@ The first release.
 - The CLI, with the pretty, JSON, SARIF and GitHub formats.
 - The MCP server and the Agent Skill.
 - The GitHub Action, with the CLI shipped inside it.
+- The npm package `samosa-math`, with the `samosa` CLI and the `samosa-mcp`
+  server, so `npx samosa-math check paper.tex` works with no install.
 - Fifteen derivations in the Menu, each with its planted bug.
 
 ### Measured

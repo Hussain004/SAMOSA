@@ -33,7 +33,8 @@
     "test:watch": "vitest",
     "bench": "vitest bench --run",
     "test:e2e": "playwright test",
-    "check:corpus": "node scripts/check-corpus.mjs"
+    "check:corpus": "node scripts/check-corpus.mjs",
+    "publish:pkg": "npm run build:pkg && npm publish --access public --prefix pkg"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.4",

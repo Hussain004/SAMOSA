@@ -51,6 +51,9 @@ writeFileSync(
       license: 'MIT',
       type: 'module',
       bin: {
+        // the bin that carries the name of the package, so `npx samosa-math`
+        // runs the CLI, and the shorter name for the people who install it
+        'samosa-math': 'dist/cli.mjs',
         samosa: 'dist/cli.mjs',
         'samosa-mcp': 'dist/mcp.mjs',
       },
