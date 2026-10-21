@@ -70,6 +70,23 @@ checks it, exactly, and it also finds the two ways you can get it wrong.
 | **Your pipeline** | A CLI and a GitHub Action that lint the `align` blocks of a paper. |
 | **Your machine** | Everything runs in the browser. The share link lives in the URL fragment. No account, no server, no upload. |
 
+## See it work
+
+**A transposed product.** The squiggle, the counterexample, and the fix that
+takes one keystroke.
+
+![A transposed product is flagged, the counterexample is small, and the fix applies](public/gifs/transpose.gif)
+
+**The Kalman update, with the missing noise term.** The row everybody writes
+from memory, and the term that is not there.
+
+![The Kalman measurement update, with the row that is wrong](public/gifs/kalman.gif)
+
+**A gradient in the wrong layout.** The numerator layout is a transpose away
+from the right answer, and SAMOSA says so.
+
+![A gradient in the numerator layout, with the hint](public/gifs/gradient.gif)
+
 ## Quick start
 
 ```bash
