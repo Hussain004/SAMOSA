@@ -120,6 +120,7 @@ async function main(): Promise<void> {
     JSON.stringify(
       {
         papers: fetched,
+        ids: ids.slice(0, PAPER_COUNT),
         rows: rows.length,
         parsed,
         percent: Number(percent.toFixed(1)),

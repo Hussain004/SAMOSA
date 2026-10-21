@@ -23,15 +23,15 @@ npx vite-node scripts/coverage.ts 40
 | | |
 | --- | --- |
 | papers | 39 |
-| display math rows | 1605 |
-| rows SAMOSA can parse | 1226 (**76.4%**) |
-| rows SAMOSA reads with no unknown construct | 820 (**51.1%**) |
+| display math rows | 1498 |
+| rows SAMOSA can parse | 1173 (**78.3%**) |
+| rows SAMOSA reads with no unknown construct | 818 (**54.6%**) |
 
 Two numbers, because they answer two different questions:
 
-* **76.4%** is the parse coverage, the number the plan's gate G3 asks for.
+* **78.3%** is the parse coverage, the number the plan's gate G3 asks for.
   Those rows come out of the parser as a tree, so SAMOSA can look at them.
-* **51.1%** is the checkable coverage: the rows where every part of the row
+* **54.6%** is the checkable coverage: the rows where every part of the row
   is something SAMOSA understands, so it can actually decide whether the row
   is right. The gap between the two is rows that parse but contain a
   construct SAMOSA has never heard of, such as `\mid` or a macro the authors
@@ -53,6 +53,10 @@ The failures, bucketed by the first unknown construct:
 | 23 | `\middle\|`, the conditional bar of a bracket |
 | 21 | `\leq` and `\le` inside an expression |
 | 14 | `\norm`, a macro the authors defined themselves |
+
+(The counts are from the run that produced the table above; the sample is
+listed in `.coverage/coverage.json`, and the same sample gives the same
+numbers.)
 
 Two thirds of the failures are one ambiguity: `\|` is a norm in most of the
 matrix calculus literature and a double bar in the information theory

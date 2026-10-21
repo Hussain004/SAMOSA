@@ -115,12 +115,12 @@ counterexample, and tells you the term you are missing.
 ## How much of a real paper it reads
 
 Measured, not guessed. The display math of 39 recent papers from cs.LG,
-cs.RO and stat.ML, 1605 rows:
+cs.RO and stat.ML, 1498 rows:
 
 | | |
 | --- | --- |
-| rows SAMOSA can parse | 1226 (**76.4%**) |
-| rows SAMOSA reads with no unknown construct | 820 (**51.1%**) |
+| rows SAMOSA can parse | 1173 (**78.3%**) |
+| rows SAMOSA reads with no unknown construct | 818 (**54.6%**) |
 
 The gap is rows that parse but contain something SAMOSA does not know, such
 as a `\|` used as a double bar instead of a norm, or a macro the authors

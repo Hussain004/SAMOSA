@@ -481,7 +481,7 @@ const DEEP_DIVES = [
   {
     n: '06',
     title: 'It reads real papers',
-    body: 'Of the display math of 39 recent papers, 76% parses and 51% is understood well enough to check. The number is measured, and published.',
+    body: 'Of the display math of 39 recent papers, 78% parses and 55% is understood well enough to check. The number is measured, and published.',
     link: '/docs/COVERAGE.md',
   },
 ];
