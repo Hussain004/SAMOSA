@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { deflateSync, inflateSync, strToU8, strFromU8 } from 'fflate';
+import { decodeShare, encodeShare } from '../core/share.ts';
 import type { Explanation, Report } from '../core/index.ts';
 import type { WorkerRequest, WorkerResponse } from '../worker.ts';
 import { PRESETS } from '../core/index.ts';
@@ -210,9 +210,13 @@ export const useApp = create<AppState>((set, get) => ({
   applyShare: (hash) => {
     try {
       const json = decodeShare(hash);
+      const settings = { ...DEFAULT_SETTINGS, ...(json.settings ?? {}) } as Settings;
+      // a link carries the declarations as well, so the derivation is checked
+      // the way it was checked when the link was made
+      if (json.decls) settings.decls = json.decls;
       set({
         source: json.src ?? '',
-        settings: { ...DEFAULT_SETTINGS, ...(json.settings ?? {}) },
+        settings,
         shareHash: hash,
       });
       schedule(get());
@@ -220,7 +224,6 @@ export const useApp = create<AppState>((set, get) => ({
       // a broken link is not worth crashing over
     }
   },
-
   setExplanation: (stepId, explanation) =>
     set((state) => ({ explanations: { ...state.explanations, [stepId]: explanation } })),
 }));
@@ -234,33 +237,8 @@ function schedule(state: AppState): void {
 
 /** The share link, with everything in the fragment so nothing is uploaded. */
 export function shareUrl(source: string, settings: Settings): string {
-  const hash = encodeShare({ src: source, settings });
+  const hash = encodeShare({ src: source, settings: settings as unknown as Record<string, unknown> });
   return `${window.location.origin}${window.location.pathname}#v1.${hash}`;
-}
-
-export function encodeShare(payload: { src: string; settings: Settings }): string {
-  const json = JSON.stringify(payload);
-  const compressed = deflateSync(strToU8(json), { level: 9 });
-  return bytesToBase64Url(compressed);
-}
-
-export function decodeShare(hash: string): { src?: string; settings?: Partial<Settings> } {
-  const compressed = base64UrlToBytes(hash);
-  return JSON.parse(strFromU8(inflateSync(compressed)));
-}
-
-function bytesToBase64Url(bytes: Uint8Array): string {
-  let binary = '';
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-function base64UrlToBytes(text: string): Uint8Array {
-  const padded = text.replace(/-/g, '+').replace(/_/g, '/');
-  const binary = atob(padded + '='.repeat((4 - (padded.length % 4)) % 4));
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes;
 }
 
 export { PRESETS, DEFAULT_SOURCE, DEFAULT_SETTINGS };

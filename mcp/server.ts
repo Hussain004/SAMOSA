@@ -2,7 +2,8 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { check, checkStep, explain } from '../src/core/index.ts';
+import { check, checkStep, explain, explainAll } from '../src/core/index.ts';
+import { shareLink } from '../src/core/share.ts';
 
 /**
  * The MCP server.
@@ -59,14 +60,14 @@ function summarise(report: ReturnType<typeof check>): string {
 
 const shareBase = process.env.SAMOSA_SHARE_BASE ?? 'https://samosa-math.vercel.app';
 
-function shareUrl(source: string): string {
-  // the fragment keeps the derivation in the browser, nothing is uploaded
-  const json = JSON.stringify({ src: source });
-  const bytes = new TextEncoder().encode(json);
-  let binary = '';
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  const base64 = btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  return `${shareBase}/#v1.${base64}`;
+/**
+ * The link to the app, with the derivation and the declarations in it.
+ *
+ * The codec is the one the app reads, so the link opens the same thing the
+ * agent just checked.
+ */
+function shareUrl(source: string, declarations?: string): string {
+  return shareLink(shareBase, { src: source, decls: declarations });
 }
 
 server.registerTool(
@@ -89,17 +90,29 @@ server.registerTool(
       preset: args.preset,
       seed: args.seed,
     });
+    // The fixes and the shrunk counterexample, so the agent has something it
+    // can act on and not only the fact that a row is wrong.
+    const explanations = explainAll(args.latex, {
+      decls: args.declarations,
+      preset: args.preset,
+      seed: args.seed,
+    });
     const structured = {
       summary: summarise(report),
-      steps: report.steps.map((step) => ({
-        row: step.row,
-        verdict: step.verdict,
-        mode: step.mode ?? null,
-        message: step.message,
-        relation: step.relation,
-        card: step.card,
-      })),
-      shareUrl: shareUrl(args.latex),
+      steps: report.steps.map((step) => {
+        const explanation = explanations.get(step.id);
+        return {
+          row: step.row,
+          verdict: step.verdict,
+          mode: step.mode ?? null,
+          message: step.message,
+          relation: step.relation,
+          card: step.card,
+          fixes: explanation?.fixes ?? [],
+          counterexample: explanation?.counterexample ?? null,
+        };
+      }),
+      shareUrl: shareUrl(args.latex, args.declarations),
     };
     return {
       content: [{ type: 'text' as const, text: summarise(report) }],
@@ -124,6 +137,8 @@ server.registerTool(
   },
   async (args) => {
     const step = checkStep(args.lhs, args.rhs, { decls: args.declarations });
+    const source = `${args.lhs} = ${args.rhs}`;
+    const explanation = explain(source, 's0', { decls: args.declarations });
     const structured = {
       summary: `${step.verdict}: ${step.message}`,
       steps: [
@@ -134,8 +149,11 @@ server.registerTool(
           message: step.message,
           relation: step.relation,
           card: step.card,
+          fixes: explanation.fixes,
+          counterexample: explanation.counterexample ?? null,
         },
       ],
+      shareUrl: shareUrl(source, args.declarations),
     };
     return {
       content: [{ type: 'text' as const, text: `${step.verdict}: ${step.message}` }],
