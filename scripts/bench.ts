@@ -120,7 +120,9 @@ if (write) {
   console.log(`the baseline is written in ${baselineFile}`);
 } else if (check_ && existsSync(baselineFile)) {
   const baseline = JSON.parse(readFileSync(baselineFile, 'utf8')) as Record<string, Measurement>;
-  const tolerance = Number(process.env.BENCH_TOLERANCE ?? '1.25');
+    // A fifth on a machine that is not shared, and a much wider one on a
+  // shared runner, where the measurement is noisy.
+  const tolerance = Number(process.env.BENCH_TOLERANCE ?? '1.2');
   let failed = false;
   for (const [name, before] of Object.entries(baseline)) {
     const now = measured[name];
