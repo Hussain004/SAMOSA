@@ -478,6 +478,12 @@ const DEEP_DIVES = [
     body: 'A CLI and a GitHub Action that lint the align blocks of a paper, and fail the build when a step is wrong.',
     link: '/docs/CLI.md',
   },
+  {
+    n: '06',
+    title: 'It reads real papers',
+    body: 'Of the display math of 39 recent papers, 76% parses and 51% is understood well enough to check. The number is measured, and published.',
+    link: '/docs/COVERAGE.md',
+  },
 ];
 
 function DeepDives() {

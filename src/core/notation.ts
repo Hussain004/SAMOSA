@@ -104,6 +104,7 @@ export const UNICODE_MAP: Record<string, string> = {
 /** LaTeX commands that decorate a symbol without changing its identity. */
 export const ACCENTS = new Set([
   'hat',
+  'widehat',
   'bar',
   'overline',
   'tilde',
@@ -116,17 +117,19 @@ export const ACCENTS = new Set([
   'boldsymbol',
   'bm',
   'mathcal',
+  'mathscr',
+  'mathfrak',
   'mathrm',
   'mathsf',
   'mathtt',
   'mathbb',
   'text',
-  'boldsymbol',
 ]);
 
 /** Accents that change the glyph but keep the same base letter. */
 export const GLYPH_ACCENTS = new Set([
   'hat',
+  'widehat',
   'bar',
   'overline',
   'tilde',
@@ -138,6 +141,8 @@ export const GLYPH_ACCENTS = new Set([
   'mathbf',
   'boldsymbol',
   'bm',
+  'mathscr',
+  'mathfrak',
 ]);
 
 /** Greek letter names, used to decide whether a symbol looks like a matrix. */
@@ -147,16 +152,21 @@ export const GREEK = new Set([
   'gamma',
   'delta',
   'epsilon',
+  'varepsilon',
   'zeta',
   'eta',
   'theta',
+  'vartheta',
   'iota',
   'kappa',
   'lambda',
   'mu',
   'nu',
   'xi',
+  'pi',
+  'varpi',
   'rho',
+  'varrho',
   'sigma',
   'tau',
   'upsilon',

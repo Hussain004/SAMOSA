@@ -106,6 +106,8 @@ const EOF_TOKEN: Token = { type: 'eof', value: '', from: 0, to: 0 };
 
 export class Parser {
   private pos = 0;
+  /** is the next factor the first of its product? */
+  private firstFactor = false;
 
   private readonly tokens: Token[];
   private readonly opts: ParseOptions;
@@ -134,6 +136,20 @@ export class Parser {
   }
 
   // ---------------------------------------------------------------- symbols
+
+  /**
+   * Does this name look like a function?
+   *
+   * The known functions always do. A name that starts with a lowercase letter
+   * usually does, because a capital name is a matrix in this notation.
+   */
+  private looksLikeCall(name: string): boolean {
+    if (this.isFnName(name)) return true;
+    if (this.opts.knownFns?.has(name)) return true;
+    if (this.firstFactor) return true;
+    const first = name[0];
+    return first !== undefined && /[a-z]/.test(first);
+  }
 
   private isFnName(name: string): boolean {
     if (this.opts.knownFns?.has(name)) return true;
@@ -256,23 +272,32 @@ export class Parser {
     let spanEnd = base.span.to;
     const scripts: Array<{ kind: 'transpose' | 'inverse' | 'inverseT' | 'power'; text?: string; to: number }> = [];
 
-    if (this.kind() === 'sub') {
-      this.pos++;
-      const s = this.readSubscript();
-      sub = s.text;
-      spanEnd = s.span.to;
-    }
-
-    while (this.kind() === 'sup') {
-      this.pos++;
-      const sup = this.readSuperscript();
-      const classified = classifySuperscript(sup.text);
-      spanEnd = sup.span.to;
-      if (classified.kind === 'label') {
-        labelSup = sup.text;
+    // the scripts may come in either order, so P^\kappa_{B_R} works
+    for (;;) {
+      if (this.kind() === 'sub' && sub === null) {
+        this.pos++;
+        const s = this.readSubscript();
+        sub = s.text;
+        spanEnd = s.span.to;
         continue;
       }
-      scripts.push({ kind: classified.kind, text: classified.kind === 'power' ? classified.powerText : undefined, to: sup.span.to });
+      if (this.kind() === 'sup') {
+        this.pos++;
+        const sup = this.readSuperscript();
+        const classified = classifySuperscript(sup.text);
+        spanEnd = sup.span.to;
+        if (classified.kind === 'label') {
+          labelSup = sup.text;
+          continue;
+        }
+        scripts.push({
+          kind: classified.kind,
+          text: classified.kind === 'power' ? classified.powerText : undefined,
+          to: sup.span.to,
+        });
+        continue;
+      }
+      break;
     }
 
     // the symbol keeps its subscript and its label, whatever happens to the scripts
@@ -348,7 +373,10 @@ export class Parser {
   }
 
   private parseProduct(): Node {
+    // the first factor of a product may be a call, such as J(x, y)
+    this.firstFactor = true;
     let left = this.parseUnary();
+    this.firstFactor = false;
     for (;;) {
       const t = this.cur;
       let op: Op | null = null;
@@ -393,7 +421,7 @@ export class Parser {
           t.value !== 'nonumber'
         );
       case 'csym':
-        return t.value !== "'" && t.value !== '|';
+        return t.value !== "'" && t.value !== '|' && t.value !== '\\|';
       default:
         return false;
     }
@@ -505,7 +533,10 @@ export class Parser {
         }
         const sym = this.makeSym([], t.value, null, null, { from: t.from, to: t.to });
         const scripted = this.applyScripts(sym, [], t.value);
-        if (this.kind() === 'lparen' && this.isFnName(t.value)) {
+        if (this.kind() === 'lparen' && scripted.k === 'sym' && this.looksLikeCall(t.value)) {
+          // A lowercase name with parentheses is a function call, even when
+          // SAMOSA does not know the function. A capital name is a matrix, so
+          // A(B) is a product, the way the notation reads.
           const args = this.parseArgs();
           return { k: 'call', fn: t.value, args, span: { from: t.from, to: args.at(-1)?.span.to ?? t.to } };
         }
@@ -520,11 +551,37 @@ export class Parser {
       case 'lbrace': {
         return this.parseGroupAsExpression();
       }
+      case 'op':
+        if (t.value === '*') {
+          // a star with nothing after it, as in f^*, is a label
+          if (!this.startsOperand()) {
+            this.pos++;
+            return { k: 'raw', text: 'a star', span: { from: t.from, to: t.to } };
+          }
+          this.pos++;
+          const right = this.parseUnary();
+          return {
+            k: 'op',
+            op: 'mul',
+            args: [
+              { k: 'num', value: { n: 1, d: 1 }, span: { from: t.from, to: t.to } },
+              right,
+            ],
+            span: { from: t.from, to: right.span.to },
+          };
+        }
+        if (t.value === '.') {
+          // the evaluation bar of \left. ... \right|_{x=a}
+          this.pos++;
+          return { k: 'raw', text: 'an evaluation bar', span: { from: t.from, to: t.to } };
+        }
+        break;
       case 'lbrack':
         return this.parseBareBracket();
       case 'cmd':
         return this.parseCommand();
       case 'csym':
+        if (t.value === '\\|') return this.parseNorm();
         if (t.value === '|') return this.parseBars();
         if (t.value === '\\') {
           this.pos++;
@@ -541,9 +598,17 @@ export class Parser {
 
   private parseGroupAsExpression(): Node {
     const open = this.expect('lbrace', '{');
-    const inner = this.parseExpression();
+    const parts: Node[] = [this.parseExpression()];
+    // a group may hold a list, such as a set or a tuple
+    while (this.kind() === 'comma') {
+      this.pos++;
+      parts.push(this.parseExpression());
+    }
     const close = this.expect('rbrace', '}');
-    return { ...inner, span: { from: open.from, to: close.to } };
+    if (parts.length > 1) {
+      return { k: 'raw', text: 'a list', span: { from: open.from, to: close.to } };
+    }
+    return { ...parts[0], span: { from: open.from, to: close.to } };
   }
 
   private parseBareBracket(): Node {
@@ -611,7 +676,12 @@ export class Parser {
         this.pos++;
         if (name === 'langle') {
           const a = this.parseExpression();
-          this.expect('comma', ',');
+          if (this.kind() !== 'comma') {
+            // an angle bracket with a single argument is not an inner product
+            const close = this.expect('cmd', '\\rangle');
+            return { k: 'raw', text: 'an angle bracket with one argument', span: { from: t.from, to: close.to } };
+          }
+          this.pos++;
           const b = this.parseExpression();
           const close = this.expect('cmd', '\\rangle');
           return { k: 'op', op: 'inner', args: [a, b], span: { from: t.from, to: close.to } };
@@ -623,7 +693,15 @@ export class Parser {
       case 'mathsf':
       case 'mathtt': {
         this.pos++;
-        const g = this.rawGroupText();
+        // \mathrm{d} and \mathrm d are both common
+        const g =
+          this.kind() === 'lbrace'
+            ? this.rawGroupText()
+            : (() => {
+                const t = this.cur;
+                this.pos++;
+                return { text: t.type === 'cmd' ? `\\${t.value}` : t.value, span: { from: t.from, to: t.to } };
+              })();
         const text = g.text.trim();
         if (text === 'd') {
           const arg = this.parsePrimary();
@@ -652,7 +730,14 @@ export class Parser {
       }
       case 'mathbb': {
         this.pos++;
-        const g = this.rawGroupText();
+        const g =
+          this.kind() === 'lbrace'
+            ? this.rawGroupText()
+            : (() => {
+                const t = this.cur;
+                this.pos++;
+                return { text: t.type === 'cmd' ? `\\${t.value}` : t.value, span: { from: t.from, to: t.to } };
+              })();
         const base = g.text.trim();
         const sym = this.makeSym(['mathbb'], base, null, null, { from: t.from, to: g.span.to });
         if (base === 'E' || base === 'V') {
@@ -717,7 +802,17 @@ export class Parser {
     if (GREEK.has(name) || SYMBOL_COMMANDS.has(name)) {
       this.pos++;
       const sym = this.makeSym([], `\\${name}`, null, null, { from: t.from, to: t.to });
-      return this.applyScripts(sym, [], `\\${name}`);
+      const scripted = this.applyScripts(sym, [], `\\${name}`);
+      if (this.kind() === 'lparen' && scripted.k === 'sym') {
+        const args = this.parseArgs();
+        return {
+          k: 'call',
+          fn: `\\${name}`,
+          args,
+          span: { from: t.from, to: args.at(-1)?.span.to ?? t.to },
+        };
+      }
+      return scripted;
     }
 
     if (ACCENTS.has(name)) {
@@ -1069,6 +1164,39 @@ export class Parser {
     const span = { from: t.from, to: endTok ? endTok.to : t.to };
     void env;
     return { k: 'block', rows, span };
+  }
+
+  /**
+   * A norm: \|x\| and \|A\|_F.
+   *
+   * A squared norm is a sum of squares, so it is exact. The unsquared ones
+   * are not rational, so they are left unsupported rather than approximated.
+   */
+  private parseNorm(): Node {
+    const open = this.cur;
+    this.pos++;
+    const inner = this.parseExpression();
+    const close = this.cur;
+    if (close.type === 'csym' && close.value === '\\|') {
+      this.pos++;
+      let kind = '2';
+      let squared = false;
+      if (this.kind() === 'sub') {
+        this.pos++;
+        kind = this.readSubscript().text;
+      }
+      if (this.kind() === 'sup') {
+        this.pos++;
+        squared = this.readSuperscript().text === '2';
+      }
+      const span = { from: open.from, to: close.to };
+      if (squared) {
+        if (kind === 'F' || kind === 'f') return { k: 'op', op: 'frob', args: [inner], span };
+        return { k: 'op', op: 'norm2', args: [inner], span };
+      }
+      return { k: 'raw', text: `the unsquared norm \\|${kind}\\|`, span };
+    }
+    return { k: 'raw', text: 'an unbalanced norm', span: { from: open.from, to: inner.span.to } };
   }
 
   private parseBars(): Node {

@@ -112,6 +112,21 @@ Now change one thing. Put `Q_t^{-1}` inside the inverse on the push-through
 row, and SAMOSA says the two sides are not equal, gives you a 2 by 2
 counterexample, and tells you the term you are missing.
 
+## How much of a real paper it reads
+
+Measured, not guessed. The display math of 39 recent papers from cs.LG,
+cs.RO and stat.ML, 1605 rows:
+
+| | |
+| --- | --- |
+| rows SAMOSA can parse | 1226 (**76.4%**) |
+| rows SAMOSA reads with no unknown construct | 820 (**51.1%**) |
+
+The gap is rows that parse but contain something SAMOSA does not know, such
+as a `\|` used as a double bar instead of a norm, or a macro the authors
+defined in their own preamble. The method and the full list of what stops
+the rest are in [docs/COVERAGE.md](docs/COVERAGE.md).
+
 ## What it cannot do
 
 Being straight about the edges is part of the product:
