@@ -220,7 +220,13 @@ function pushRow(rows: SourceRow[], segment: string, offset: number, where: stri
 
 /** Removes the noise that carries no mathematical content. */
 function cleanRow(text: string): string {
-  return text.replace(/\\nonumber\b/g, '').replace(/\\notag\b/g, '').trim();
+  return text
+    .replace(/\\nonumber\b/g, '')
+    .replace(/\\notag\b/g, '')
+    // a row separator that ended the line, which happens when the rows are
+    // pasted without an environment around them
+    .replace(/\\\\\s*$/, '')
+    .trim();
 }
 
 /** The prose of a document, used to harvest "where ..." declarations. */

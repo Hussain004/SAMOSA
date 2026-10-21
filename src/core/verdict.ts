@@ -271,6 +271,9 @@ export function check(src: string, opts: CheckOptions = {}): Report {
       ctx.defs.set(step.defName, step.rhs);
     }
     const result = checkStep(step, ctx, defs, { seed, trials, budgetMs: opts.budgetMs ?? 500 }, diagnostics);
+    // every result carries the text of its row, so a caller can point at the
+    // line of the file the step came from
+    result.text ??= step.text;
     results.push(result);
   }
 

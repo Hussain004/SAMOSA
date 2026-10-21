@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="public/favicon.svg" width="86" alt="SAMOSA logo" />
+<img src="https://raw.githubusercontent.com/Hussain004/SAMOSA/master/public/favicon.svg" width="86" alt="SAMOSA logo" />
 
 # SAMOSA
 
@@ -70,6 +70,29 @@ checks it, exactly, and it also finds the two ways you can get it wrong.
 | **Your pipeline** | A CLI and a GitHub Action that lint the `align` blocks of a paper. |
 | **Your machine** | Everything runs in the browser. The share link lives in the URL fragment. No account, no server, no upload. |
 
+## See it work
+
+**Nineteen seconds.** The line everybody writes and nobody checks, and what
+happens when a machine reads it.
+
+[Watch the nineteen second tour](https://raw.githubusercontent.com/Hussain004/SAMOSA/master/public/brag.mp4) (or
+[download it](https://raw.githubusercontent.com/Hussain004/SAMOSA/master/public/brag.mp4))
+
+**A transposed product.** The squiggle, the counterexample, and the fix that
+takes one keystroke.
+
+![A transposed product is flagged, the counterexample is small, and the fix applies](https://raw.githubusercontent.com/Hussain004/SAMOSA/master/public/gifs/transpose.gif)
+
+**The Kalman update, with the missing noise term.** The row everybody writes
+from memory, and the term that is not there.
+
+![The Kalman measurement update, with the row that is wrong](https://raw.githubusercontent.com/Hussain004/SAMOSA/master/public/gifs/kalman.gif)
+
+**A gradient in the wrong layout.** The numerator layout is a transpose away
+from the right answer, and SAMOSA says so.
+
+![A gradient in the numerator layout, with the hint](https://raw.githubusercontent.com/Hussain004/SAMOSA/master/public/gifs/gradient.gif)
+
 ## Quick start
 
 ```bash
@@ -112,6 +135,21 @@ Now change one thing. Put `Q_t^{-1}` inside the inverse on the push-through
 row, and SAMOSA says the two sides are not equal, gives you a 2 by 2
 counterexample, and tells you the term you are missing.
 
+## How much of a real paper it reads
+
+Measured, not guessed. The display math of 39 recent papers from cs.LG,
+cs.RO and stat.ML, 1498 rows:
+
+| | |
+| --- | --- |
+| rows SAMOSA can parse | 1173 (**78.3%**) |
+| rows SAMOSA reads with no unknown construct | 818 (**54.6%**) |
+
+The gap is rows that parse but contain something SAMOSA does not know, such
+as a `\|` used as a double bar instead of a norm, or a macro the authors
+defined in their own preamble. The method and the full list of what stops
+the rest are in [docs/COVERAGE.md](https://raw.githubusercontent.com/Hussain004/SAMOSA/master/docs/COVERAGE.md).
+
 ## What it cannot do
 
 Being straight about the edges is part of the product:
@@ -153,11 +191,11 @@ both sides of every step on the same instance. Non-commutativity, structure
 and shape all come for free.
 
 The long version, with the probability bounds and the two honest caveats,
-is in [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md).
+is in [docs/HOW_IT_WORKS.md](https://raw.githubusercontent.com/Hussain004/SAMOSA/master/docs/HOW_IT_WORKS.md).
 
 ## The notation
 
-[docs/NOTATION.md](docs/NOTATION.md) has the full list: what a superscript
+[docs/NOTATION.md](https://raw.githubusercontent.com/Hussain004/SAMOSA/master/docs/NOTATION.md) has the full list: what a superscript
 means, how a symbol is named, what the relations do, and the declaration
 syntax in both the LaTeX and the compact form.
 
@@ -166,7 +204,7 @@ syntax in both the LaTeX and the compact form.
 Your derivation never leaves your machine. The engine is a Web Worker in
 the tab, a share link keeps the derivation in the URL fragment, and the CLI
 and the MCP server make no network requests at all. See
-[docs/PRIVACY.md](docs/PRIVACY.md).
+[docs/PRIVACY.md](https://raw.githubusercontent.com/Hussain004/SAMOSA/master/docs/PRIVACY.md).
 
 ## Development
 

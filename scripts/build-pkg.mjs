@@ -74,7 +74,19 @@ writeFileSync(
 );
 
 copyFileSync(resolve(root, 'LICENSE'), resolve(root, 'pkg/LICENSE'));
-copyFileSync(resolve(root, 'README.md'), resolve(root, 'pkg/README.md'));
+
+/**
+ * The readme of the package.
+ *
+ * The paths in the readme of the repository are relative to the repository,
+ * so on the npm page they are rewritten to the raw files of the repository.
+ */
+const RAW = 'https://raw.githubusercontent.com/Hussain004/SAMOSA/master';
+const readme = readFileSync(resolve(root, 'README.md'), 'utf8')
+  .replace(/(src=")public\//g, `$1${RAW}/public/`)
+  .replace(/(\]\()public\//g, `$1${RAW}/public/`)
+  .replace(/(\]\()docs\//g, `$1${RAW}/docs/`);
+writeFileSync(resolve(root, 'pkg/README.md'), readme);
 
 console.log('the package is ready in pkg/');
 void dirname;

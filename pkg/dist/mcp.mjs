@@ -10,6 +10,7 @@ var F64Field = class {
   name = "f64";
   zero = 0;
   one = 1;
+  pi = Math.PI;
   add(a, b) {
     return a + b;
   }
@@ -2256,12 +2257,17 @@ var DecField = class {
   name = "decimal(50)";
   zero;
   one;
+  /** pi, to fifty digits */
+  pi;
   precision;
   constructor(precision = 50) {
     this.precision = precision;
     decimal_default.set({ precision, rounding: decimal_default.ROUND_HALF_EVEN });
     this.zero = new decimal_default(0);
     this.one = new decimal_default(1);
+    this.pi = new decimal_default(
+      "3.14159265358979323846264338327950288419716939937510582097494459231"
+    );
   }
   add(a, b) {
     return a.plus(b);
@@ -2332,9 +2338,12 @@ var GFpField = class {
   name = "GF(p)";
   zero = 0;
   one = 1;
+  /** pi is not in a finite field, so this is a rational approximation of it */
+  pi;
   p;
   constructor(p) {
     this.p = p;
+    this.pi = this.mul(314159265, this.inv(1e8));
   }
   /** Reduce to the canonical representative in [0, p). */
   mod(a) {
@@ -2635,12 +2644,14 @@ var DualField = class {
   name;
   zero;
   one;
+  pi;
   base;
   constructor(base) {
     this.base = base;
     this.name = `dual(${base.name})`;
     this.zero = { v: base.zero, t: base.zero };
     this.one = { v: base.one, t: base.zero };
+    this.pi = { v: base.pi, t: base.zero };
   }
   add(a, b) {
     return { v: this.base.add(a.v, b.v), t: this.base.add(a.t, b.t) };
@@ -2724,12 +2735,14 @@ var HyperDualField = class {
   name;
   zero;
   one;
+  pi;
   base;
   constructor(base) {
     this.base = base;
     this.name = `hyperdual(${base.name})`;
     this.zero = { v: base.zero, e1: base.zero, e2: base.zero, e12: base.zero };
     this.one = { v: base.one, e1: base.zero, e2: base.zero, e12: base.zero };
+    this.pi = { v: base.pi, e1: base.zero, e2: base.zero, e12: base.zero };
   }
   add(a, b) {
     return {
@@ -3550,6 +3563,14 @@ var Sampler = class {
     if (has("triu")) return { k: "m", m: this.sampleTriangular(r, c, true) };
     if (has("tril")) return { k: "m", m: this.sampleTriangular(r, c, false) };
     if (has("skew")) return { k: "m", m: this.sampleSkew(r, c) };
+    if (has("spd") && !(this.field instanceof GFpField)) {
+      const f = this.field;
+      const b = this.sampleGeneral(r, r);
+      const bb = matMul(f, b, transpose(b));
+      const eye = identity(r, f.one, f.zero);
+      const scaled = matScale(f, f.fromRational(r, 1), eye);
+      return { k: "m", m: matAdd(f, bb, scaled) };
+    }
     if (has("sym") || has("spd") || has("psd")) return { k: "m", m: this.sampleSymmetric(r, c) };
     return { k: "m", m: this.sampleGeneral(r, c) };
   }
@@ -3775,6 +3796,7 @@ var UNICODE_MAP = {
 };
 var ACCENTS = /* @__PURE__ */ new Set([
   "hat",
+  "widehat",
   "bar",
   "overline",
   "tilde",
@@ -3787,15 +3809,17 @@ var ACCENTS = /* @__PURE__ */ new Set([
   "boldsymbol",
   "bm",
   "mathcal",
+  "mathscr",
+  "mathfrak",
   "mathrm",
   "mathsf",
   "mathtt",
   "mathbb",
-  "text",
-  "boldsymbol"
+  "text"
 ]);
 var GLYPH_ACCENTS = /* @__PURE__ */ new Set([
   "hat",
+  "widehat",
   "bar",
   "overline",
   "tilde",
@@ -3806,7 +3830,9 @@ var GLYPH_ACCENTS = /* @__PURE__ */ new Set([
   "vec",
   "mathbf",
   "boldsymbol",
-  "bm"
+  "bm",
+  "mathscr",
+  "mathfrak"
 ]);
 var GREEK = /* @__PURE__ */ new Set([
   "alpha",
@@ -3814,16 +3840,21 @@ var GREEK = /* @__PURE__ */ new Set([
   "gamma",
   "delta",
   "epsilon",
+  "varepsilon",
   "zeta",
   "eta",
   "theta",
+  "vartheta",
   "iota",
   "kappa",
   "lambda",
   "mu",
   "nu",
   "xi",
+  "pi",
+  "varpi",
   "rho",
+  "varrho",
   "sigma",
   "tau",
   "upsilon",
@@ -4289,6 +4320,8 @@ var NON_OPERAND_COMMANDS = /* @__PURE__ */ new Set([
 var EOF_TOKEN = { type: "eof", value: "", from: 0, to: 0 };
 var Parser = class _Parser {
   pos = 0;
+  /** is the next factor the first of its product? */
+  firstFactor = false;
   tokens;
   opts;
   constructor(tokens, _src, opts = {}) {
@@ -4311,6 +4344,19 @@ var Parser = class _Parser {
     return t;
   }
   // ---------------------------------------------------------------- symbols
+  /**
+   * Does this name look like a function?
+   *
+   * The known functions always do. A name that starts with a lowercase letter
+   * usually does, because a capital name is a matrix in this notation.
+   */
+  looksLikeCall(name) {
+    if (this.isFnName(name)) return true;
+    if (this.opts.knownFns?.has(name)) return true;
+    if (this.firstFactor) return true;
+    const first = name[0];
+    return first !== void 0 && /[a-z]/.test(first);
+  }
   isFnName(name) {
     if (this.opts.knownFns?.has(name)) return true;
     return DEFAULT_FUNCTIONS.has(name);
@@ -4377,6 +4423,18 @@ var Parser = class _Parser {
     this.pos++;
     return { text: t.type === "cmd" ? `\\${t.value}` : t.value, span: { from: t.from, to: t.to } };
   }
+  /**
+   * Reads the variable of a proportionality, the subscript of \\propto.
+   *
+   * It returns the name of the variable and how many tokens it took, so the
+   * caller can drop them from the right hand side.
+   */
+  readProportionalityVariable() {
+    const start = this.pos;
+    this.pos++;
+    const sub2 = this.readSubscript();
+    return { name: sub2.text, tokens: this.pos - start };
+  }
   /** Reads a subscript, which may be a group or a single token. */
   readSubscript() {
     if (this.kind() === "lbrace") return this.rawGroupText();
@@ -4410,22 +4468,31 @@ var Parser = class _Parser {
     let labelSup = null;
     let spanEnd = base.span.to;
     const scripts = [];
-    if (this.kind() === "sub") {
-      this.pos++;
-      const s = this.readSubscript();
-      sub2 = s.text;
-      spanEnd = s.span.to;
-    }
-    while (this.kind() === "sup") {
-      this.pos++;
-      const sup = this.readSuperscript();
-      const classified = classifySuperscript(sup.text);
-      spanEnd = sup.span.to;
-      if (classified.kind === "label") {
-        labelSup = sup.text;
+    for (; ; ) {
+      if (this.kind() === "sub" && sub2 === null) {
+        this.pos++;
+        const s = this.readSubscript();
+        sub2 = s.text;
+        spanEnd = s.span.to;
         continue;
       }
-      scripts.push({ kind: classified.kind, text: classified.kind === "power" ? classified.powerText : void 0, to: sup.span.to });
+      if (this.kind() === "sup") {
+        this.pos++;
+        const sup = this.readSuperscript();
+        const classified = classifySuperscript(sup.text);
+        spanEnd = sup.span.to;
+        if (classified.kind === "label") {
+          labelSup = sup.text;
+          continue;
+        }
+        scripts.push({
+          kind: classified.kind,
+          text: classified.kind === "power" ? classified.powerText : void 0,
+          to: sup.span.to
+        });
+        continue;
+      }
+      break;
     }
     let node = base;
     if (node.k === "sym") {
@@ -4493,7 +4560,9 @@ var Parser = class _Parser {
     return left;
   }
   parseProduct() {
+    this.firstFactor = true;
     let left = this.parseUnary();
+    this.firstFactor = false;
     for (; ; ) {
       const t = this.cur;
       let op = null;
@@ -4530,7 +4599,7 @@ var Parser = class _Parser {
       case "cmd":
         return !NON_OPERAND_COMMANDS.has(t.value) && !["left", "right"].includes(t.value) && t.value !== "nonumber";
       case "csym":
-        return t.value !== "'" && t.value !== "|";
+        return t.value !== "'" && t.value !== "|" && t.value !== "\\|";
       default:
         return false;
     }
@@ -4632,7 +4701,7 @@ var Parser = class _Parser {
         }
         const sym = this.makeSym([], t.value, null, null, { from: t.from, to: t.to });
         const scripted = this.applyScripts(sym, [], t.value);
-        if (this.kind() === "lparen" && this.isFnName(t.value)) {
+        if (this.kind() === "lparen" && scripted.k === "sym" && this.looksLikeCall(t.value)) {
           const args = this.parseArgs();
           return { k: "call", fn: t.value, args, span: { from: t.from, to: args.at(-1)?.span.to ?? t.to } };
         }
@@ -4647,11 +4716,35 @@ var Parser = class _Parser {
       case "lbrace": {
         return this.parseGroupAsExpression();
       }
+      case "op":
+        if (t.value === "*") {
+          if (!this.startsOperand()) {
+            this.pos++;
+            return { k: "raw", text: "a star", span: { from: t.from, to: t.to } };
+          }
+          this.pos++;
+          const right = this.parseUnary();
+          return {
+            k: "op",
+            op: "mul",
+            args: [
+              { k: "num", value: { n: 1, d: 1 }, span: { from: t.from, to: t.to } },
+              right
+            ],
+            span: { from: t.from, to: right.span.to }
+          };
+        }
+        if (t.value === ".") {
+          this.pos++;
+          return { k: "raw", text: "an evaluation bar", span: { from: t.from, to: t.to } };
+        }
+        break;
       case "lbrack":
         return this.parseBareBracket();
       case "cmd":
         return this.parseCommand();
       case "csym":
+        if (t.value === "\\|") return this.parseNorm();
         if (t.value === "|") return this.parseBars();
         if (t.value === "\\") {
           this.pos++;
@@ -4667,9 +4760,16 @@ var Parser = class _Parser {
   }
   parseGroupAsExpression() {
     const open = this.expect("lbrace", "{");
-    const inner2 = this.parseExpression();
+    const parts = [this.parseExpression()];
+    while (this.kind() === "comma") {
+      this.pos++;
+      parts.push(this.parseExpression());
+    }
     const close = this.expect("rbrace", "}");
-    return { ...inner2, span: { from: open.from, to: close.to } };
+    if (parts.length > 1) {
+      return { k: "raw", text: "a list", span: { from: open.from, to: close.to } };
+    }
+    return { ...parts[0], span: { from: open.from, to: close.to } };
   }
   parseBareBracket() {
     const open = this.expect("lbrack", "[");
@@ -4732,7 +4832,11 @@ var Parser = class _Parser {
         this.pos++;
         if (name === "langle") {
           const a = this.parseExpression();
-          this.expect("comma", ",");
+          if (this.kind() !== "comma") {
+            const close2 = this.expect("cmd", "\\rangle");
+            return { k: "raw", text: "an angle bracket with one argument", span: { from: t.from, to: close2.to } };
+          }
+          this.pos++;
           const b = this.parseExpression();
           const close = this.expect("cmd", "\\rangle");
           return { k: "op", op: "inner", args: [a, b], span: { from: t.from, to: close.to } };
@@ -4744,7 +4848,11 @@ var Parser = class _Parser {
       case "mathsf":
       case "mathtt": {
         this.pos++;
-        const g = this.rawGroupText();
+        const g = this.kind() === "lbrace" ? this.rawGroupText() : (() => {
+          const t2 = this.cur;
+          this.pos++;
+          return { text: t2.type === "cmd" ? `\\${t2.value}` : t2.value, span: { from: t2.from, to: t2.to } };
+        })();
         const text = g.text.trim();
         if (text === "d") {
           const arg = this.parsePrimary();
@@ -4773,7 +4881,11 @@ var Parser = class _Parser {
       }
       case "mathbb": {
         this.pos++;
-        const g = this.rawGroupText();
+        const g = this.kind() === "lbrace" ? this.rawGroupText() : (() => {
+          const t2 = this.cur;
+          this.pos++;
+          return { text: t2.type === "cmd" ? `\\${t2.value}` : t2.value, span: { from: t2.from, to: t2.to } };
+        })();
         const base = g.text.trim();
         const sym = this.makeSym(["mathbb"], base, null, null, { from: t.from, to: g.span.to });
         if (base === "E" || base === "V") {
@@ -4835,7 +4947,17 @@ var Parser = class _Parser {
     if (GREEK.has(name) || SYMBOL_COMMANDS.has(name)) {
       this.pos++;
       const sym = this.makeSym([], `\\${name}`, null, null, { from: t.from, to: t.to });
-      return this.applyScripts(sym, [], `\\${name}`);
+      const scripted = this.applyScripts(sym, [], `\\${name}`);
+      if (this.kind() === "lparen" && scripted.k === "sym") {
+        const args = this.parseArgs();
+        return {
+          k: "call",
+          fn: `\\${name}`,
+          args,
+          span: { from: t.from, to: args.at(-1)?.span.to ?? t.to }
+        };
+      }
+      return scripted;
     }
     if (ACCENTS.has(name)) {
       const accentSpan = { from: t.from, to: t.to };
@@ -5154,6 +5276,38 @@ var Parser = class _Parser {
     void env;
     return { k: "block", rows, span };
   }
+  /**
+   * A norm: \|x\| and \|A\|_F.
+   *
+   * A squared norm is a sum of squares, so it is exact. The unsquared ones
+   * are not rational, so they are left unsupported rather than approximated.
+   */
+  parseNorm() {
+    const open = this.cur;
+    this.pos++;
+    const inner2 = this.parseExpression();
+    const close = this.cur;
+    if (close.type === "csym" && close.value === "\\|") {
+      this.pos++;
+      let kind = "2";
+      let squared = false;
+      if (this.kind() === "sub") {
+        this.pos++;
+        kind = this.readSubscript().text;
+      }
+      if (this.kind() === "sup") {
+        this.pos++;
+        squared = this.readSuperscript().text === "2";
+      }
+      const span = { from: open.from, to: close.to };
+      if (squared) {
+        if (kind === "F" || kind === "f") return { k: "op", op: "frob", args: [inner2], span };
+        return { k: "op", op: "norm2", args: [inner2], span };
+      }
+      return { k: "raw", text: `the unsquared norm \\|${kind}\\|`, span };
+    }
+    return { k: "raw", text: "an unbalanced norm", span: { from: open.from, to: inner2.span.to } };
+  }
   parseBars() {
     const open = this.cur;
     this.pos++;
@@ -5283,7 +5437,14 @@ function parseRow(_src, rowText, offset, index, knownFns) {
   for (let i = 0; i < rels.length; i++) {
     const rel = rels[i];
     const lhsSeg = i === 0 ? tokens.slice(bounds[0], bounds[1]) : [];
-    const rhsSeg = tokens.slice(bounds[2 * i + 2], bounds[2 * i + 3]);
+    let rhsSeg = tokens.slice(bounds[2 * i + 2], bounds[2 * i + 3]);
+    let proportionalTo;
+    if (rel.relation === "propto" && rhsSeg[0]?.type === "sub") {
+      const parser = new Parser(rhsSeg, "", knownFns ? { knownFns } : {});
+      const read = parser.readProportionalityVariable();
+      proportionalTo = read.name;
+      rhsSeg = rhsSeg.slice(read.tokens);
+    }
     const lhs = (lhsSeg.length ? parseNode(lhsSeg, knownFns) : null) ?? void 0;
     const rhs = (rhsSeg.length ? parseNode(rhsSeg, knownFns) : null) ?? void 0;
     parts.push({
@@ -5293,7 +5454,8 @@ function parseRow(_src, rowText, offset, index, knownFns) {
       rhs,
       span: { from: offset, to: offset + rowText.length },
       lhsSpan: lhs?.span,
-      rhsSpan: rhs?.span
+      rhsSpan: rhs?.span,
+      proportionalTo
     });
   }
   return { index, span: { from: offset, to: offset + rowText.length }, parts, annotation };
@@ -5534,7 +5696,7 @@ function pushRow(rows, segment, offset, where) {
   rows.push({ text, from, to: from + text.trimEnd().length, where });
 }
 function cleanRow(text) {
-  return text.replace(/\\nonumber\b/g, "").replace(/\\notag\b/g, "").trim();
+  return text.replace(/\\nonumber\b/g, "").replace(/\\notag\b/g, "").replace(/\\\\\s*$/, "").trim();
 }
 
 // src/core/decl.ts
@@ -6514,7 +6676,8 @@ function derivType(ctx, node) {
     }
     return { t: "scalar" };
   }
-  if (f.t === "scalar") {
+  const scalarish = f.t === "scalar" || f.t === "mat" && f.r === 1 && f.c === 1;
+  if (scalarish) {
     const w2 = wrtTypes[0];
     if (w2 && isMatrix(w2)) {
       if (ctx.layout === "numerator") return { t: "mat", r: w2.c, c: w2.r };
@@ -6807,6 +6970,7 @@ function check(src, opts = {}) {
         text: row.text,
         lhs,
         rhs,
+        proportionalTo: part.proportionalTo,
         relation: part.relation === ":=" ? "defined" : part.relation,
         annotation: parsed.annotation,
         isDefinition,
@@ -6825,6 +6989,7 @@ function check(src, opts = {}) {
       ctx.defs.set(step.defName, step.rhs);
     }
     const result = checkStep(step, ctx, defs, { seed, trials, budgetMs: opts.budgetMs ?? 500 }, diagnostics);
+    result.text ??= step.text;
     results.push(result);
   }
   chips.push(...ctx.chips);
@@ -6881,7 +7046,7 @@ function checkStep(step, ctx, defs, opts, diagnostics) {
   if (step.relation === "=>" || step.relation === "<=>") {
     return checkImplication(step, ctx, defs, opts, base);
   }
-  if (step.relation !== "=") {
+  if (step.relation !== "=" && step.relation !== "propto") {
     const message = unsupportedRelation(step.relation);
     return {
       id: step.id,
@@ -6913,10 +7078,18 @@ function checkStep(step, ctx, defs, opts, diagnostics) {
   }
   const lhsTy = inferType(ctx, step.lhs);
   const rhsTy = inferType(ctx, step.rhs);
+  let transposed = false;
+  if (step.lhs?.k === "deriv" && rhsTy.t === "mat" && lhsTy.t === "mat") {
+    const key = (d) => typeof d === "number" ? String(d) : ctx.dims.find(d.v);
+    transposed = key(rhsTy.r) === key(lhsTy.c) && key(rhsTy.c) === key(lhsTy.r) && key(rhsTy.r) !== key(rhsTy.c);
+  }
   if (lhsTy.t === "mat" && rhsTy.t === "mat") {
     unifyShapes(ctx, lhsTy, rhsTy, step.span);
   }
   const shapeErrors = ctx.errors.splice(0, ctx.errors.length);
+  if (shapeErrors.length && transposed) {
+    shapeErrors[0].message = "this is the numerator layout: SAMOSA uses the denominator layout, where the gradient has the shape of the variable it is taken with respect to";
+  }
   if (shapeErrors.length) {
     for (const error of shapeErrors) {
       diagnostics.push({ severity: "error", message: error.message, span: error.span, stepId: step.id });
@@ -6934,6 +7107,9 @@ function checkStep(step, ctx, defs, opts, diagnostics) {
       reason: shapeErrors.map((e) => e.message).join("; "),
       annotation: step.annotation
     };
+  }
+  if (step.relation === "propto") {
+    return checkProportionality(step, ctx, defs, opts, base);
   }
   const mode = planMode(step, ctx, defs);
   if (mode === "unchecked") {
@@ -7427,6 +7603,154 @@ function valuesEqual(field, a, b) {
     return true;
   }
   return false;
+}
+function checkProportionality(step, ctx, defs, opts, card) {
+  const dimVars = collectDimVars(ctx, step, defs);
+  const settings = sizeSettings(dimVars);
+  const assumptions = collectAssumptions(ctx, step);
+  const sizes = [];
+  const variable = step.proportionalTo;
+  for (const setting of settings) {
+    sizes.push(Object.fromEntries(setting));
+    const rng = rngFor(opts.seed, step.id, settingKey(setting), "propto");
+    const field = new F64Field();
+    const sampler = new Sampler(field, rng);
+    const env = makeEnv(field, rng);
+    env.defs = defs;
+    const sampled = sampleFor(ctx, step, defs, setting, sampler);
+    if (sampled === "unknown") {
+      const message = "could not sample an instance";
+      return {
+        id: step.id,
+        row: step.row,
+        span: step.span,
+        relation: step.relation,
+        verdict: "unchecked",
+        card: { ...card, sizes, assumptions },
+        message,
+        reason: message,
+        annotation: step.annotation
+      };
+    }
+    for (const [name2, value] of sampled.values.entries()) env.values.set(name2, value);
+    const name = variable ?? guessProportionalityVariable(step, ctx);
+    if (!name) {
+      const message = "SAMOSA does not know which variable this proportionality is taken in. Write \\propto_x.";
+      return {
+        id: step.id,
+        row: step.row,
+        span: step.span,
+        relation: step.relation,
+        verdict: "unchecked",
+        card: { ...card, sizes, assumptions },
+        message,
+        reason: message,
+        annotation: step.annotation
+      };
+    }
+    const info = ctx.symbols.get(name);
+    if (!info) {
+      const message = `SAMOSA does not know the shape of ${name}`;
+      return {
+        id: step.id,
+        row: step.row,
+        span: step.span,
+        relation: step.relation,
+        verdict: "unchecked",
+        card: { ...card, sizes, assumptions },
+        message,
+        reason: message,
+        annotation: step.annotation
+      };
+    }
+    const differences = [];
+    for (let point = 0; point < 3; point++) {
+      const trialEnv = { ...env, values: new Map(env.values), memo: /* @__PURE__ */ new Map() };
+      if (info.ty.t === "mat") {
+        const r = dimSizeOf(ctx, info.ty.r, setting);
+        const c = dimSizeOf(ctx, info.ty.c, setting);
+        trialEnv.values.set(name, { k: "m", m: sampler.sampleGeneral(r, c) });
+      } else {
+        trialEnv.values.set(name, scalar(sampler.sampleScalar()));
+      }
+      let left;
+      let right;
+      try {
+        const l = evalNode(field, step.lhs, trialEnv);
+        const r = evalNode(field, step.rhs, trialEnv);
+        left = asNumber(l);
+        right = asNumber(r);
+      } catch {
+        const message = "SAMOSA could not evaluate this proportionality over the reals";
+        return {
+          id: step.id,
+          row: step.row,
+          span: step.span,
+          relation: step.relation,
+          verdict: "unchecked",
+          card: { ...card, sizes, assumptions },
+          message,
+          reason: message,
+          annotation: step.annotation
+        };
+      }
+      if (!Number.isFinite(left) || !Number.isFinite(right)) {
+        const message = "this proportionality was not defined at one of the points";
+        return {
+          id: step.id,
+          row: step.row,
+          span: step.span,
+          relation: step.relation,
+          verdict: "unchecked",
+          card: { ...card, sizes, assumptions },
+          message,
+          reason: message,
+          annotation: step.annotation
+        };
+      }
+      differences.push(Math.log(Math.abs(left)) - Math.log(Math.abs(right)));
+    }
+    const spread = Math.max(...differences) - Math.min(...differences);
+    const scale = Math.max(1, ...differences.map((d) => Math.abs(d)));
+    if (spread > 1e-8 * scale) {
+      return {
+        id: step.id,
+        row: step.row,
+        span: step.span,
+        relation: step.relation,
+        verdict: "wrong",
+        mode: "numeric",
+        card: { ...card, sizes, assumptions },
+        message: `the ratio of the two sides depends on ${name}, so they are not proportional`,
+        reason: `the ratio of the two sides depends on ${name}, so they are not proportional`,
+        annotation: step.annotation
+      };
+    }
+  }
+  return {
+    id: step.id,
+    row: step.row,
+    span: step.span,
+    relation: step.relation,
+    verdict: "ok",
+    mode: "numeric",
+    card: { ...card, sizes, assumptions },
+    message: "the ratio of the two sides does not depend on the variable",
+    annotation: step.annotation
+  };
+}
+function asNumber(val) {
+  if (isScalarVal(val)) return Number(val.v);
+  return Number(val.m.d[0]);
+}
+function guessProportionalityVariable(step, ctx) {
+  const names = /* @__PURE__ */ new Set();
+  collectSymbols(step.lhs, names);
+  for (const name of names) {
+    const info = ctx.symbols.get(name);
+    if (info && info.ty.t === "mat") return name;
+  }
+  return void 0;
 }
 function checkNumeric(step, ctx, defs, opts, card) {
   const dimVars = collectDimVars(ctx, step, defs);
