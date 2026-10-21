@@ -16,7 +16,8 @@ jobs:
           version: 12.14.0
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # the toolchain wants a recent Node, and the engine says so
+          node-version: 22
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm test
@@ -25,6 +26,13 @@ jobs:
       - run: pnpm build:pkg
       - name: The CLI still runs
         run: node pkg/dist/cli.mjs check --help
+      - name: The demo of the landing page is what the engine says
+        run: pnpm gen:demo && git diff --exit-code src/landing/generated.json
+      - name: The math of the landing page is rendered
+        run: pnpm gen:tex && git diff --exit-code src/landing/generated-tex.json
+      - name: The committed CLI is the one that was built
+        # the Action runs the CLI from the repository, so it may not go stale
+        run: git diff --exit-code pkg/dist
 
   e2e:
     name: The browser tests
@@ -36,7 +44,7 @@ jobs:
           version: 12.14.0
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e

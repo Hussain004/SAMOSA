@@ -68,7 +68,7 @@ writeFileSync(
         'decimal.js': '^10.6.0',
         'zod': '^4.6.7',
       },
-      engines: { node: '>=20' },
+      engines: { node: '>=22' },
     },
     null,
     2,
