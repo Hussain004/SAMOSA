@@ -98,4 +98,12 @@ export class DualField<F extends Field<any>> implements Field<DualValue> {
   toNumber(a: DualValue): number {
     return this.base.toNumber(a.v);
   }
+
+  random(rng: () => number): DualValue {
+    return { v: this.base.random(rng), t: this.base.zero };
+  }
+
+  normal(rng: () => number): DualValue {
+    return { v: this.base.normal(rng), t: this.base.zero };
+  }
 }

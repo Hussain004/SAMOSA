@@ -33,6 +33,9 @@ export type Prop =
   | 'stoch'
   | 'pos'
   | 'int'
+  | 'ident'
+  | 'zero'
+  | 'ones'
   | { rank: Dim }
   | { commutes: string };
 
@@ -181,7 +184,7 @@ function parseLatexItem(item: string, result: DeclResult): boolean {
         display: toDisplay(name),
         kind: dims.length === 1 ? 'vector' : 'matrix',
         rows: dims[0],
-        cols: dims.length > 1 ? dims[1] : dims[0],
+        cols: dims.length > 1 ? dims[1] : 1,
         props: [],
         source: 'declared',
       });
@@ -217,7 +220,7 @@ function parseLatexItem(item: string, result: DeclResult): boolean {
         display: toDisplay(name),
         kind: 'vector',
         rows: inRPlain[2],
-        cols: inRPlain[2],
+        cols: 1,
         props: [],
         source: 'declared',
       });
@@ -509,11 +512,16 @@ function parseType(name: string, type: string): SymbolDecl | null {
     return { ...base, kind: 'matrix', props };
   }
   if (dims.length === 1) {
+    // one dimension means a column vector, unless the structure says matrix
+    const matrixish = props.some((p) =>
+      typeof p === 'string' &&
+      ['sym', 'spd', 'psd', 'orth', 'diag', 'triu', 'tril', 'skew', 'idem', 'proj', 'stoch'].includes(p),
+    );
     return {
       ...base,
-      kind: 'vector',
+      kind: matrixish ? 'matrix' : 'vector',
       rows: dims[0],
-      cols: dims[0],
+      cols: matrixish ? dims[0] : 1,
       props,
     };
   }

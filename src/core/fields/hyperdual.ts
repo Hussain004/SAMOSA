@@ -183,4 +183,12 @@ export class HyperDualField<F extends Field<any>> implements Field<HyperDualValu
   toNumber(a: HyperDualValue): number {
     return this.base.toNumber(a.v);
   }
+
+  random(rng: () => number): HyperDualValue {
+    return { v: this.base.random(rng), e1: this.base.zero, e2: this.base.zero, e12: this.base.zero };
+  }
+
+  normal(rng: () => number): HyperDualValue {
+    return { v: this.base.normal(rng), e1: this.base.zero, e2: this.base.zero, e12: this.base.zero };
+  }
 }

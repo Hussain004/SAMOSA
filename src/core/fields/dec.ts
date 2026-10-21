@@ -73,4 +73,14 @@ export class DecField implements Field<Decimal> {
   toNumber(a: Decimal): number {
     return a.toNumber();
   }
+
+  random(rng: () => number): Decimal {
+    return new Decimal(rng() * 2 - 1);
+  }
+
+  normal(rng: () => number): Decimal {
+    const u = Math.max(rng(), 1e-12);
+    const v = rng();
+    return new Decimal(Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v));
+  }
 }

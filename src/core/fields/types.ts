@@ -33,6 +33,10 @@ export interface Field<T> {
   tanh(a: T): T;
   /** Converts back to a plain number, for reporting and for the real fields. */
   toNumber(a: T): number;
+  /** A uniformly random element of the field. */
+  random(rng: () => number): T;
+  /** A random element from the standard normal distribution. */
+  normal(rng: () => number): T;
 }
 
 /** A scalar of an arbitrary field, used by the dual number wrappers. */

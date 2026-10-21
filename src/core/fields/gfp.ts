@@ -115,6 +115,16 @@ export class GFpField implements Field<number> {
   toNumber(a: number): number {
     return a;
   }
+
+  random(rng: () => number): number {
+    const hi = Math.floor(rng() * 65536) % 65536;
+    const lo = Math.floor(rng() * 65536) % 65536;
+    return (hi * 65536 + lo) % this.p;
+  }
+
+  normal(_rng: () => number): number {
+    throw new Error('GF(p) has no normal distribution');
+  }
 }
 
 /** The two primes used for exact checking. Both were verified prime. */

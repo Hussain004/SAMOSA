@@ -60,4 +60,15 @@ export class F64Field implements Field<number> {
   toNumber(a: number): number {
     return a;
   }
+
+  random(rng: () => number): number {
+    return rng() * 2 - 1;
+  }
+
+  normal(rng: () => number): number {
+    // Box-Muller
+    const u = Math.max(rng(), 1e-12);
+    const v = rng();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  }
 }
