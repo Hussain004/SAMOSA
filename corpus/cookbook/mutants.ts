@@ -49,7 +49,10 @@ export function mutantsOf(identity: Identity): Mutant[] {
             id: identity.id,
             row: rowIndex,
             rule: mutation.id,
-            source: identity.source.replace(row.text, row.text.replace(part.rhs.span.from - row.from, part.rhs.span.to - row.from, text)),
+            source:
+              identity.source.slice(0, part.rhs.span.from) +
+              text +
+              identity.source.slice(part.rhs.span.to),
             text,
           });
         }

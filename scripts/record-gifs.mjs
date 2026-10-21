@@ -128,8 +128,29 @@ async function record(name, script) {
     '0',
     resolve(OUT, `${name}.gif`),
   ]);
+
+  // The WebP is what the readme shows: it is an image, so it plays by itself,
+  // and it has all the colours, so the text is as sharp as the screen.
+  execFileSync('ffmpeg', [
+    '-y',
+    '-i',
+    raw,
+    '-vf',
+    'trim=start=1.2,setpts=PTS-STARTPTS,fps=16,scale=1080:-1:flags=lanczos',
+    '-vcodec',
+    'libwebp_anim',
+    '-lossless',
+    '0',
+    '-q:v',
+    '72',
+    '-loop',
+    '0',
+    '-an',
+    resolve(OUT, `${name}.webp`),
+  ]);
+
   rmSync(dir, { recursive: true, force: true });
-  console.log(`  ${name}.gif and ${name}.mp4`);
+  console.log(`  ${name}.gif, ${name}.webp and ${name}.mp4`);
 }
 
 /** Scrolls the inspector down to the counterexample. */

@@ -20,7 +20,6 @@ export interface Identity {
 }
 
 const N = 'A, B, C, D: n×n';
-const M = 'A: m×n; B: n×p; C: p×m';
 
 export const IDENTITIES: Identity[] = [
   // ------------------------------------------------------------- the algebra

@@ -76,29 +76,25 @@ checks it, exactly, and it also finds the two ways you can get it wrong.
 **Nineteen seconds.** The line everybody writes and nobody checks, and what
 happens when a machine reads it.
 
-[Watch the nineteen second tour](public/brag.mp4) (or
-[download it](public/brag.mp4))
+![The nineteen second tour: the derivation types in, the wrong row gets its badge, the counterexample arrives](public/brag.mp4)
 
 **A transposed product.** The squiggle, the counterexample, and the fix that
 takes one keystroke.
 
-![A transposed product is flagged, the counterexample is small, and the fix applies](public/gifs/transpose.gif)
-
-[watch it in colour](public/gifs/transpose.mp4)
+![A transposed product is flagged, the counterexample is small, and the fix applies](public/gifs/transpose.webp)
 
 **The Kalman update, with the missing noise term.** The row everybody writes
 from memory, and the term that is not there.
 
-![The Kalman measurement update, with the row that is wrong](public/gifs/kalman.gif)
-
-[watch it in colour](public/gifs/kalman.mp4)
+![The Kalman measurement update, with the row that is wrong](public/gifs/kalman.webp)
 
 **A gradient in the wrong layout.** The numerator layout is a transpose away
 from the right answer, and SAMOSA says so.
 
-![A gradient in the numerator layout, with the hint](public/gifs/gradient.gif)
+![A gradient in the numerator layout, with the hint](public/gifs/gradient.webp)
 
-[watch it in colour](public/gifs/gradient.mp4)
+The same three, as videos: [the transposed product](public/gifs/transpose.mp4),
+[the Kalman update](public/gifs/kalman.mp4), [the layout](public/gifs/gradient.mp4).
 
 ## Quick start
 
