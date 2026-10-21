@@ -22,38 +22,65 @@ export function TypedDemo() {
     timers.current = [];
 
     if (reduce) {
-      setLines(renderAll(script.events));
+      setLines(script.events.map(toLine));
       return;
     }
 
     setLines([]);
     let at = 0;
+
+    const push = (line: RenderedLine) => setLines((current) => [...current, line]);
+    const replaceLast = (text: string) =>
+      setLines((current) => {
+        if (!current.length) return current;
+        const next = current.slice();
+        next[next.length - 1] = { ...next[next.length - 1], text };
+        return next;
+      });
+
     const step = () => {
       if (at >= script.events.length) {
-        timers.current.push(window.setTimeout(() => {
-          setLines([]);
-          at = 0;
-          step();
-        }, 4000));
+        timers.current.push(
+          window.setTimeout(() => {
+            setLines([]);
+            at = 0;
+            step();
+          }, 4000),
+        );
         return;
       }
       const event = script.events[at];
       at++;
+
       if (event.kind === 'user') {
-        typeInto(event, (text) => {
-          setLines((current) => [...current, { kind: 'user', text }]);
-          timers.current.push(window.setTimeout(step, 500));
-        }, timers.current);
+        push({ kind: 'user', text: '' });
+        let index = 0;
+        const tick = () => {
+          index += 1;
+          const text = event.text.slice(0, index);
+          replaceLast(text);
+          if (index >= event.text.length) {
+            timers.current.push(window.setTimeout(step, 500));
+            return;
+          }
+          const jitter =
+            25 + Math.random() * 45 + (',.!?:'.includes(event.text[index - 1]) ? 120 : 0);
+          timers.current.push(window.setTimeout(tick, jitter));
+        };
+        timers.current.push(window.setTimeout(tick, 120));
         return;
       }
+
       if (event.kind === 'think') {
-        setLines((current) => [...current, { kind: 'think', text: '' }]);
+        push({ kind: 'think', text: 'Thinking…' });
         timers.current.push(window.setTimeout(step, 900));
         return;
       }
-      setLines((current) => [...current, toLine(event)]);
+
+      push(toLine(event));
       timers.current.push(window.setTimeout(step, event.pauseMs ?? 450));
     };
+
     timers.current.push(window.setTimeout(step, 300));
     return () => timers.current.forEach((t) => window.clearTimeout(t));
   }, [script]);
@@ -92,7 +119,9 @@ export function TypedDemo() {
         {lines.map((line, i) => (
           <div key={i} className={lineClass(line)}>
             {line.text}
-            {line.kind === 'user' && <span className="ml-0.5 inline-block h-4 w-2 translate-y-0.5 bg-[var(--color-gold)] animate-pulse" />}
+            {line.kind === 'user' && line.text.length < 40 && (
+              <span className="ml-0.5 inline-block h-4 w-2 translate-y-0.5 bg-[var(--color-gold)] animate-pulse" />
+            )}
           </div>
         ))}
         {lines.length === 0 && <div className="text-[var(--color-faint)]">$ samosa</div>}
@@ -114,10 +143,6 @@ interface RenderedLine {
 
 function toLine(event: DemoEvent): RenderedLine {
   return { kind: event.kind, text: event.text, tone: 'tone' in event ? event.tone : undefined };
-}
-
-function renderAll(events: DemoEvent[]): RenderedLine[] {
-  return events.map((event) => toLine(event));
 }
 
 function lineClass(line: RenderedLine): string {
@@ -143,25 +168,4 @@ function lineClass(line: RenderedLine): string {
     default:
       return 'text-[var(--color-muted)]';
   }
-}
-
-/** Types the text of an event, one character at a time. */
-function typeInto(
-  event: { kind: 'user'; text: string },
-  done: (text: string) => void,
-  timers: number[],
-): void {
-  let index = 0;
-  const tick = () => {
-    index += 1;
-    const text = event.text.slice(0, index);
-    if (index >= event.text.length) {
-      done(event.text);
-      return;
-    }
-    done(text);
-    const jitter = 25 + Math.random() * 45 + (',.!?'.includes(event.text[index - 1]) ? 120 : 0);
-    timers.push(window.setTimeout(tick, jitter));
-  };
-  tick();
 }

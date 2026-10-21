@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "SAMOSA — a step auditor for matrix algebra, stochastics and algebra. Checks every step of a derivation, exactly, in your browser.",
+  "description": "SAMOSA \u2014 a step auditor for matrix algebra, stochastics and algebra. Checks every step of a derivation, exactly, in your browser.",
   "license": "MIT",
   "homepage": "https://samosa-math.vercel.app",
   "repository": {
@@ -23,12 +23,12 @@
   ],
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "node scripts/copy-docs.mjs && tsc -b && vite build",
     "preview": "vite preview",
     "lint": "eslint .",
     "check:bundle": "node scripts/check-bundle-budget.mjs",
     "build:cli": "node scripts/build-cli.mjs",
-    "build:pkg": "node scripts/build-pkg.mjs",
+    "build:pkg": "node scripts/copy-docs.mjs && node scripts/build-pkg.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "bench": "vitest bench --run",

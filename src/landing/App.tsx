@@ -396,7 +396,7 @@ function Divider() {
   return (
     <section className="border-y border-[var(--color-line)] bg-[var(--color-panel)]">
       <div className="mx-auto flex max-w-[1180px] flex-wrap items-center justify-center gap-6 px-6 py-12">
-        <span className="text-[13px] tracking-[0.3em] text-[var(--color-faint)]">SAMESA-SERVATIONS</span>
+        <span className="text-[13px] tracking-[0.3em] text-[var(--color-faint)]">SAMOSA-SERVATIONS</span>
         {bubbles.map((bubble, i) => (
           <div key={bubble} className="flex items-center gap-2">
             <span className="text-2xl" aria-hidden="true">
