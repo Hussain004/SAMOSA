@@ -161,58 +161,58 @@ var LN10_PRECISION = LN10.length - 1;
 var PI_PRECISION = PI.length - 1;
 var P = { toStringTag: tag };
 P.absoluteValue = P.abs = function() {
-  var x = new this.constructor(this);
-  if (x.s < 0) x.s = 1;
-  return finalise(x);
+  var x2 = new this.constructor(this);
+  if (x2.s < 0) x2.s = 1;
+  return finalise(x2);
 };
 P.ceil = function() {
   return finalise(new this.constructor(this), this.e + 1, 2);
 };
 P.clampedTo = P.clamp = function(min2, max2) {
-  var k, x = this, Ctor = x.constructor;
+  var k, x2 = this, Ctor = x2.constructor;
   min2 = new Ctor(min2);
   max2 = new Ctor(max2);
   if (!min2.s || !max2.s) return new Ctor(NaN);
   if (min2.gt(max2)) throw Error(invalidArgument + max2);
-  k = x.cmp(min2);
-  return k < 0 ? min2 : x.cmp(max2) > 0 ? max2 : new Ctor(x);
+  k = x2.cmp(min2);
+  return k < 0 ? min2 : x2.cmp(max2) > 0 ? max2 : new Ctor(x2);
 };
 P.comparedTo = P.cmp = function(y) {
-  var i, j, xdL, ydL, x = this, xd = x.d, yd = (y = new x.constructor(y)).d, xs = x.s, ys = y.s;
+  var i2, j, xdL, ydL, x2 = this, xd = x2.d, yd = (y = new x2.constructor(y)).d, xs = x2.s, ys = y.s;
   if (!xd || !yd) {
     return !xs || !ys ? NaN : xs !== ys ? xs : xd === yd ? 0 : !xd ^ xs < 0 ? 1 : -1;
   }
   if (!xd[0] || !yd[0]) return xd[0] ? xs : yd[0] ? -ys : 0;
   if (xs !== ys) return xs;
-  if (x.e !== y.e) return x.e > y.e ^ xs < 0 ? 1 : -1;
+  if (x2.e !== y.e) return x2.e > y.e ^ xs < 0 ? 1 : -1;
   xdL = xd.length;
   ydL = yd.length;
-  for (i = 0, j = xdL < ydL ? xdL : ydL; i < j; ++i) {
-    if (xd[i] !== yd[i]) return xd[i] > yd[i] ^ xs < 0 ? 1 : -1;
+  for (i2 = 0, j = xdL < ydL ? xdL : ydL; i2 < j; ++i2) {
+    if (xd[i2] !== yd[i2]) return xd[i2] > yd[i2] ^ xs < 0 ? 1 : -1;
   }
   return xdL === ydL ? 0 : xdL > ydL ^ xs < 0 ? 1 : -1;
 };
 P.cosine = P.cos = function() {
-  var pr, rm, x = this, Ctor = x.constructor;
-  if (!x.d) return new Ctor(NaN);
-  if (!x.d[0]) return new Ctor(1);
+  var pr, rm, x2 = this, Ctor = x2.constructor;
+  if (!x2.d) return new Ctor(NaN);
+  if (!x2.d[0]) return new Ctor(1);
   pr = Ctor.precision;
   rm = Ctor.rounding;
-  Ctor.precision = pr + Math.max(x.e, x.sd()) + LOG_BASE;
+  Ctor.precision = pr + Math.max(x2.e, x2.sd()) + LOG_BASE;
   Ctor.rounding = 1;
-  x = cosine(Ctor, toLessThanHalfPi(Ctor, x));
+  x2 = cosine(Ctor, toLessThanHalfPi(Ctor, x2));
   Ctor.precision = pr;
   Ctor.rounding = rm;
-  return finalise(quadrant == 2 || quadrant == 3 ? x.neg() : x, pr, rm, true);
+  return finalise(quadrant == 2 || quadrant == 3 ? x2.neg() : x2, pr, rm, true);
 };
 P.cubeRoot = P.cbrt = function() {
-  var e, m, n, r, rep, s, sd, t, t3, t3plusx, x = this, Ctor = x.constructor;
-  if (!x.isFinite() || x.isZero()) return new Ctor(x);
+  var e, m, n, r, rep, s, sd, t, t3, t3plusx, x2 = this, Ctor = x2.constructor;
+  if (!x2.isFinite() || x2.isZero()) return new Ctor(x2);
   external = false;
-  s = x.s * mathpow(x.s * x, 1 / 3);
+  s = x2.s * mathpow(x2.s * x2, 1 / 3);
   if (!s || Math.abs(s) == 1 / 0) {
-    n = digitsToString(x.d);
-    e = x.e;
+    n = digitsToString(x2.d);
+    e = x2.e;
     if (s = (e - n.length + 1) % 3) n += s == 1 || s == -2 ? "0" : "00";
     s = mathpow(n, 1 / 3);
     e = mathfloor((e + 1) / 3) - (e % 3 == (e < 0 ? -1 : 2));
@@ -223,7 +223,7 @@ P.cubeRoot = P.cbrt = function() {
       n = n.slice(0, n.indexOf("e") + 1) + e;
     }
     r = new Ctor(n);
-    r.s = x.s;
+    r.s = x2.s;
   } else {
     r = new Ctor(s.toString());
   }
@@ -231,14 +231,14 @@ P.cubeRoot = P.cbrt = function() {
   for (; ; ) {
     t = r;
     t3 = t.times(t).times(t);
-    t3plusx = t3.plus(x);
-    r = divide(t3plusx.plus(x).times(t), t3plusx.plus(t3), sd + 2, 1);
+    t3plusx = t3.plus(x2);
+    r = divide(t3plusx.plus(x2).times(t), t3plusx.plus(t3), sd + 2, 1);
     if (digitsToString(t.d).slice(0, sd) === (n = digitsToString(r.d)).slice(0, sd)) {
       n = n.slice(sd - 3, sd + 1);
       if (n == "9999" || !rep && n == "4999") {
         if (!rep) {
           finalise(t, e + 1, 0);
-          if (t.times(t).times(t).eq(x)) {
+          if (t.times(t).times(t).eq(x2)) {
             r = t;
             break;
           }
@@ -248,7 +248,7 @@ P.cubeRoot = P.cbrt = function() {
       } else {
         if (!+n || !+n.slice(1) && n.charAt(0) == "5") {
           finalise(r, e + 1, 1);
-          m = !r.times(r).times(r).eq(x);
+          m = !r.times(r).times(r).eq(x2);
         }
         break;
       }
@@ -272,8 +272,8 @@ P.dividedBy = P.div = function(y) {
   return divide(this, new this.constructor(y));
 };
 P.dividedToIntegerBy = P.divToInt = function(y) {
-  var x = this, Ctor = x.constructor;
-  return finalise(divide(x, new Ctor(y), 0, 1, 1), Ctor.precision, Ctor.rounding);
+  var x2 = this, Ctor = x2.constructor;
+  return finalise(divide(x2, new Ctor(y), 0, 1, 1), Ctor.precision, Ctor.rounding);
 };
 P.equals = P.eq = function(y) {
   return this.cmp(y) === 0;
@@ -289,14 +289,14 @@ P.greaterThanOrEqualTo = P.gte = function(y) {
   return k == 1 || k === 0;
 };
 P.hyperbolicCosine = P.cosh = function() {
-  var k, n, pr, rm, len, x = this, Ctor = x.constructor, one = new Ctor(1);
-  if (!x.isFinite()) return new Ctor(x.s ? 1 / 0 : NaN);
-  if (x.isZero()) return one;
+  var k, n, pr, rm, len, x2 = this, Ctor = x2.constructor, one = new Ctor(1);
+  if (!x2.isFinite()) return new Ctor(x2.s ? 1 / 0 : NaN);
+  if (x2.isZero()) return one;
   pr = Ctor.precision;
   rm = Ctor.rounding;
-  Ctor.precision = pr + Math.max(x.e, x.sd()) + 4;
+  Ctor.precision = pr + Math.max(x2.e, x2.sd()) + 4;
   Ctor.rounding = 1;
-  len = x.d.length;
+  len = x2.d.length;
   if (len < 32) {
     k = Math.ceil(len / 3);
     n = (1 / tinyPow(4, k)).toString();
@@ -304,161 +304,161 @@ P.hyperbolicCosine = P.cosh = function() {
     k = 16;
     n = "2.3283064365386962890625e-10";
   }
-  x = taylorSeries(Ctor, 1, x.times(n), new Ctor(1), true);
-  var cosh2_x, i = k, d8 = new Ctor(8);
-  for (; i--; ) {
-    cosh2_x = x.times(x);
-    x = one.minus(cosh2_x.times(d8.minus(cosh2_x.times(d8))));
+  x2 = taylorSeries(Ctor, 1, x2.times(n), new Ctor(1), true);
+  var cosh2_x, i2 = k, d8 = new Ctor(8);
+  for (; i2--; ) {
+    cosh2_x = x2.times(x2);
+    x2 = one.minus(cosh2_x.times(d8.minus(cosh2_x.times(d8))));
   }
-  return finalise(x, Ctor.precision = pr, Ctor.rounding = rm, true);
+  return finalise(x2, Ctor.precision = pr, Ctor.rounding = rm, true);
 };
 P.hyperbolicSine = P.sinh = function() {
-  var k, pr, rm, len, x = this, Ctor = x.constructor;
-  if (!x.isFinite() || x.isZero()) return new Ctor(x);
+  var k, pr, rm, len, x2 = this, Ctor = x2.constructor;
+  if (!x2.isFinite() || x2.isZero()) return new Ctor(x2);
   pr = Ctor.precision;
   rm = Ctor.rounding;
-  Ctor.precision = pr + Math.max(x.e, x.sd()) + 4;
+  Ctor.precision = pr + Math.max(x2.e, x2.sd()) + 4;
   Ctor.rounding = 1;
-  len = x.d.length;
+  len = x2.d.length;
   if (len < 3) {
-    x = taylorSeries(Ctor, 2, x, x, true);
+    x2 = taylorSeries(Ctor, 2, x2, x2, true);
   } else {
     k = 1.4 * Math.sqrt(len);
     k = k > 16 ? 16 : k | 0;
-    x = x.times(1 / tinyPow(5, k));
-    x = taylorSeries(Ctor, 2, x, x, true);
+    x2 = x2.times(1 / tinyPow(5, k));
+    x2 = taylorSeries(Ctor, 2, x2, x2, true);
     var sinh2_x, d5 = new Ctor(5), d16 = new Ctor(16), d20 = new Ctor(20);
     for (; k--; ) {
-      sinh2_x = x.times(x);
-      x = x.times(d5.plus(sinh2_x.times(d16.times(sinh2_x).plus(d20))));
+      sinh2_x = x2.times(x2);
+      x2 = x2.times(d5.plus(sinh2_x.times(d16.times(sinh2_x).plus(d20))));
     }
   }
   Ctor.precision = pr;
   Ctor.rounding = rm;
-  return finalise(x, pr, rm, true);
+  return finalise(x2, pr, rm, true);
 };
 P.hyperbolicTangent = P.tanh = function() {
-  var pr, rm, x = this, Ctor = x.constructor;
-  if (!x.isFinite()) return new Ctor(x.s);
-  if (x.isZero()) return new Ctor(x);
+  var pr, rm, x2 = this, Ctor = x2.constructor;
+  if (!x2.isFinite()) return new Ctor(x2.s);
+  if (x2.isZero()) return new Ctor(x2);
   pr = Ctor.precision;
   rm = Ctor.rounding;
   Ctor.precision = pr + 7;
   Ctor.rounding = 1;
-  return divide(x.sinh(), x.cosh(), Ctor.precision = pr, Ctor.rounding = rm);
+  return divide(x2.sinh(), x2.cosh(), Ctor.precision = pr, Ctor.rounding = rm);
 };
 P.inverseCosine = P.acos = function() {
-  var x = this, Ctor = x.constructor, k = x.abs().cmp(1), pr = Ctor.precision, rm = Ctor.rounding;
+  var x2 = this, Ctor = x2.constructor, k = x2.abs().cmp(1), pr = Ctor.precision, rm = Ctor.rounding;
   if (k !== -1) {
-    return k === 0 ? x.isNeg() ? getPi(Ctor, pr, rm) : new Ctor(0) : new Ctor(NaN);
+    return k === 0 ? x2.isNeg() ? getPi(Ctor, pr, rm) : new Ctor(0) : new Ctor(NaN);
   }
-  if (x.isZero()) return getPi(Ctor, pr + 4, rm).times(0.5);
+  if (x2.isZero()) return getPi(Ctor, pr + 4, rm).times(0.5);
   Ctor.precision = pr + 6;
   Ctor.rounding = 1;
-  x = new Ctor(1).minus(x).div(x.plus(1)).sqrt().atan();
+  x2 = new Ctor(1).minus(x2).div(x2.plus(1)).sqrt().atan();
   Ctor.precision = pr;
   Ctor.rounding = rm;
-  return x.times(2);
+  return x2.times(2);
 };
 P.inverseHyperbolicCosine = P.acosh = function() {
-  var pr, rm, x = this, Ctor = x.constructor;
-  if (x.lte(1)) return new Ctor(x.eq(1) ? 0 : NaN);
-  if (!x.isFinite()) return new Ctor(x);
+  var pr, rm, x2 = this, Ctor = x2.constructor;
+  if (x2.lte(1)) return new Ctor(x2.eq(1) ? 0 : NaN);
+  if (!x2.isFinite()) return new Ctor(x2);
   pr = Ctor.precision;
   rm = Ctor.rounding;
-  Ctor.precision = pr + Math.max(Math.abs(x.e), x.sd()) + 4;
+  Ctor.precision = pr + Math.max(Math.abs(x2.e), x2.sd()) + 4;
   Ctor.rounding = 1;
   external = false;
-  x = x.times(x).minus(1).sqrt().plus(x);
+  x2 = x2.times(x2).minus(1).sqrt().plus(x2);
   external = true;
   Ctor.precision = pr;
   Ctor.rounding = rm;
-  return x.ln();
+  return x2.ln();
 };
 P.inverseHyperbolicSine = P.asinh = function() {
-  var pr, rm, x = this, Ctor = x.constructor;
-  if (!x.isFinite() || x.isZero()) return new Ctor(x);
+  var pr, rm, x2 = this, Ctor = x2.constructor;
+  if (!x2.isFinite() || x2.isZero()) return new Ctor(x2);
   pr = Ctor.precision;
   rm = Ctor.rounding;
-  Ctor.precision = pr + 2 * Math.max(Math.abs(x.e), x.sd()) + 6;
+  Ctor.precision = pr + 2 * Math.max(Math.abs(x2.e), x2.sd()) + 6;
   Ctor.rounding = 1;
   external = false;
-  x = x.times(x).plus(1).sqrt().plus(x);
+  x2 = x2.times(x2).plus(1).sqrt().plus(x2);
   external = true;
   Ctor.precision = pr;
   Ctor.rounding = rm;
-  return x.ln();
+  return x2.ln();
 };
 P.inverseHyperbolicTangent = P.atanh = function() {
-  var pr, rm, wpr, xsd, x = this, Ctor = x.constructor;
-  if (!x.isFinite()) return new Ctor(NaN);
-  if (x.e >= 0) return new Ctor(x.abs().eq(1) ? x.s / 0 : x.isZero() ? x : NaN);
+  var pr, rm, wpr, xsd, x2 = this, Ctor = x2.constructor;
+  if (!x2.isFinite()) return new Ctor(NaN);
+  if (x2.e >= 0) return new Ctor(x2.abs().eq(1) ? x2.s / 0 : x2.isZero() ? x2 : NaN);
   pr = Ctor.precision;
   rm = Ctor.rounding;
-  xsd = x.sd();
-  if (Math.max(xsd, pr) < 2 * -x.e - 1) return finalise(new Ctor(x), pr, rm, true);
-  Ctor.precision = wpr = xsd - x.e;
-  x = divide(x.plus(1), new Ctor(1).minus(x), wpr + pr, 1);
+  xsd = x2.sd();
+  if (Math.max(xsd, pr) < 2 * -x2.e - 1) return finalise(new Ctor(x2), pr, rm, true);
+  Ctor.precision = wpr = xsd - x2.e;
+  x2 = divide(x2.plus(1), new Ctor(1).minus(x2), wpr + pr, 1);
   Ctor.precision = pr + 4;
   Ctor.rounding = 1;
-  x = x.ln();
+  x2 = x2.ln();
   Ctor.precision = pr;
   Ctor.rounding = rm;
-  return x.times(0.5);
+  return x2.times(0.5);
 };
 P.inverseSine = P.asin = function() {
-  var halfPi, k, pr, rm, x = this, Ctor = x.constructor;
-  if (x.isZero()) return new Ctor(x);
-  k = x.abs().cmp(1);
+  var halfPi, k, pr, rm, x2 = this, Ctor = x2.constructor;
+  if (x2.isZero()) return new Ctor(x2);
+  k = x2.abs().cmp(1);
   pr = Ctor.precision;
   rm = Ctor.rounding;
   if (k !== -1) {
     if (k === 0) {
       halfPi = getPi(Ctor, pr + 4, rm).times(0.5);
-      halfPi.s = x.s;
+      halfPi.s = x2.s;
       return halfPi;
     }
     return new Ctor(NaN);
   }
   Ctor.precision = pr + 6;
   Ctor.rounding = 1;
-  x = x.div(new Ctor(1).minus(x.times(x)).sqrt().plus(1)).atan();
+  x2 = x2.div(new Ctor(1).minus(x2.times(x2)).sqrt().plus(1)).atan();
   Ctor.precision = pr;
   Ctor.rounding = rm;
-  return x.times(2);
+  return x2.times(2);
 };
 P.inverseTangent = P.atan = function() {
-  var i, j, k, n, px, t, r, wpr, x2, x = this, Ctor = x.constructor, pr = Ctor.precision, rm = Ctor.rounding;
-  if (!x.isFinite()) {
-    if (!x.s) return new Ctor(NaN);
+  var i2, j, k, n, px, t, r, wpr, x2, x3 = this, Ctor = x3.constructor, pr = Ctor.precision, rm = Ctor.rounding;
+  if (!x3.isFinite()) {
+    if (!x3.s) return new Ctor(NaN);
     if (pr + 4 <= PI_PRECISION) {
       r = getPi(Ctor, pr + 4, rm).times(0.5);
-      r.s = x.s;
+      r.s = x3.s;
       return r;
     }
-  } else if (x.isZero()) {
-    return new Ctor(x);
-  } else if (x.abs().eq(1) && pr + 4 <= PI_PRECISION) {
+  } else if (x3.isZero()) {
+    return new Ctor(x3);
+  } else if (x3.abs().eq(1) && pr + 4 <= PI_PRECISION) {
     r = getPi(Ctor, pr + 4, rm).times(0.25);
-    r.s = x.s;
+    r.s = x3.s;
     return r;
   }
   Ctor.precision = wpr = pr + 10;
   Ctor.rounding = 1;
   k = Math.min(28, wpr / LOG_BASE + 2 | 0);
-  for (i = k; i; --i) x = x.div(x.times(x).plus(1).sqrt().plus(1));
+  for (i2 = k; i2; --i2) x3 = x3.div(x3.times(x3).plus(1).sqrt().plus(1));
   external = false;
   j = Math.ceil(wpr / LOG_BASE);
   n = 1;
-  x2 = x.times(x);
-  r = new Ctor(x);
-  px = x;
-  for (; i !== -1; ) {
+  x2 = x3.times(x3);
+  r = new Ctor(x3);
+  px = x3;
+  for (; i2 !== -1; ) {
     px = px.times(x2);
     t = r.minus(px.div(n += 2));
     px = px.times(x2);
     r = t.plus(px.div(n += 2));
-    if (r.d[j] !== void 0) for (i = j; r.d[i] === t.d[i] && i--; ) ;
+    if (r.d[j] !== void 0) for (i2 = j; r.d[i2] === t.d[i2] && i2--; ) ;
   }
   if (k) r = r.times(2 << k - 1);
   external = true;
@@ -534,30 +534,30 @@ P.logarithm = P.log = function(base) {
   return finalise(r, pr, rm);
 };
 P.minus = P.sub = function(y) {
-  var d, e, i, j, k, len, pr, rm, xd, xe, xLTy, yd, x = this, Ctor = x.constructor;
+  var d, e, i2, j, k, len, pr, rm, xd, xe, xLTy, yd, x2 = this, Ctor = x2.constructor;
   y = new Ctor(y);
-  if (!x.d || !y.d) {
-    if (!x.s || !y.s) y = new Ctor(NaN);
-    else if (x.d) y.s = -y.s;
-    else y = new Ctor(y.d || x.s !== y.s ? x : NaN);
+  if (!x2.d || !y.d) {
+    if (!x2.s || !y.s) y = new Ctor(NaN);
+    else if (x2.d) y.s = -y.s;
+    else y = new Ctor(y.d || x2.s !== y.s ? x2 : NaN);
     return y;
   }
-  if (x.s != y.s) {
+  if (x2.s != y.s) {
     y.s = -y.s;
-    return x.plus(y);
+    return x2.plus(y);
   }
-  xd = x.d;
+  xd = x2.d;
   yd = y.d;
   pr = Ctor.precision;
   rm = Ctor.rounding;
   if (!xd[0] || !yd[0]) {
     if (yd[0]) y.s = -y.s;
-    else if (xd[0]) y = new Ctor(x);
+    else if (xd[0]) y = new Ctor(x2);
     else return new Ctor(rm === 3 ? -0 : 0);
     return external ? finalise(y, pr, rm) : y;
   }
   e = mathfloor(y.e / LOG_BASE);
-  xe = mathfloor(x.e / LOG_BASE);
+  xe = mathfloor(x2.e / LOG_BASE);
   xd = xd.slice();
   k = xe - e;
   if (k) {
@@ -571,22 +571,22 @@ P.minus = P.sub = function(y) {
       e = xe;
       len = xd.length;
     }
-    i = Math.max(Math.ceil(pr / LOG_BASE), len) + 2;
-    if (k > i) {
-      k = i;
+    i2 = Math.max(Math.ceil(pr / LOG_BASE), len) + 2;
+    if (k > i2) {
+      k = i2;
       d.length = 1;
     }
     d.reverse();
-    for (i = k; i--; ) d.push(0);
+    for (i2 = k; i2--; ) d.push(0);
     d.reverse();
   } else {
-    i = xd.length;
+    i2 = xd.length;
     len = yd.length;
-    xLTy = i < len;
-    if (xLTy) len = i;
-    for (i = 0; i < len; i++) {
-      if (xd[i] != yd[i]) {
-        xLTy = xd[i] < yd[i];
+    xLTy = i2 < len;
+    if (xLTy) len = i2;
+    for (i2 = 0; i2 < len; i2++) {
+      if (xd[i2] != yd[i2]) {
+        xLTy = xd[i2] < yd[i2];
         break;
       }
     }
@@ -599,14 +599,14 @@ P.minus = P.sub = function(y) {
     y.s = -y.s;
   }
   len = xd.length;
-  for (i = yd.length - len; i > 0; --i) xd[len++] = 0;
-  for (i = yd.length; i > k; ) {
-    if (xd[--i] < yd[i]) {
-      for (j = i; j && xd[--j] === 0; ) xd[j] = BASE - 1;
+  for (i2 = yd.length - len; i2 > 0; --i2) xd[len++] = 0;
+  for (i2 = yd.length; i2 > k; ) {
+    if (xd[--i2] < yd[i2]) {
+      for (j = i2; j && xd[--j] === 0; ) xd[j] = BASE - 1;
       --xd[j];
-      xd[i] += BASE;
+      xd[i2] += BASE;
     }
-    xd[i] -= yd[i];
+    xd[i2] -= yd[i2];
   }
   for (; xd[--len] === 0; ) xd.pop();
   for (; xd[0] === 0; xd.shift()) --e;
@@ -616,22 +616,22 @@ P.minus = P.sub = function(y) {
   return external ? finalise(y, pr, rm) : y;
 };
 P.modulo = P.mod = function(y) {
-  var q, x = this, Ctor = x.constructor;
+  var q, x2 = this, Ctor = x2.constructor;
   y = new Ctor(y);
-  if (!x.d || !y.s || y.d && !y.d[0]) return new Ctor(NaN);
-  if (!y.d || x.d && !x.d[0]) {
-    return finalise(new Ctor(x), Ctor.precision, Ctor.rounding);
+  if (!x2.d || !y.s || y.d && !y.d[0]) return new Ctor(NaN);
+  if (!y.d || x2.d && !x2.d[0]) {
+    return finalise(new Ctor(x2), Ctor.precision, Ctor.rounding);
   }
   external = false;
   if (Ctor.modulo == 9) {
-    q = divide(x, y.abs(), 0, 3, 1);
+    q = divide(x2, y.abs(), 0, 3, 1);
     q.s *= y.s;
   } else {
-    q = divide(x, y, 0, Ctor.modulo, 1);
+    q = divide(x2, y, 0, Ctor.modulo, 1);
   }
   q = q.times(y);
   external = true;
-  return x.minus(q);
+  return x2.minus(q);
 };
 P.naturalExponential = P.exp = function() {
   return naturalExponential(this);
@@ -640,38 +640,38 @@ P.naturalLogarithm = P.ln = function() {
   return naturalLogarithm(this);
 };
 P.negated = P.neg = function() {
-  var x = new this.constructor(this);
-  x.s = -x.s;
-  return finalise(x);
+  var x2 = new this.constructor(this);
+  x2.s = -x2.s;
+  return finalise(x2);
 };
 P.plus = P.add = function(y) {
-  var carry, d, e, i, k, len, pr, rm, xd, yd, x = this, Ctor = x.constructor;
+  var carry, d, e, i2, k, len, pr, rm, xd, yd, x2 = this, Ctor = x2.constructor;
   y = new Ctor(y);
-  if (!x.d || !y.d) {
-    if (!x.s || !y.s) y = new Ctor(NaN);
-    else if (!x.d) y = new Ctor(y.d || x.s === y.s ? x : NaN);
+  if (!x2.d || !y.d) {
+    if (!x2.s || !y.s) y = new Ctor(NaN);
+    else if (!x2.d) y = new Ctor(y.d || x2.s === y.s ? x2 : NaN);
     return y;
   }
-  if (x.s != y.s) {
+  if (x2.s != y.s) {
     y.s = -y.s;
-    return x.minus(y);
+    return x2.minus(y);
   }
-  xd = x.d;
+  xd = x2.d;
   yd = y.d;
   pr = Ctor.precision;
   rm = Ctor.rounding;
   if (!xd[0] || !yd[0]) {
-    if (!yd[0]) y = new Ctor(x);
+    if (!yd[0]) y = new Ctor(x2);
     return external ? finalise(y, pr, rm) : y;
   }
-  k = mathfloor(x.e / LOG_BASE);
+  k = mathfloor(x2.e / LOG_BASE);
   e = mathfloor(y.e / LOG_BASE);
   xd = xd.slice();
-  i = k - e;
-  if (i) {
-    if (i < 0) {
+  i2 = k - e;
+  if (i2) {
+    if (i2 < 0) {
       d = xd;
-      i = -i;
+      i2 = -i2;
       len = yd.length;
     } else {
       d = yd;
@@ -680,25 +680,25 @@ P.plus = P.add = function(y) {
     }
     k = Math.ceil(pr / LOG_BASE);
     len = k > len ? k + 1 : len + 1;
-    if (i > len) {
-      i = len;
+    if (i2 > len) {
+      i2 = len;
       d.length = 1;
     }
     d.reverse();
-    for (; i--; ) d.push(0);
+    for (; i2--; ) d.push(0);
     d.reverse();
   }
   len = xd.length;
-  i = yd.length;
-  if (len - i < 0) {
-    i = len;
+  i2 = yd.length;
+  if (len - i2 < 0) {
+    i2 = len;
     d = yd;
     yd = xd;
     xd = d;
   }
-  for (carry = 0; i; ) {
-    carry = (xd[--i] = xd[i] + yd[i] + carry) / BASE | 0;
-    xd[i] %= BASE;
+  for (carry = 0; i2; ) {
+    carry = (xd[--i2] = xd[i2] + yd[i2] + carry) / BASE | 0;
+    xd[i2] %= BASE;
   }
   if (carry) {
     xd.unshift(carry);
@@ -710,40 +710,40 @@ P.plus = P.add = function(y) {
   return external ? finalise(y, pr, rm) : y;
 };
 P.precision = P.sd = function(z2) {
-  var k, x = this;
+  var k, x2 = this;
   if (z2 !== void 0 && z2 !== !!z2 && z2 !== 1 && z2 !== 0) throw Error(invalidArgument + z2);
-  if (x.d) {
-    k = getPrecision(x.d);
-    if (z2 && x.e + 1 > k) k = x.e + 1;
+  if (x2.d) {
+    k = getPrecision(x2.d);
+    if (z2 && x2.e + 1 > k) k = x2.e + 1;
   } else {
     k = NaN;
   }
   return k;
 };
 P.round = function() {
-  var x = this, Ctor = x.constructor;
-  return finalise(new Ctor(x), x.e + 1, Ctor.rounding);
+  var x2 = this, Ctor = x2.constructor;
+  return finalise(new Ctor(x2), x2.e + 1, Ctor.rounding);
 };
 P.sine = P.sin = function() {
-  var pr, rm, x = this, Ctor = x.constructor;
-  if (!x.isFinite()) return new Ctor(NaN);
-  if (x.isZero()) return new Ctor(x);
+  var pr, rm, x2 = this, Ctor = x2.constructor;
+  if (!x2.isFinite()) return new Ctor(NaN);
+  if (x2.isZero()) return new Ctor(x2);
   pr = Ctor.precision;
   rm = Ctor.rounding;
-  Ctor.precision = pr + Math.max(x.e, x.sd()) + LOG_BASE;
+  Ctor.precision = pr + Math.max(x2.e, x2.sd()) + LOG_BASE;
   Ctor.rounding = 1;
-  x = sine(Ctor, toLessThanHalfPi(Ctor, x));
+  x2 = sine(Ctor, toLessThanHalfPi(Ctor, x2));
   Ctor.precision = pr;
   Ctor.rounding = rm;
-  return finalise(quadrant > 2 ? x.neg() : x, pr, rm, true);
+  return finalise(quadrant > 2 ? x2.neg() : x2, pr, rm, true);
 };
 P.squareRoot = P.sqrt = function() {
-  var m, n, sd, r, rep, t, x = this, d = x.d, e = x.e, s = x.s, Ctor = x.constructor;
+  var m, n, sd, r, rep, t, x2 = this, d = x2.d, e = x2.e, s = x2.s, Ctor = x2.constructor;
   if (s !== 1 || !d || !d[0]) {
-    return new Ctor(!s || s < 0 && (!d || d[0]) ? NaN : d ? x : 1 / 0);
+    return new Ctor(!s || s < 0 && (!d || d[0]) ? NaN : d ? x2 : 1 / 0);
   }
   external = false;
-  s = Math.sqrt(+x);
+  s = Math.sqrt(+x2);
   if (s == 0 || s == 1 / 0) {
     n = digitsToString(d);
     if ((n.length + e) % 2 == 0) n += "0";
@@ -762,13 +762,13 @@ P.squareRoot = P.sqrt = function() {
   sd = (e = Ctor.precision) + 3;
   for (; ; ) {
     t = r;
-    r = t.plus(divide(x, t, sd + 2, 1)).times(0.5);
+    r = t.plus(divide(x2, t, sd + 2, 1)).times(0.5);
     if (digitsToString(t.d).slice(0, sd) === (n = digitsToString(r.d)).slice(0, sd)) {
       n = n.slice(sd - 3, sd + 1);
       if (n == "9999" || !rep && n == "4999") {
         if (!rep) {
           finalise(t, e + 1, 0);
-          if (t.times(t).eq(x)) {
+          if (t.times(t).eq(x2)) {
             r = t;
             break;
           }
@@ -778,7 +778,7 @@ P.squareRoot = P.sqrt = function() {
       } else {
         if (!+n || !+n.slice(1) && n.charAt(0) == "5") {
           finalise(r, e + 1, 1);
-          m = !r.times(r).eq(x);
+          m = !r.times(r).eq(x2);
         }
         break;
       }
@@ -788,27 +788,27 @@ P.squareRoot = P.sqrt = function() {
   return finalise(r, e, Ctor.rounding, m);
 };
 P.tangent = P.tan = function() {
-  var pr, rm, x = this, Ctor = x.constructor;
-  if (!x.isFinite()) return new Ctor(NaN);
-  if (x.isZero()) return new Ctor(x);
+  var pr, rm, x2 = this, Ctor = x2.constructor;
+  if (!x2.isFinite()) return new Ctor(NaN);
+  if (x2.isZero()) return new Ctor(x2);
   pr = Ctor.precision;
   rm = Ctor.rounding;
   Ctor.precision = pr + 10;
   Ctor.rounding = 1;
-  x = x.sin();
-  x.s = 1;
-  x = divide(x, new Ctor(1).minus(x.times(x)).sqrt(), pr + 10, 0);
+  x2 = x2.sin();
+  x2.s = 1;
+  x2 = divide(x2, new Ctor(1).minus(x2.times(x2)).sqrt(), pr + 10, 0);
   Ctor.precision = pr;
   Ctor.rounding = rm;
-  return finalise(quadrant == 2 || quadrant == 4 ? x.neg() : x, pr, rm, true);
+  return finalise(quadrant == 2 || quadrant == 4 ? x2.neg() : x2, pr, rm, true);
 };
 P.times = P.mul = function(y) {
-  var carry, e, i, k, r, rL, t, xdL, ydL, x = this, Ctor = x.constructor, xd = x.d, yd = (y = new Ctor(y)).d;
-  y.s *= x.s;
+  var carry, e, i2, k, r, rL, t, xdL, ydL, x2 = this, Ctor = x2.constructor, xd = x2.d, yd = (y = new Ctor(y)).d;
+  y.s *= x2.s;
   if (!xd || !xd[0] || !yd || !yd[0]) {
     return new Ctor(!y.s || xd && !xd[0] && !yd || yd && !yd[0] && !xd ? NaN : !xd || !yd ? y.s / 0 : y.s * 0);
   }
-  e = mathfloor(x.e / LOG_BASE) + mathfloor(y.e / LOG_BASE);
+  e = mathfloor(x2.e / LOG_BASE) + mathfloor(y.e / LOG_BASE);
   xdL = xd.length;
   ydL = yd.length;
   if (xdL < ydL) {
@@ -821,11 +821,11 @@ P.times = P.mul = function(y) {
   }
   r = [];
   rL = xdL + ydL;
-  for (i = rL; i--; ) r.push(0);
-  for (i = ydL; --i >= 0; ) {
+  for (i2 = rL; i2--; ) r.push(0);
+  for (i2 = ydL; --i2 >= 0; ) {
     carry = 0;
-    for (k = xdL + i; k > i; ) {
-      t = r[k] + yd[i] * xd[k - i - 1] + carry;
+    for (k = xdL + i2; k > i2; ) {
+      t = r[k] + yd[i2] * xd[k - i2 - 1] + carry;
       r[k--] = t % BASE | 0;
       carry = t / BASE | 0;
     }
@@ -842,47 +842,47 @@ P.toBinary = function(sd, rm) {
   return toStringBinary(this, 2, sd, rm);
 };
 P.toDecimalPlaces = P.toDP = function(dp, rm) {
-  var x = this, Ctor = x.constructor;
-  x = new Ctor(x);
-  if (dp === void 0) return x;
+  var x2 = this, Ctor = x2.constructor;
+  x2 = new Ctor(x2);
+  if (dp === void 0) return x2;
   checkInt32(dp, 0, MAX_DIGITS);
   if (rm === void 0) rm = Ctor.rounding;
   else checkInt32(rm, 0, 8);
-  return finalise(x, dp + x.e + 1, rm);
+  return finalise(x2, dp + x2.e + 1, rm);
 };
 P.toExponential = function(dp, rm) {
-  var str, x = this, Ctor = x.constructor;
+  var str, x2 = this, Ctor = x2.constructor;
   if (dp === void 0) {
-    str = finiteToString(x, true);
+    str = finiteToString(x2, true);
   } else {
     checkInt32(dp, 0, MAX_DIGITS);
     if (rm === void 0) rm = Ctor.rounding;
     else checkInt32(rm, 0, 8);
-    x = finalise(new Ctor(x), dp + 1, rm);
-    str = finiteToString(x, true, dp + 1);
+    x2 = finalise(new Ctor(x2), dp + 1, rm);
+    str = finiteToString(x2, true, dp + 1);
   }
-  return x.isNeg() && !x.isZero() ? "-" + str : str;
+  return x2.isNeg() && !x2.isZero() ? "-" + str : str;
 };
 P.toFixed = function(dp, rm) {
-  var str, y, x = this, Ctor = x.constructor;
+  var str, y, x2 = this, Ctor = x2.constructor;
   if (dp === void 0) {
-    str = finiteToString(x);
+    str = finiteToString(x2);
   } else {
     checkInt32(dp, 0, MAX_DIGITS);
     if (rm === void 0) rm = Ctor.rounding;
     else checkInt32(rm, 0, 8);
-    y = finalise(new Ctor(x), dp + x.e + 1, rm);
+    y = finalise(new Ctor(x2), dp + x2.e + 1, rm);
     str = finiteToString(y, false, dp + y.e + 1);
   }
-  return x.isNeg() && !x.isZero() ? "-" + str : str;
+  return x2.isNeg() && !x2.isZero() ? "-" + str : str;
 };
 P.toFraction = function(maxD) {
-  var d, d0, d1, d2, e, k, n, n0, n1, pr, q, r, x = this, xd = x.d, Ctor = x.constructor;
-  if (!xd) return new Ctor(x);
+  var d, d0, d1, d2, e, k, n, n0, n1, pr, q, r, x2 = this, xd = x2.d, Ctor = x2.constructor;
+  if (!xd) return new Ctor(x2);
   n1 = d0 = new Ctor(1);
   d1 = n0 = new Ctor(0);
   d = new Ctor(d1);
-  e = d.e = getPrecision(xd) - x.e - 1;
+  e = d.e = getPrecision(xd) - x2.e - 1;
   k = e % LOG_BASE;
   d.d[0] = mathpow(10, k < 0 ? LOG_BASE + k : k);
   if (maxD == null) {
@@ -912,8 +912,8 @@ P.toFraction = function(maxD) {
   d2 = divide(maxD.minus(d0), d1, 0, 1, 1);
   n0 = n0.plus(d2.times(n1));
   d0 = d0.plus(d2.times(d1));
-  n0.s = n1.s = x.s;
-  r = divide(n1, d1, e, 1).minus(x).abs().cmp(divide(n0, d0, e, 1).minus(x).abs()) < 1 ? [n1, d1] : [n0, d0];
+  n0.s = n1.s = x2.s;
+  r = divide(n1, d1, e, 1).minus(x2).abs().cmp(divide(n0, d0, e, 1).minus(x2).abs()) < 1 ? [n1, d1] : [n0, d0];
   Ctor.precision = pr;
   external = true;
   return r;
@@ -922,10 +922,10 @@ P.toHexadecimal = P.toHex = function(sd, rm) {
   return toStringBinary(this, 16, sd, rm);
 };
 P.toNearest = function(y, rm) {
-  var x = this, Ctor = x.constructor;
-  x = new Ctor(x);
+  var x2 = this, Ctor = x2.constructor;
+  x2 = new Ctor(x2);
   if (y == null) {
-    if (!x.d) return x;
+    if (!x2.d) return x2;
     y = new Ctor(1);
     rm = Ctor.rounding;
   } else {
@@ -935,22 +935,22 @@ P.toNearest = function(y, rm) {
     } else {
       checkInt32(rm, 0, 8);
     }
-    if (!x.d) return y.s ? x : y;
+    if (!x2.d) return y.s ? x2 : y;
     if (!y.d) {
-      if (y.s) y.s = x.s;
+      if (y.s) y.s = x2.s;
       return y;
     }
   }
   if (y.d[0]) {
     external = false;
-    x = divide(x, y, 0, rm, 1).times(y);
+    x2 = divide(x2, y, 0, rm, 1).times(y);
     external = true;
-    finalise(x);
+    finalise(x2);
   } else {
-    y.s = x.s;
-    x = y;
+    y.s = x2.s;
+    x2 = y;
   }
-  return x;
+  return x2;
 };
 P.toNumber = function() {
   return +this;
@@ -959,39 +959,39 @@ P.toOctal = function(sd, rm) {
   return toStringBinary(this, 8, sd, rm);
 };
 P.toPower = P.pow = function(y) {
-  var e, k, pr, r, rm, s, x = this, Ctor = x.constructor, yn = +(y = new Ctor(y));
-  if (!x.d || !y.d || !x.d[0] || !y.d[0]) return new Ctor(mathpow(+x, yn));
-  x = new Ctor(x);
-  if (x.eq(1)) return x;
+  var e, k, pr, r, rm, s, x2 = this, Ctor = x2.constructor, yn = +(y = new Ctor(y));
+  if (!x2.d || !y.d || !x2.d[0] || !y.d[0]) return new Ctor(mathpow(+x2, yn));
+  x2 = new Ctor(x2);
+  if (x2.eq(1)) return x2;
   pr = Ctor.precision;
   rm = Ctor.rounding;
-  if (y.eq(1)) return finalise(x, pr, rm);
+  if (y.eq(1)) return finalise(x2, pr, rm);
   e = mathfloor(y.e / LOG_BASE);
   if (e >= y.d.length - 1 && (k = yn < 0 ? -yn : yn) <= MAX_SAFE_INTEGER) {
-    r = intPow(Ctor, x, k, pr);
+    r = intPow(Ctor, x2, k, pr);
     return y.s < 0 ? new Ctor(1).div(r) : finalise(r, pr, rm);
   }
-  s = x.s;
+  s = x2.s;
   if (s < 0) {
     if (e < y.d.length - 1) return new Ctor(NaN);
     if ((y.d[e] & 1) == 0) s = 1;
-    if (x.e == 0 && x.d[0] == 1 && x.d.length == 1) {
-      x.s = s;
-      return x;
+    if (x2.e == 0 && x2.d[0] == 1 && x2.d.length == 1) {
+      x2.s = s;
+      return x2;
     }
   }
-  k = mathpow(+x, yn);
-  e = k == 0 || !isFinite(k) ? mathfloor(yn * (Math.log("0." + digitsToString(x.d)) / Math.LN10 + x.e + 1)) : new Ctor(k + "").e;
+  k = mathpow(+x2, yn);
+  e = k == 0 || !isFinite(k) ? mathfloor(yn * (Math.log("0." + digitsToString(x2.d)) / Math.LN10 + x2.e + 1)) : new Ctor(k + "").e;
   if (e > Ctor.maxE + 1 || e < Ctor.minE - 1) return new Ctor(e > 0 ? s / 0 : 0);
   external = false;
-  Ctor.rounding = x.s = 1;
+  Ctor.rounding = x2.s = 1;
   k = Math.min(12, (e + "").length);
-  r = naturalExponential(y.times(naturalLogarithm(x, pr + k)), pr);
+  r = naturalExponential(y.times(naturalLogarithm(x2, pr + k)), pr);
   if (r.d) {
     r = finalise(r, pr + 5, 1);
     if (checkRoundingDigits(r.d, pr, rm)) {
       e = pr + 10;
-      r = finalise(naturalExponential(y.times(naturalLogarithm(x, e + k)), e), e + 5, 1);
+      r = finalise(naturalExponential(y.times(naturalLogarithm(x2, e + k)), e), e + 5, 1);
       if (+digitsToString(r.d).slice(pr + 1, pr + 15) + 1 == 1e14) {
         r = finalise(r, pr + 1, 0);
       }
@@ -1003,20 +1003,20 @@ P.toPower = P.pow = function(y) {
   return finalise(r, pr, rm);
 };
 P.toPrecision = function(sd, rm) {
-  var str, x = this, Ctor = x.constructor;
+  var str, x2 = this, Ctor = x2.constructor;
   if (sd === void 0) {
-    str = finiteToString(x, x.e <= Ctor.toExpNeg || x.e >= Ctor.toExpPos);
+    str = finiteToString(x2, x2.e <= Ctor.toExpNeg || x2.e >= Ctor.toExpPos);
   } else {
     checkInt32(sd, 1, MAX_DIGITS);
     if (rm === void 0) rm = Ctor.rounding;
     else checkInt32(rm, 0, 8);
-    x = finalise(new Ctor(x), sd, rm);
-    str = finiteToString(x, sd <= x.e || x.e <= Ctor.toExpNeg, sd);
+    x2 = finalise(new Ctor(x2), sd, rm);
+    str = finiteToString(x2, sd <= x2.e || x2.e <= Ctor.toExpNeg, sd);
   }
-  return x.isNeg() && !x.isZero() ? "-" + str : str;
+  return x2.isNeg() && !x2.isZero() ? "-" + str : str;
 };
 P.toSignificantDigits = P.toSD = function(sd, rm) {
-  var x = this, Ctor = x.constructor;
+  var x2 = this, Ctor = x2.constructor;
   if (sd === void 0) {
     sd = Ctor.precision;
     rm = Ctor.rounding;
@@ -1025,30 +1025,30 @@ P.toSignificantDigits = P.toSD = function(sd, rm) {
     if (rm === void 0) rm = Ctor.rounding;
     else checkInt32(rm, 0, 8);
   }
-  return finalise(new Ctor(x), sd, rm);
+  return finalise(new Ctor(x2), sd, rm);
 };
 P.toString = function() {
-  var x = this, Ctor = x.constructor, str = finiteToString(x, x.e <= Ctor.toExpNeg || x.e >= Ctor.toExpPos);
-  return x.isNeg() && !x.isZero() ? "-" + str : str;
+  var x2 = this, Ctor = x2.constructor, str = finiteToString(x2, x2.e <= Ctor.toExpNeg || x2.e >= Ctor.toExpPos);
+  return x2.isNeg() && !x2.isZero() ? "-" + str : str;
 };
 P.truncated = P.trunc = function() {
   return finalise(new this.constructor(this), this.e + 1, 1);
 };
 P.valueOf = P.toJSON = function() {
-  var x = this, Ctor = x.constructor, str = finiteToString(x, x.e <= Ctor.toExpNeg || x.e >= Ctor.toExpPos);
-  return x.isNeg() ? "-" + str : str;
+  var x2 = this, Ctor = x2.constructor, str = finiteToString(x2, x2.e <= Ctor.toExpNeg || x2.e >= Ctor.toExpPos);
+  return x2.isNeg() ? "-" + str : str;
 };
 function digitsToString(d) {
-  var i, k, ws, indexOfLastWord = d.length - 1, str = "", w = d[0];
+  var i2, k, ws, indexOfLastWord = d.length - 1, str = "", w = d[0];
   if (indexOfLastWord > 0) {
     str += w;
-    for (i = 1; i < indexOfLastWord; i++) {
-      ws = d[i] + "";
+    for (i2 = 1; i2 < indexOfLastWord; i2++) {
+      ws = d[i2] + "";
       k = LOG_BASE - ws.length;
       if (k) str += getZeroString(k);
       str += ws;
     }
-    w = d[i];
+    w = d[i2];
     ws = w + "";
     k = LOG_BASE - ws.length;
     if (k) str += getZeroString(k);
@@ -1058,48 +1058,48 @@ function digitsToString(d) {
   for (; w % 10 === 0; ) w /= 10;
   return str + w;
 }
-function checkInt32(i, min2, max2) {
-  if (i !== ~~i || i < min2 || i > max2) {
-    throw Error(invalidArgument + i);
+function checkInt32(i2, min2, max2) {
+  if (i2 !== ~~i2 || i2 < min2 || i2 > max2) {
+    throw Error(invalidArgument + i2);
   }
 }
-function checkRoundingDigits(d, i, rm, repeating) {
+function checkRoundingDigits(d, i2, rm, repeating) {
   var di, k, r, rd;
-  for (k = d[0]; k >= 10; k /= 10) --i;
-  if (--i < 0) {
-    i += LOG_BASE;
+  for (k = d[0]; k >= 10; k /= 10) --i2;
+  if (--i2 < 0) {
+    i2 += LOG_BASE;
     di = 0;
   } else {
-    di = Math.ceil((i + 1) / LOG_BASE);
-    i %= LOG_BASE;
+    di = Math.ceil((i2 + 1) / LOG_BASE);
+    i2 %= LOG_BASE;
   }
-  k = mathpow(10, LOG_BASE - i);
+  k = mathpow(10, LOG_BASE - i2);
   rd = d[di] % k | 0;
   if (repeating == null) {
-    if (i < 3) {
-      if (i == 0) rd = rd / 100 | 0;
-      else if (i == 1) rd = rd / 10 | 0;
+    if (i2 < 3) {
+      if (i2 == 0) rd = rd / 100 | 0;
+      else if (i2 == 1) rd = rd / 10 | 0;
       r = rm < 4 && rd == 99999 || rm > 3 && rd == 49999 || rd == 5e4 || rd == 0;
     } else {
-      r = (rm < 4 && rd + 1 == k || rm > 3 && rd + 1 == k / 2) && (d[di + 1] / k / 100 | 0) == mathpow(10, i - 2) - 1 || (rd == k / 2 || rd == 0) && (d[di + 1] / k / 100 | 0) == 0;
+      r = (rm < 4 && rd + 1 == k || rm > 3 && rd + 1 == k / 2) && (d[di + 1] / k / 100 | 0) == mathpow(10, i2 - 2) - 1 || (rd == k / 2 || rd == 0) && (d[di + 1] / k / 100 | 0) == 0;
     }
   } else {
-    if (i < 4) {
-      if (i == 0) rd = rd / 1e3 | 0;
-      else if (i == 1) rd = rd / 100 | 0;
-      else if (i == 2) rd = rd / 10 | 0;
+    if (i2 < 4) {
+      if (i2 == 0) rd = rd / 1e3 | 0;
+      else if (i2 == 1) rd = rd / 100 | 0;
+      else if (i2 == 2) rd = rd / 10 | 0;
       r = (repeating || rm < 4) && rd == 9999 || !repeating && rm > 3 && rd == 4999;
     } else {
-      r = ((repeating || rm < 4) && rd + 1 == k || !repeating && rm > 3 && rd + 1 == k / 2) && (d[di + 1] / k / 1e3 | 0) == mathpow(10, i - 3) - 1;
+      r = ((repeating || rm < 4) && rd + 1 == k || !repeating && rm > 3 && rd + 1 == k / 2) && (d[di + 1] / k / 1e3 | 0) == mathpow(10, i2 - 3) - 1;
     }
   }
   return r;
 }
 function convertBase(str, baseIn, baseOut) {
-  var j, arr = [0], arrL, i = 0, strL = str.length;
-  for (; i < strL; ) {
+  var j, arr = [0], arrL, i2 = 0, strL = str.length;
+  for (; i2 < strL; ) {
     for (arrL = arr.length; arrL--; ) arr[arrL] *= baseIn;
-    arr[0] += NUMERALS.indexOf(str.charAt(i++));
+    arr[0] += NUMERALS.indexOf(str.charAt(i2++));
     for (j = 0; j < arr.length; j++) {
       if (arr[j] > baseOut - 1) {
         if (arr[j + 1] === void 0) arr[j + 1] = 0;
@@ -1110,10 +1110,10 @@ function convertBase(str, baseIn, baseOut) {
   }
   return arr.reverse();
 }
-function cosine(Ctor, x) {
+function cosine(Ctor, x2) {
   var k, len, y;
-  if (x.isZero()) return x;
-  len = x.d.length;
+  if (x2.isZero()) return x2;
+  len = x2.d.length;
   if (len < 32) {
     k = Math.ceil(len / 3);
     y = (1 / tinyPow(4, k)).toString();
@@ -1122,33 +1122,33 @@ function cosine(Ctor, x) {
     y = "2.3283064365386962890625e-10";
   }
   Ctor.precision += k;
-  x = taylorSeries(Ctor, 1, x.times(y), new Ctor(1));
-  for (var i = k; i--; ) {
-    var cos2x = x.times(x);
-    x = cos2x.times(cos2x).minus(cos2x).times(8).plus(1);
+  x2 = taylorSeries(Ctor, 1, x2.times(y), new Ctor(1));
+  for (var i2 = k; i2--; ) {
+    var cos2x = x2.times(x2);
+    x2 = cos2x.times(cos2x).minus(cos2x).times(8).plus(1);
   }
   Ctor.precision -= k;
-  return x;
+  return x2;
 }
 var divide = /* @__PURE__ */ (function() {
-  function multiplyInteger(x, k, base) {
-    var temp, carry = 0, i = x.length;
-    for (x = x.slice(); i--; ) {
-      temp = x[i] * k + carry;
-      x[i] = temp % base | 0;
+  function multiplyInteger(x2, k, base) {
+    var temp, carry = 0, i2 = x2.length;
+    for (x2 = x2.slice(); i2--; ) {
+      temp = x2[i2] * k + carry;
+      x2[i2] = temp % base | 0;
       carry = temp / base | 0;
     }
-    if (carry) x.unshift(carry);
-    return x;
+    if (carry) x2.unshift(carry);
+    return x2;
   }
   function compare(a, b, aL, bL) {
-    var i, r;
+    var i2, r;
     if (aL != bL) {
       r = aL > bL ? 1 : -1;
     } else {
-      for (i = r = 0; i < aL; i++) {
-        if (a[i] != b[i]) {
-          r = a[i] > b[i] ? 1 : -1;
+      for (i2 = r = 0; i2 < aL; i2++) {
+        if (a[i2] != b[i2]) {
+          r = a[i2] > b[i2] ? 1 : -1;
           break;
         }
       }
@@ -1156,20 +1156,20 @@ var divide = /* @__PURE__ */ (function() {
     return r;
   }
   function subtract(a, b, aL, base) {
-    var i = 0;
+    var i2 = 0;
     for (; aL--; ) {
-      a[aL] -= i;
-      i = a[aL] < b[aL] ? 1 : 0;
-      a[aL] = i * base + a[aL] - b[aL];
+      a[aL] -= i2;
+      i2 = a[aL] < b[aL] ? 1 : 0;
+      a[aL] = i2 * base + a[aL] - b[aL];
     }
     for (; !a[0] && a.length > 1; ) a.shift();
   }
-  return function(x, y, pr, rm, dp, base) {
-    var cmp, e, i, k, logBase, more, prod, prodL, q, qd, rem, remL, rem0, sd, t, xi, xL, yd0, yL, yz, Ctor = x.constructor, sign2 = x.s == y.s ? 1 : -1, xd = x.d, yd = y.d;
+  return function(x2, y, pr, rm, dp, base) {
+    var cmp, e, i2, k, logBase, more, prod, prodL, q, qd, rem, remL, rem0, sd, t, xi, xL, yd0, yL, yz, Ctor = x2.constructor, sign2 = x2.s == y.s ? 1 : -1, xd = x2.d, yd = y.d;
     if (!xd || !xd[0] || !yd || !yd[0]) {
       return new Ctor(
         // Return NaN if either NaN, or both Infinity or 0.
-        !x.s || !y.s || (xd ? yd && xd[0] == yd[0] : !yd) ? NaN : (
+        !x2.s || !y.s || (xd ? yd && xd[0] == yd[0] : !yd) ? NaN : (
           // Return ±0 if x is 0 or y is ±Infinity, or return ±Infinity as y is 0.
           xd && xd[0] == 0 || !yd ? sign2 * 0 : sign2 / 0
         )
@@ -1177,23 +1177,23 @@ var divide = /* @__PURE__ */ (function() {
     }
     if (base) {
       logBase = 1;
-      e = x.e - y.e;
+      e = x2.e - y.e;
     } else {
       base = BASE;
       logBase = LOG_BASE;
-      e = mathfloor(x.e / logBase) - mathfloor(y.e / logBase);
+      e = mathfloor(x2.e / logBase) - mathfloor(y.e / logBase);
     }
     yL = yd.length;
     xL = xd.length;
     q = new Ctor(sign2);
     qd = q.d = [];
-    for (i = 0; yd[i] == (xd[i] || 0); i++) ;
-    if (yd[i] > (xd[i] || 0)) e--;
+    for (i2 = 0; yd[i2] == (xd[i2] || 0); i2++) ;
+    if (yd[i2] > (xd[i2] || 0)) e--;
     if (pr == null) {
       sd = pr = Ctor.precision;
       rm = Ctor.rounding;
     } else if (dp) {
-      sd = pr + (x.e - y.e) + 1;
+      sd = pr + (x2.e - y.e) + 1;
     } else {
       sd = pr;
     }
@@ -1202,17 +1202,17 @@ var divide = /* @__PURE__ */ (function() {
       more = true;
     } else {
       sd = sd / logBase + 2 | 0;
-      i = 0;
+      i2 = 0;
       if (yL == 1) {
         k = 0;
         yd = yd[0];
         sd++;
-        for (; (i < xL || k) && sd--; i++) {
-          t = k * base + (xd[i] || 0);
-          qd[i] = t / yd | 0;
+        for (; (i2 < xL || k) && sd--; i2++) {
+          t = k * base + (xd[i2] || 0);
+          qd[i2] = t / yd | 0;
           k = t % yd | 0;
         }
-        more = k || i < xL;
+        more = k || i2 < xL;
       } else {
         k = base / (yd[0] + 1) | 0;
         if (k > 1) {
@@ -1266,7 +1266,7 @@ var divide = /* @__PURE__ */ (function() {
             k++;
             rem = [0];
           }
-          qd[i++] = k;
+          qd[i2++] = k;
           if (cmp && rem[0]) {
             rem[remL++] = xd[xi] || 0;
           } else {
@@ -1282,77 +1282,77 @@ var divide = /* @__PURE__ */ (function() {
       q.e = e;
       inexact = more;
     } else {
-      for (i = 1, k = qd[0]; k >= 10; k /= 10) i++;
-      q.e = i + e * logBase - 1;
+      for (i2 = 1, k = qd[0]; k >= 10; k /= 10) i2++;
+      q.e = i2 + e * logBase - 1;
       finalise(q, dp ? pr + q.e + 1 : pr, rm, more);
     }
     return q;
   };
 })();
-function finalise(x, sd, rm, isTruncated) {
-  var digits, i, j, k, rd, roundUp, w, xd, xdi, Ctor = x.constructor;
+function finalise(x2, sd, rm, isTruncated) {
+  var digits, i2, j, k, rd, roundUp, w, xd, xdi, Ctor = x2.constructor;
   out: if (sd != null) {
-    xd = x.d;
-    if (!xd) return x;
+    xd = x2.d;
+    if (!xd) return x2;
     for (digits = 1, k = xd[0]; k >= 10; k /= 10) digits++;
-    i = sd - digits;
-    if (i < 0) {
-      i += LOG_BASE;
+    i2 = sd - digits;
+    if (i2 < 0) {
+      i2 += LOG_BASE;
       j = sd;
       w = xd[xdi = 0];
       rd = w / mathpow(10, digits - j - 1) % 10 | 0;
     } else {
-      xdi = Math.ceil((i + 1) / LOG_BASE);
+      xdi = Math.ceil((i2 + 1) / LOG_BASE);
       k = xd.length;
       if (xdi >= k) {
         if (isTruncated) {
           for (; k++ <= xdi; ) xd.push(0);
           w = rd = 0;
           digits = 1;
-          i %= LOG_BASE;
-          j = i - LOG_BASE + 1;
+          i2 %= LOG_BASE;
+          j = i2 - LOG_BASE + 1;
         } else {
           break out;
         }
       } else {
         w = k = xd[xdi];
         for (digits = 1; k >= 10; k /= 10) digits++;
-        i %= LOG_BASE;
-        j = i - LOG_BASE + digits;
+        i2 %= LOG_BASE;
+        j = i2 - LOG_BASE + digits;
         rd = j < 0 ? 0 : w / mathpow(10, digits - j - 1) % 10 | 0;
       }
     }
     isTruncated = isTruncated || sd < 0 || xd[xdi + 1] !== void 0 || (j < 0 ? w : w % mathpow(10, digits - j - 1));
-    roundUp = rm < 4 ? (rd || isTruncated) && (rm == 0 || rm == (x.s < 0 ? 3 : 2)) : rd > 5 || rd == 5 && (rm == 4 || isTruncated || rm == 6 && // Check whether the digit to the left of the rounding digit is odd.
-    (i > 0 ? j > 0 ? w / mathpow(10, digits - j) : 0 : xd[xdi - 1]) % 10 & 1 || rm == (x.s < 0 ? 8 : 7));
+    roundUp = rm < 4 ? (rd || isTruncated) && (rm == 0 || rm == (x2.s < 0 ? 3 : 2)) : rd > 5 || rd == 5 && (rm == 4 || isTruncated || rm == 6 && // Check whether the digit to the left of the rounding digit is odd.
+    (i2 > 0 ? j > 0 ? w / mathpow(10, digits - j) : 0 : xd[xdi - 1]) % 10 & 1 || rm == (x2.s < 0 ? 8 : 7));
     if (sd < 1 || !xd[0]) {
       xd.length = 0;
       if (roundUp) {
-        sd -= x.e + 1;
+        sd -= x2.e + 1;
         xd[0] = mathpow(10, (LOG_BASE - sd % LOG_BASE) % LOG_BASE);
-        x.e = -sd || 0;
+        x2.e = -sd || 0;
       } else {
-        xd[0] = x.e = 0;
+        xd[0] = x2.e = 0;
       }
-      return x;
+      return x2;
     }
-    if (i == 0) {
+    if (i2 == 0) {
       xd.length = xdi;
       k = 1;
       xdi--;
     } else {
       xd.length = xdi + 1;
-      k = mathpow(10, LOG_BASE - i);
+      k = mathpow(10, LOG_BASE - i2);
       xd[xdi] = j > 0 ? (w / mathpow(10, digits - j) % mathpow(10, j) | 0) * k : 0;
     }
     if (roundUp) {
       for (; ; ) {
         if (xdi == 0) {
-          for (i = 1, j = xd[0]; j >= 10; j /= 10) i++;
+          for (i2 = 1, j = xd[0]; j >= 10; j /= 10) i2++;
           j = xd[0] += k;
           for (k = 1; j >= 10; j /= 10) k++;
-          if (i != k) {
-            x.e++;
+          if (i2 != k) {
+            x2.e++;
             if (xd[0] == BASE) xd[0] = 1;
           }
           break;
@@ -1364,29 +1364,29 @@ function finalise(x, sd, rm, isTruncated) {
         }
       }
     }
-    for (i = xd.length; xd[--i] === 0; ) xd.pop();
+    for (i2 = xd.length; xd[--i2] === 0; ) xd.pop();
   }
   if (external) {
-    if (x.e > Ctor.maxE) {
-      x.d = null;
-      x.e = NaN;
-    } else if (x.e < Ctor.minE) {
-      x.e = 0;
-      x.d = [0];
+    if (x2.e > Ctor.maxE) {
+      x2.d = null;
+      x2.e = NaN;
+    } else if (x2.e < Ctor.minE) {
+      x2.e = 0;
+      x2.d = [0];
     }
   }
-  return x;
+  return x2;
 }
-function finiteToString(x, isExp, sd) {
-  if (!x.isFinite()) return nonFiniteToString(x);
-  var k, e = x.e, str = digitsToString(x.d), len = str.length;
+function finiteToString(x2, isExp, sd) {
+  if (!x2.isFinite()) return nonFiniteToString(x2);
+  var k, e = x2.e, str = digitsToString(x2.d), len = str.length;
   if (isExp) {
     if (sd && (k = sd - len) > 0) {
       str = str.charAt(0) + "." + str.slice(1) + getZeroString(k);
     } else if (len > 1) {
       str = str.charAt(0) + "." + str.slice(1);
     }
-    str = str + (x.e < 0 ? "e" : "e+") + x.e;
+    str = str + (x2.e < 0 ? "e" : "e+") + x2.e;
   } else if (e < 0) {
     str = "0." + getZeroString(-e - 1) + str;
     if (sd && (k = sd - len) > 0) str += getZeroString(k);
@@ -1433,12 +1433,12 @@ function getZeroString(k) {
   for (; k--; ) zs += "0";
   return zs;
 }
-function intPow(Ctor, x, n, pr) {
+function intPow(Ctor, x2, n, pr) {
   var isTruncated, r = new Ctor(1), k = Math.ceil(pr / LOG_BASE + 4);
   external = false;
   for (; ; ) {
     if (n % 2) {
-      r = r.times(x);
+      r = r.times(x2);
       if (truncate(r.d, k)) isTruncated = true;
     }
     n = mathfloor(n / 2);
@@ -1447,8 +1447,8 @@ function intPow(Ctor, x, n, pr) {
       if (isTruncated && r.d[n] === 0) ++r.d[n];
       break;
     }
-    x = x.times(x);
-    truncate(x.d, k);
+    x2 = x2.times(x2);
+    truncate(x2.d, k);
   }
   external = true;
   return r;
@@ -1457,24 +1457,24 @@ function isOdd(n) {
   return n.d[n.d.length - 1] & 1;
 }
 function maxOrMin(Ctor, args, n) {
-  var k, y, x = new Ctor(args[0]), i = 0;
-  for (; ++i < args.length; ) {
-    y = new Ctor(args[i]);
+  var k, y, x2 = new Ctor(args[0]), i2 = 0;
+  for (; ++i2 < args.length; ) {
+    y = new Ctor(args[i2]);
     if (!y.s) {
-      x = y;
+      x2 = y;
       break;
     }
-    k = x.cmp(y);
-    if (k === n || k === 0 && x.s === n) {
-      x = y;
+    k = x2.cmp(y);
+    if (k === n || k === 0 && x2.s === n) {
+      x2 = y;
     }
   }
-  return x;
+  return x2;
 }
-function naturalExponential(x, sd) {
-  var denominator, guard, j, pow2, sum2, t, wpr, rep = 0, i = 0, k = 0, Ctor = x.constructor, rm = Ctor.rounding, pr = Ctor.precision;
-  if (!x.d || !x.d[0] || x.e > 17) {
-    return new Ctor(x.d ? !x.d[0] ? 1 : x.s < 0 ? 0 : 1 / 0 : x.s ? x.s < 0 ? 0 : x : 0 / 0);
+function naturalExponential(x2, sd) {
+  var denominator, guard, j, pow2, sum2, t, wpr, rep = 0, i2 = 0, k = 0, Ctor = x2.constructor, rm = Ctor.rounding, pr = Ctor.precision;
+  if (!x2.d || !x2.d[0] || x2.e > 17) {
+    return new Ctor(x2.d ? !x2.d[0] ? 1 : x2.s < 0 ? 0 : 1 / 0 : x2.s ? x2.s < 0 ? 0 : x2 : 0 / 0);
   }
   if (sd == null) {
     external = false;
@@ -1483,8 +1483,8 @@ function naturalExponential(x, sd) {
     wpr = sd;
   }
   t = new Ctor(0.03125);
-  while (x.e > -2) {
-    x = x.times(t);
+  while (x2.e > -2) {
+    x2 = x2.times(t);
     k += 5;
   }
   guard = Math.log(mathpow(2, k)) / Math.LN10 * 2 + 5 | 0;
@@ -1492,8 +1492,8 @@ function naturalExponential(x, sd) {
   denominator = pow2 = sum2 = new Ctor(1);
   Ctor.precision = wpr;
   for (; ; ) {
-    pow2 = finalise(pow2.times(x), wpr, 1);
-    denominator = denominator.times(++i);
+    pow2 = finalise(pow2.times(x2), wpr, 1);
+    denominator = denominator.times(++i2);
     t = sum2.plus(divide(pow2, denominator, wpr, 1));
     if (digitsToString(t.d).slice(0, wpr) === digitsToString(sum2.d).slice(0, wpr)) {
       j = k;
@@ -1502,7 +1502,7 @@ function naturalExponential(x, sd) {
         if (rep < 3 && checkRoundingDigits(sum2.d, wpr - guard, rm, rep)) {
           Ctor.precision = wpr += 10;
           denominator = pow2 = t = new Ctor(1);
-          i = 0;
+          i2 = 0;
           rep++;
         } else {
           return finalise(sum2, Ctor.precision = pr, rm, external = true);
@@ -1516,9 +1516,9 @@ function naturalExponential(x, sd) {
   }
 }
 function naturalLogarithm(y, sd) {
-  var c, c0, denominator, e, numerator, rep, sum2, t, wpr, x1, x2, n = 1, guard = 10, x = y, xd = x.d, Ctor = x.constructor, rm = Ctor.rounding, pr = Ctor.precision;
-  if (x.s < 0 || !xd || !xd[0] || !x.e && xd[0] == 1 && xd.length == 1) {
-    return new Ctor(xd && !xd[0] ? -1 / 0 : x.s != 1 ? NaN : xd ? 0 : x);
+  var c, c0, denominator, e, numerator, rep, sum2, t, wpr, x1, x2, n = 1, guard = 10, x3 = y, xd = x3.d, Ctor = x3.constructor, rm = Ctor.rounding, pr = Ctor.precision;
+  if (x3.s < 0 || !xd || !xd[0] || !x3.e && xd[0] == 1 && xd.length == 1) {
+    return new Ctor(xd && !xd[0] ? -1 / 0 : x3.s != 1 ? NaN : xd ? 0 : x3);
   }
   if (sd == null) {
     external = false;
@@ -1529,29 +1529,29 @@ function naturalLogarithm(y, sd) {
   Ctor.precision = wpr += guard;
   c = digitsToString(xd);
   c0 = c.charAt(0);
-  if (Math.abs(e = x.e) < 15e14) {
+  if (Math.abs(e = x3.e) < 15e14) {
     while (c0 < 7 && c0 != 1 || c0 == 1 && c.charAt(1) > 3) {
-      x = x.times(y);
-      c = digitsToString(x.d);
+      x3 = x3.times(y);
+      c = digitsToString(x3.d);
       c0 = c.charAt(0);
       n++;
     }
-    e = x.e;
+    e = x3.e;
     if (c0 > 1) {
-      x = new Ctor("0." + c);
+      x3 = new Ctor("0." + c);
       e++;
     } else {
-      x = new Ctor(c0 + "." + c.slice(1));
+      x3 = new Ctor(c0 + "." + c.slice(1));
     }
   } else {
     t = getLn10(Ctor, wpr + 2, pr).times(e + "");
-    x = naturalLogarithm(new Ctor(c0 + "." + c.slice(1)), wpr - guard).plus(t);
+    x3 = naturalLogarithm(new Ctor(c0 + "." + c.slice(1)), wpr - guard).plus(t);
     Ctor.precision = pr;
-    return sd == null ? finalise(x, pr, rm, external = true) : x;
+    return sd == null ? finalise(x3, pr, rm, external = true) : x3;
   }
-  x1 = x;
-  sum2 = numerator = x = divide(x.minus(1), x.plus(1), wpr, 1);
-  x2 = finalise(x.times(x), wpr, 1);
+  x1 = x3;
+  sum2 = numerator = x3 = divide(x3.minus(1), x3.plus(1), wpr, 1);
+  x2 = finalise(x3.times(x3), wpr, 1);
   denominator = 3;
   for (; ; ) {
     numerator = finalise(numerator.times(x2), wpr, 1);
@@ -1563,8 +1563,8 @@ function naturalLogarithm(y, sd) {
       if (sd == null) {
         if (checkRoundingDigits(sum2.d, wpr - guard, rm, rep)) {
           Ctor.precision = wpr += guard;
-          t = numerator = x = divide(x1.minus(1), x1.plus(1), wpr, 1);
-          x2 = finalise(x.times(x), wpr, 1);
+          t = numerator = x3 = divide(x1.minus(1), x1.plus(1), wpr, 1);
+          x2 = finalise(x3.times(x3), wpr, 1);
           denominator = rep = 1;
         } else {
           return finalise(sum2, Ctor.precision = pr, rm, external = true);
@@ -1578,63 +1578,63 @@ function naturalLogarithm(y, sd) {
     denominator += 2;
   }
 }
-function nonFiniteToString(x) {
-  return String(x.s * x.s / 0);
+function nonFiniteToString(x2) {
+  return String(x2.s * x2.s / 0);
 }
-function parseDecimal(x, str) {
-  var e, i, len;
+function parseDecimal(x2, str) {
+  var e, i2, len;
   if ((e = str.indexOf(".")) > -1) str = str.replace(".", "");
-  if ((i = str.search(/e/i)) > 0) {
-    if (e < 0) e = i;
-    e += +str.slice(i + 1);
-    str = str.substring(0, i);
+  if ((i2 = str.search(/e/i)) > 0) {
+    if (e < 0) e = i2;
+    e += +str.slice(i2 + 1);
+    str = str.substring(0, i2);
   } else if (e < 0) {
     e = str.length;
   }
-  for (i = 0; str.charCodeAt(i) === 48; i++) ;
+  for (i2 = 0; str.charCodeAt(i2) === 48; i2++) ;
   for (len = str.length; str.charCodeAt(len - 1) === 48; --len) ;
-  str = str.slice(i, len);
+  str = str.slice(i2, len);
   if (str) {
-    len -= i;
-    x.e = e = e - i - 1;
-    x.d = [];
-    i = (e + 1) % LOG_BASE;
-    if (e < 0) i += LOG_BASE;
-    if (i < len) {
-      if (i) x.d.push(+str.slice(0, i));
-      for (len -= LOG_BASE; i < len; ) x.d.push(+str.slice(i, i += LOG_BASE));
-      str = str.slice(i);
-      i = LOG_BASE - str.length;
+    len -= i2;
+    x2.e = e = e - i2 - 1;
+    x2.d = [];
+    i2 = (e + 1) % LOG_BASE;
+    if (e < 0) i2 += LOG_BASE;
+    if (i2 < len) {
+      if (i2) x2.d.push(+str.slice(0, i2));
+      for (len -= LOG_BASE; i2 < len; ) x2.d.push(+str.slice(i2, i2 += LOG_BASE));
+      str = str.slice(i2);
+      i2 = LOG_BASE - str.length;
     } else {
-      i -= len;
+      i2 -= len;
     }
-    for (; i--; ) str += "0";
-    x.d.push(+str);
+    for (; i2--; ) str += "0";
+    x2.d.push(+str);
     if (external) {
-      if (x.e > x.constructor.maxE) {
-        x.d = null;
-        x.e = NaN;
-      } else if (x.e < x.constructor.minE) {
-        x.e = 0;
-        x.d = [0];
+      if (x2.e > x2.constructor.maxE) {
+        x2.d = null;
+        x2.e = NaN;
+      } else if (x2.e < x2.constructor.minE) {
+        x2.e = 0;
+        x2.d = [0];
       }
     }
   } else {
-    x.e = 0;
-    x.d = [0];
+    x2.e = 0;
+    x2.d = [0];
   }
-  return x;
+  return x2;
 }
-function parseOther(x, str) {
-  var base, Ctor, divisor, i, isFloat, len, p, xd, xe;
+function parseOther(x2, str) {
+  var base, Ctor, divisor, i2, isFloat, len, p, xd, xe;
   if (str.indexOf("_") > -1) {
     str = str.replace(/(\d)_(?=\d)/g, "$1");
-    if (isDecimal.test(str)) return parseDecimal(x, str);
+    if (isDecimal.test(str)) return parseDecimal(x2, str);
   } else if (str === "Infinity" || str === "NaN") {
-    if (!+str) x.s = NaN;
-    x.e = NaN;
-    x.d = null;
-    return x;
+    if (!+str) x2.s = NaN;
+    x2.e = NaN;
+    x2.d = null;
+    return x2;
   }
   if (isHex.test(str)) {
     base = 16;
@@ -1646,59 +1646,59 @@ function parseOther(x, str) {
   } else {
     throw Error(invalidArgument + str);
   }
-  i = str.search(/p/i);
-  if (i > 0) {
-    p = +str.slice(i + 1);
-    str = str.substring(2, i);
+  i2 = str.search(/p/i);
+  if (i2 > 0) {
+    p = +str.slice(i2 + 1);
+    str = str.substring(2, i2);
   } else {
     str = str.slice(2);
   }
-  i = str.indexOf(".");
-  isFloat = i >= 0;
-  Ctor = x.constructor;
+  i2 = str.indexOf(".");
+  isFloat = i2 >= 0;
+  Ctor = x2.constructor;
   if (isFloat) {
     str = str.replace(".", "");
     len = str.length;
-    i = len - i;
-    divisor = intPow(Ctor, new Ctor(base), i, i * 2);
+    i2 = len - i2;
+    divisor = intPow(Ctor, new Ctor(base), i2, i2 * 2);
   }
   xd = convertBase(str, base, BASE);
   xe = xd.length - 1;
-  for (i = xe; xd[i] === 0; --i) xd.pop();
-  if (i < 0) return new Ctor(x.s * 0);
-  x.e = getBase10Exponent(xd, xe);
-  x.d = xd;
+  for (i2 = xe; xd[i2] === 0; --i2) xd.pop();
+  if (i2 < 0) return new Ctor(x2.s * 0);
+  x2.e = getBase10Exponent(xd, xe);
+  x2.d = xd;
   external = false;
-  if (isFloat) x = divide(x, divisor, len * 4);
-  if (p) x = x.times(Math.abs(p) < 54 ? mathpow(2, p) : Decimal.pow(2, p));
+  if (isFloat) x2 = divide(x2, divisor, len * 4);
+  if (p) x2 = x2.times(Math.abs(p) < 54 ? mathpow(2, p) : Decimal.pow(2, p));
   external = true;
-  return x;
+  return x2;
 }
-function sine(Ctor, x) {
-  var k, len = x.d.length;
+function sine(Ctor, x2) {
+  var k, len = x2.d.length;
   if (len < 3) {
-    return x.isZero() ? x : taylorSeries(Ctor, 2, x, x);
+    return x2.isZero() ? x2 : taylorSeries(Ctor, 2, x2, x2);
   }
   k = 1.4 * Math.sqrt(len);
   k = k > 16 ? 16 : k | 0;
-  x = x.times(1 / tinyPow(5, k));
-  x = taylorSeries(Ctor, 2, x, x);
+  x2 = x2.times(1 / tinyPow(5, k));
+  x2 = taylorSeries(Ctor, 2, x2, x2);
   var sin2_x, d5 = new Ctor(5), d16 = new Ctor(16), d20 = new Ctor(20);
   for (; k--; ) {
-    sin2_x = x.times(x);
-    x = x.times(d5.plus(sin2_x.times(d16.times(sin2_x).minus(d20))));
+    sin2_x = x2.times(x2);
+    x2 = x2.times(d5.plus(sin2_x.times(d16.times(sin2_x).minus(d20))));
   }
-  return x;
+  return x2;
 }
-function taylorSeries(Ctor, n, x, y, isHyperbolic) {
-  var j, t, u, x2, i = 1, pr = Ctor.precision, k = Math.ceil(pr / LOG_BASE);
+function taylorSeries(Ctor, n, x2, y, isHyperbolic) {
+  var j, t, u, x22, i2 = 1, pr = Ctor.precision, k = Math.ceil(pr / LOG_BASE);
   external = false;
-  x2 = x.times(x);
+  x22 = x2.times(x2);
   u = new Ctor(y);
   for (; ; ) {
-    t = divide(u.times(x2), new Ctor(n++ * n++), pr, 1);
+    t = divide(u.times(x22), new Ctor(n++ * n++), pr, 1);
     u = isHyperbolic ? y.plus(t) : y.minus(t);
-    y = divide(t.times(x2), new Ctor(n++ * n++), pr, 1);
+    y = divide(t.times(x22), new Ctor(n++ * n++), pr, 1);
     t = u.plus(y);
     if (t.d[k] !== void 0) {
       for (j = k; t.d[j] === u.d[j] && j--; ) ;
@@ -1708,7 +1708,7 @@ function taylorSeries(Ctor, n, x, y, isHyperbolic) {
     u = y;
     y = t;
     t = j;
-    i++;
+    i2++;
   }
   external = true;
   t.d.length = k + 1;
@@ -1719,28 +1719,28 @@ function tinyPow(b, e) {
   while (--e) n *= b;
   return n;
 }
-function toLessThanHalfPi(Ctor, x) {
-  var t, isNeg = x.s < 0, pi = getPi(Ctor, Ctor.precision, 1), halfPi = pi.times(0.5);
-  x = x.abs();
-  if (x.lte(halfPi)) {
+function toLessThanHalfPi(Ctor, x2) {
+  var t, isNeg = x2.s < 0, pi = getPi(Ctor, Ctor.precision, 1), halfPi = pi.times(0.5);
+  x2 = x2.abs();
+  if (x2.lte(halfPi)) {
     quadrant = isNeg ? 4 : 1;
-    return x;
+    return x2;
   }
-  t = x.divToInt(pi);
+  t = x2.divToInt(pi);
   if (t.isZero()) {
     quadrant = isNeg ? 3 : 2;
   } else {
-    x = x.minus(t.times(pi));
-    if (x.lte(halfPi)) {
+    x2 = x2.minus(t.times(pi));
+    if (x2.lte(halfPi)) {
       quadrant = isOdd(t) ? isNeg ? 2 : 3 : isNeg ? 4 : 1;
-      return x;
+      return x2;
     }
     quadrant = isOdd(t) ? isNeg ? 1 : 4 : isNeg ? 3 : 2;
   }
-  return x.minus(pi).abs();
+  return x2.minus(pi).abs();
 }
-function toStringBinary(x, baseOut, sd, rm) {
-  var base, e, i, k, len, roundUp, str, xd, y, Ctor = x.constructor, isExp = sd !== void 0;
+function toStringBinary(x2, baseOut, sd, rm) {
+  var base, e, i2, k, len, roundUp, str, xd, y, Ctor = x2.constructor, isExp = sd !== void 0;
   if (isExp) {
     checkInt32(sd, 1, MAX_DIGITS);
     if (rm === void 0) rm = Ctor.rounding;
@@ -1749,11 +1749,11 @@ function toStringBinary(x, baseOut, sd, rm) {
     sd = Ctor.precision;
     rm = Ctor.rounding;
   }
-  if (!x.isFinite()) {
-    str = nonFiniteToString(x);
+  if (!x2.isFinite()) {
+    str = nonFiniteToString(x2);
   } else {
-    str = finiteToString(x);
-    i = str.indexOf(".");
+    str = finiteToString(x2);
+    i2 = str.indexOf(".");
     if (isExp) {
       base = 2;
       if (baseOut == 16) {
@@ -1764,10 +1764,10 @@ function toStringBinary(x, baseOut, sd, rm) {
     } else {
       base = baseOut;
     }
-    if (i >= 0) {
+    if (i2 >= 0) {
       str = str.replace(".", "");
       y = new Ctor(1);
-      y.e = str.length - i;
+      y.e = str.length - i2;
       y.d = convertBase(finiteToString(y), 10, base);
       y.e = y.d.length;
     }
@@ -1777,21 +1777,21 @@ function toStringBinary(x, baseOut, sd, rm) {
     if (!xd[0]) {
       str = isExp ? "0p+0" : "0";
     } else {
-      if (i < 0) {
+      if (i2 < 0) {
         e--;
       } else {
-        x = new Ctor(x);
-        x.d = xd;
-        x.e = e;
-        x = divide(x, y, sd, rm, 0, base);
-        xd = x.d;
-        e = x.e;
+        x2 = new Ctor(x2);
+        x2.d = xd;
+        x2.e = e;
+        x2 = divide(x2, y, sd, rm, 0, base);
+        xd = x2.d;
+        e = x2.e;
         roundUp = inexact;
       }
-      i = xd[sd];
+      i2 = xd[sd];
       k = base / 2;
       roundUp = roundUp || xd[sd + 1] !== void 0;
-      roundUp = rm < 4 ? (i !== void 0 || roundUp) && (rm === 0 || rm === (x.s < 0 ? 3 : 2)) : i > k || i === k && (rm === 4 || roundUp || rm === 6 && xd[sd - 1] & 1 || rm === (x.s < 0 ? 8 : 7));
+      roundUp = rm < 4 ? (i2 !== void 0 || roundUp) && (rm === 0 || rm === (x2.s < 0 ? 3 : 2)) : i2 > k || i2 === k && (rm === 4 || roundUp || rm === 6 && xd[sd - 1] & 1 || rm === (x2.s < 0 ? 8 : 7));
       xd.length = sd;
       if (roundUp) {
         for (; ++xd[--sd] > base - 1; ) {
@@ -1803,15 +1803,15 @@ function toStringBinary(x, baseOut, sd, rm) {
         }
       }
       for (len = xd.length; !xd[len - 1]; --len) ;
-      for (i = 0, str = ""; i < len; i++) str += NUMERALS.charAt(xd[i]);
+      for (i2 = 0, str = ""; i2 < len; i2++) str += NUMERALS.charAt(xd[i2]);
       if (isExp) {
         if (len > 1) {
           if (baseOut == 16 || baseOut == 8) {
-            i = baseOut == 16 ? 4 : 3;
-            for (--len; len % i; len++) str += "0";
+            i2 = baseOut == 16 ? 4 : 3;
+            for (--len; len % i2; len++) str += "0";
             xd = convertBase(str, base, baseOut);
             for (len = xd.length; !xd[len - 1]; --len) ;
-            for (i = 1, str = "1."; i < len; i++) str += NUMERALS.charAt(xd[i]);
+            for (i2 = 1, str = "1."; i2 < len; i2++) str += NUMERALS.charAt(xd[i2]);
           } else {
             str = str.charAt(0) + "." + str.slice(1);
           }
@@ -1827,7 +1827,7 @@ function toStringBinary(x, baseOut, sd, rm) {
     }
     str = (baseOut == 16 ? "0x" : baseOut == 2 ? "0b" : baseOut == 8 ? "0o" : "") + str;
   }
-  return x.s < 0 ? "-" + str : str;
+  return x2.s < 0 ? "-" + str : str;
 }
 function truncate(arr, len) {
   if (arr.length > len) {
@@ -1835,70 +1835,70 @@ function truncate(arr, len) {
     return true;
   }
 }
-function abs(x) {
-  return new this(x).abs();
+function abs(x2) {
+  return new this(x2).abs();
 }
-function acos(x) {
-  return new this(x).acos();
+function acos(x2) {
+  return new this(x2).acos();
 }
-function acosh(x) {
-  return new this(x).acosh();
+function acosh(x2) {
+  return new this(x2).acosh();
 }
-function add(x, y) {
-  return new this(x).plus(y);
+function add(x2, y) {
+  return new this(x2).plus(y);
 }
-function asin(x) {
-  return new this(x).asin();
+function asin(x2) {
+  return new this(x2).asin();
 }
-function asinh(x) {
-  return new this(x).asinh();
+function asinh(x2) {
+  return new this(x2).asinh();
 }
-function atan(x) {
-  return new this(x).atan();
+function atan(x2) {
+  return new this(x2).atan();
 }
-function atanh(x) {
-  return new this(x).atanh();
+function atanh(x2) {
+  return new this(x2).atanh();
 }
-function atan2(y, x) {
+function atan2(y, x2) {
   y = new this(y);
-  x = new this(x);
+  x2 = new this(x2);
   var r, pr = this.precision, rm = this.rounding, wpr = pr + 4;
-  if (!y.s || !x.s) {
+  if (!y.s || !x2.s) {
     r = new this(NaN);
-  } else if (!y.d && !x.d) {
-    r = getPi(this, wpr, 1).times(x.s > 0 ? 0.25 : 0.75);
+  } else if (!y.d && !x2.d) {
+    r = getPi(this, wpr, 1).times(x2.s > 0 ? 0.25 : 0.75);
     r.s = y.s;
-  } else if (!x.d || y.isZero()) {
-    r = x.s < 0 ? getPi(this, pr, rm) : new this(0);
+  } else if (!x2.d || y.isZero()) {
+    r = x2.s < 0 ? getPi(this, pr, rm) : new this(0);
     r.s = y.s;
-  } else if (!y.d || x.isZero()) {
+  } else if (!y.d || x2.isZero()) {
     r = getPi(this, wpr, 1).times(0.5);
     r.s = y.s;
-  } else if (x.s < 0) {
+  } else if (x2.s < 0) {
     this.precision = wpr;
     this.rounding = 1;
-    r = this.atan(divide(y, x, wpr, 1));
-    x = getPi(this, wpr, 1);
+    r = this.atan(divide(y, x2, wpr, 1));
+    x2 = getPi(this, wpr, 1);
     this.precision = pr;
     this.rounding = rm;
-    r = y.s < 0 ? r.minus(x) : r.plus(x);
+    r = y.s < 0 ? r.minus(x2) : r.plus(x2);
   } else {
-    r = this.atan(divide(y, x, wpr, 1));
+    r = this.atan(divide(y, x2, wpr, 1));
   }
   return r;
 }
-function cbrt(x) {
-  return new this(x).cbrt();
+function cbrt(x2) {
+  return new this(x2).cbrt();
 }
-function ceil(x) {
-  return finalise(x = new this(x), x.e + 1, 2);
+function ceil(x2) {
+  return finalise(x2 = new this(x2), x2.e + 1, 2);
 }
-function clamp(x, min2, max2) {
-  return new this(x).clamp(min2, max2);
+function clamp(x2, min2, max2) {
+  return new this(x2).clamp(min2, max2);
 }
 function config(obj) {
   if (!obj || typeof obj !== "object") throw Error(decimalError + "Object expected");
-  var i, p, v, useDefaults = obj.defaults === true, ps = [
+  var i2, p, v, useDefaults = obj.defaults === true, ps = [
     "precision",
     1,
     MAX_DIGITS,
@@ -1921,10 +1921,10 @@ function config(obj) {
     0,
     9
   ];
-  for (i = 0; i < ps.length; i += 3) {
-    if (p = ps[i], useDefaults) this[p] = DEFAULTS[p];
+  for (i2 = 0; i2 < ps.length; i2 += 3) {
+    if (p = ps[i2], useDefaults) this[p] = DEFAULTS[p];
     if ((v = obj[p]) !== void 0) {
-      if (mathfloor(v) === v && v >= ps[i + 1] && v <= ps[i + 2]) this[p] = v;
+      if (mathfloor(v) === v && v >= ps[i2 + 1] && v <= ps[i2 + 2]) this[p] = v;
       else throw Error(invalidArgument + p + ": " + v);
     }
   }
@@ -1946,96 +1946,96 @@ function config(obj) {
   }
   return this;
 }
-function cos(x) {
-  return new this(x).cos();
+function cos(x2) {
+  return new this(x2).cos();
 }
-function cosh(x) {
-  return new this(x).cosh();
+function cosh(x2) {
+  return new this(x2).cosh();
 }
 function clone(obj) {
-  var i, p, ps;
+  var i2, p, ps;
   function Decimal2(v) {
-    var e, i2, t, x = this;
-    if (!(x instanceof Decimal2)) return new Decimal2(v);
-    x.constructor = Decimal2;
+    var e, i3, t, x2 = this;
+    if (!(x2 instanceof Decimal2)) return new Decimal2(v);
+    x2.constructor = Decimal2;
     if (isDecimalInstance(v)) {
-      x.s = v.s;
+      x2.s = v.s;
       if (external) {
         if (!v.d || v.e > Decimal2.maxE) {
-          x.e = NaN;
-          x.d = null;
+          x2.e = NaN;
+          x2.d = null;
         } else if (v.e < Decimal2.minE) {
-          x.e = 0;
-          x.d = [0];
+          x2.e = 0;
+          x2.d = [0];
         } else {
-          x.e = v.e;
-          x.d = v.d.slice();
+          x2.e = v.e;
+          x2.d = v.d.slice();
         }
       } else {
-        x.e = v.e;
-        x.d = v.d ? v.d.slice() : v.d;
+        x2.e = v.e;
+        x2.d = v.d ? v.d.slice() : v.d;
       }
       return;
     }
     t = typeof v;
     if (t === "number") {
       if (v === 0) {
-        x.s = 1 / v < 0 ? -1 : 1;
-        x.e = 0;
-        x.d = [0];
+        x2.s = 1 / v < 0 ? -1 : 1;
+        x2.e = 0;
+        x2.d = [0];
         return;
       }
       if (v < 0) {
         v = -v;
-        x.s = -1;
+        x2.s = -1;
       } else {
-        x.s = 1;
+        x2.s = 1;
       }
       if (v === ~~v && v < 1e7) {
-        for (e = 0, i2 = v; i2 >= 10; i2 /= 10) e++;
+        for (e = 0, i3 = v; i3 >= 10; i3 /= 10) e++;
         if (external) {
           if (e > Decimal2.maxE) {
-            x.e = NaN;
-            x.d = null;
+            x2.e = NaN;
+            x2.d = null;
           } else if (e < Decimal2.minE) {
-            x.e = 0;
-            x.d = [0];
+            x2.e = 0;
+            x2.d = [0];
           } else {
-            x.e = e;
-            x.d = [v];
+            x2.e = e;
+            x2.d = [v];
           }
         } else {
-          x.e = e;
-          x.d = [v];
+          x2.e = e;
+          x2.d = [v];
         }
         return;
       }
       if (v * 0 !== 0) {
-        if (!v) x.s = NaN;
-        x.e = NaN;
-        x.d = null;
+        if (!v) x2.s = NaN;
+        x2.e = NaN;
+        x2.d = null;
         return;
       }
-      return parseDecimal(x, v.toString());
+      return parseDecimal(x2, v.toString());
     }
     if (t === "string") {
-      if ((i2 = v.charCodeAt(0)) === 45) {
+      if ((i3 = v.charCodeAt(0)) === 45) {
         v = v.slice(1);
-        x.s = -1;
+        x2.s = -1;
       } else {
-        if (i2 === 43) v = v.slice(1);
-        x.s = 1;
+        if (i3 === 43) v = v.slice(1);
+        x2.s = 1;
       }
-      return isDecimal.test(v) ? parseDecimal(x, v) : parseOther(x, v);
+      return isDecimal.test(v) ? parseDecimal(x2, v) : parseOther(x2, v);
     }
     if (t === "bigint") {
       if (v < 0) {
         v = -v;
-        x.s = -1;
+        x2.s = -1;
       } else {
-        x.s = 1;
+        x2.s = 1;
       }
-      return parseDecimal(x, v.toString());
+      return parseDecimal(x2, v.toString());
     }
     throw Error(invalidArgument + v);
   }
@@ -2095,26 +2095,26 @@ function clone(obj) {
   if (obj) {
     if (obj.defaults !== true) {
       ps = ["precision", "rounding", "toExpNeg", "toExpPos", "maxE", "minE", "modulo", "crypto"];
-      for (i = 0; i < ps.length; ) if (!obj.hasOwnProperty(p = ps[i++])) obj[p] = this[p];
+      for (i2 = 0; i2 < ps.length; ) if (!obj.hasOwnProperty(p = ps[i2++])) obj[p] = this[p];
     }
   }
   Decimal2.config(obj);
   return Decimal2;
 }
-function div(x, y) {
-  return new this(x).div(y);
+function div(x2, y) {
+  return new this(x2).div(y);
 }
-function exp(x) {
-  return new this(x).exp();
+function exp(x2) {
+  return new this(x2).exp();
 }
-function floor(x) {
-  return finalise(x = new this(x), x.e + 1, 3);
+function floor(x2) {
+  return finalise(x2 = new this(x2), x2.e + 1, 3);
 }
 function hypot() {
-  var i, n, t = new this(0);
+  var i2, n, t = new this(0);
   external = false;
-  for (i = 0; i < arguments.length; ) {
-    n = new this(arguments[i++]);
+  for (i2 = 0; i2 < arguments.length; ) {
+    n = new this(arguments[i2++]);
     if (!n.d) {
       if (n.s) {
         external = true;
@@ -2131,17 +2131,17 @@ function hypot() {
 function isDecimalInstance(obj) {
   return obj instanceof Decimal || obj && obj.toStringTag === tag || false;
 }
-function ln(x) {
-  return new this(x).ln();
+function ln(x2) {
+  return new this(x2).ln();
 }
-function log(x, y) {
-  return new this(x).log(y);
+function log(x2, y) {
+  return new this(x2).log(y);
 }
-function log2(x) {
-  return new this(x).log(2);
+function log2(x2) {
+  return new this(x2).log(2);
 }
-function log10(x) {
-  return new this(x).log(10);
+function log10(x2) {
+  return new this(x2).log(10);
 }
 function max() {
   return maxOrMin(this, arguments, -1);
@@ -2149,55 +2149,55 @@ function max() {
 function min() {
   return maxOrMin(this, arguments, 1);
 }
-function mod(x, y) {
-  return new this(x).mod(y);
+function mod(x2, y) {
+  return new this(x2).mod(y);
 }
-function mul(x, y) {
-  return new this(x).mul(y);
+function mul(x2, y) {
+  return new this(x2).mul(y);
 }
-function pow(x, y) {
-  return new this(x).pow(y);
+function pow(x2, y) {
+  return new this(x2).pow(y);
 }
 function random(sd) {
-  var d, e, k, n, i = 0, r = new this(1), rd = [];
+  var d, e, k, n, i2 = 0, r = new this(1), rd = [];
   if (sd === void 0) sd = this.precision;
   else checkInt32(sd, 1, MAX_DIGITS);
   k = Math.ceil(sd / LOG_BASE);
   if (!this.crypto) {
-    for (; i < k; ) rd[i++] = Math.random() * 1e7 | 0;
+    for (; i2 < k; ) rd[i2++] = Math.random() * 1e7 | 0;
   } else if (crypto.getRandomValues) {
     d = crypto.getRandomValues(new Uint32Array(k));
-    for (; i < k; ) {
-      n = d[i];
+    for (; i2 < k; ) {
+      n = d[i2];
       if (n >= 429e7) {
-        d[i] = crypto.getRandomValues(new Uint32Array(1))[0];
+        d[i2] = crypto.getRandomValues(new Uint32Array(1))[0];
       } else {
-        rd[i++] = n % 1e7;
+        rd[i2++] = n % 1e7;
       }
     }
   } else if (crypto.randomBytes) {
     d = crypto.randomBytes(k *= 4);
-    for (; i < k; ) {
-      n = d[i] + (d[i + 1] << 8) + (d[i + 2] << 16) + ((d[i + 3] & 127) << 24);
+    for (; i2 < k; ) {
+      n = d[i2] + (d[i2 + 1] << 8) + (d[i2 + 2] << 16) + ((d[i2 + 3] & 127) << 24);
       if (n >= 214e7) {
-        crypto.randomBytes(4).copy(d, i);
+        crypto.randomBytes(4).copy(d, i2);
       } else {
         rd.push(n % 1e7);
-        i += 4;
+        i2 += 4;
       }
     }
-    i = k / 4;
+    i2 = k / 4;
   } else {
     throw Error(cryptoUnavailable);
   }
-  k = rd[--i];
+  k = rd[--i2];
   sd %= LOG_BASE;
   if (k && sd) {
     n = mathpow(10, LOG_BASE - sd);
-    rd[i] = (k / n | 0) * n;
+    rd[i2] = (k / n | 0) * n;
   }
-  for (; rd[i] === 0; i--) rd.pop();
-  if (i < 0) {
+  for (; rd[i2] === 0; i2--) rd.pop();
+  if (i2 < 0) {
     e = 0;
     rd = [0];
   } else {
@@ -2210,40 +2210,40 @@ function random(sd) {
   r.d = rd;
   return r;
 }
-function round(x) {
-  return finalise(x = new this(x), x.e + 1, this.rounding);
+function round(x2) {
+  return finalise(x2 = new this(x2), x2.e + 1, this.rounding);
 }
-function sign(x) {
-  x = new this(x);
-  return x.d ? x.d[0] ? x.s : 0 * x.s : x.s || NaN;
+function sign(x2) {
+  x2 = new this(x2);
+  return x2.d ? x2.d[0] ? x2.s : 0 * x2.s : x2.s || NaN;
 }
-function sin(x) {
-  return new this(x).sin();
+function sin(x2) {
+  return new this(x2).sin();
 }
-function sinh(x) {
-  return new this(x).sinh();
+function sinh(x2) {
+  return new this(x2).sinh();
 }
-function sqrt(x) {
-  return new this(x).sqrt();
+function sqrt(x2) {
+  return new this(x2).sqrt();
 }
-function sub(x, y) {
-  return new this(x).sub(y);
+function sub(x2, y) {
+  return new this(x2).sub(y);
 }
 function sum() {
-  var i = 0, args = arguments, x = new this(args[i]);
+  var i2 = 0, args = arguments, x2 = new this(args[i2]);
   external = false;
-  for (; x.s && ++i < args.length; ) x = x.plus(args[i]);
+  for (; x2.s && ++i2 < args.length; ) x2 = x2.plus(args[i2]);
   external = true;
-  return finalise(x, this.precision, this.rounding);
+  return finalise(x2, this.precision, this.rounding);
 }
-function tan(x) {
-  return new this(x).tan();
+function tan(x2) {
+  return new this(x2).tan();
 }
-function tanh(x) {
-  return new this(x).tanh();
+function tanh(x2) {
+  return new this(x2).tanh();
 }
-function trunc(x) {
-  return finalise(x = new this(x), x.e + 1, 1);
+function trunc(x2) {
+  return finalise(x2 = new this(x2), x2.e + 1, 1);
 }
 P[/* @__PURE__ */ Symbol.for("nodejs.util.inspect.custom")] = P.toString;
 P[Symbol.toStringTag] = "Decimal";
@@ -2405,22 +2405,22 @@ var GFpField = class {
   transcendental(op) {
     throw new Error(`${op} is not available in GF(p); this step needs numeric mode`);
   }
-  sqrt(_a) {
+  sqrt(_a2) {
     return this.transcendental("sqrt");
   }
-  exp(_a) {
+  exp(_a2) {
     return this.transcendental("exp");
   }
-  log(_a) {
+  log(_a2) {
     return this.transcendental("log");
   }
-  sin(_a) {
+  sin(_a2) {
     return this.transcendental("sin");
   }
-  cos(_a) {
+  cos(_a2) {
     return this.transcendental("cos");
   }
-  tanh(_a) {
+  tanh(_a2) {
     return this.transcendental("tanh");
   }
   toNumber(a) {
@@ -2443,41 +2443,41 @@ var DomainError = class extends Error {
 };
 function mat(r, c, fill) {
   const d = new Array(r * c);
-  for (let i = 0; i < r; i++) for (let j = 0; j < c; j++) d[i * c + j] = fill(i, j);
+  for (let i2 = 0; i2 < r; i2++) for (let j = 0; j < c; j++) d[i2 * c + j] = fill(i2, j);
   return { r, c, d };
 }
 function zeros(r, c, z2) {
   return mat(r, c, () => z2);
 }
 function identity(n, one, zero) {
-  return mat(n, n, (i, j) => i === j ? one : zero);
+  return mat(n, n, (i2, j) => i2 === j ? one : zero);
 }
 function matAdd(f, a, b) {
   if (a.r !== b.r || a.c !== b.c) throw new Error(`shape mismatch in add: ${a.r}x${a.c} vs ${b.r}x${b.c}`);
   const d = new Array(a.r * a.c);
-  for (let i = 0; i < d.length; i++) d[i] = f.add(a.d[i], b.d[i]);
+  for (let i2 = 0; i2 < d.length; i2++) d[i2] = f.add(a.d[i2], b.d[i2]);
   return { r: a.r, c: a.c, d };
 }
 function matSub(f, a, b) {
   if (a.r !== b.r || a.c !== b.c) throw new Error(`shape mismatch in sub: ${a.r}x${a.c} vs ${b.r}x${b.c}`);
   const d = new Array(a.r * a.c);
-  for (let i = 0; i < d.length; i++) d[i] = f.sub(a.d[i], b.d[i]);
+  for (let i2 = 0; i2 < d.length; i2++) d[i2] = f.sub(a.d[i2], b.d[i2]);
   return { r: a.r, c: a.c, d };
 }
 function matScale(f, s, a) {
   const d = new Array(a.r * a.c);
-  for (let i = 0; i < d.length; i++) d[i] = f.mul(s, a.d[i]);
+  for (let i2 = 0; i2 < d.length; i2++) d[i2] = f.mul(s, a.d[i2]);
   return { r: a.r, c: a.c, d };
 }
 function matMul(f, a, b) {
   if (a.c !== b.r) throw new Error(`shape mismatch in mul: ${a.r}x${a.c} times ${b.r}x${b.c}`);
   const out = new Array(a.r * b.c).fill(f.zero);
-  for (let i = 0; i < a.r; i++) {
+  for (let i2 = 0; i2 < a.r; i2++) {
     for (let k = 0; k < a.c; k++) {
-      const aik = a.d[i * a.c + k];
+      const aik = a.d[i2 * a.c + k];
       if (f.isZero(aik)) continue;
       for (let j = 0; j < b.c; j++) {
-        out[i * b.c + j] = f.add(out[i * b.c + j], f.mul(aik, b.d[k * b.c + j]));
+        out[i2 * b.c + j] = f.add(out[i2 * b.c + j], f.mul(aik, b.d[k * b.c + j]));
       }
     }
   }
@@ -2485,13 +2485,13 @@ function matMul(f, a, b) {
 }
 function transpose(a) {
   const d = new Array(a.r * a.c);
-  for (let i = 0; i < a.r; i++) for (let j = 0; j < a.c; j++) d[j * a.r + i] = a.d[i * a.c + j];
+  for (let i2 = 0; i2 < a.r; i2++) for (let j = 0; j < a.c; j++) d[j * a.r + i2] = a.d[i2 * a.c + j];
   return { r: a.c, c: a.r, d };
 }
 function trace(f, a) {
   if (a.r !== a.c) throw new Error("trace of a non square matrix");
   let s = f.zero;
-  for (let i = 0; i < a.r; i++) s = f.add(s, a.d[i * a.c + i]);
+  for (let i2 = 0; i2 < a.r; i2++) s = f.add(s, a.d[i2 * a.c + i2]);
   return s;
 }
 function matTrace(f, a) {
@@ -2500,7 +2500,7 @@ function matTrace(f, a) {
 function matInv(f, a) {
   const n = a.r;
   if (n !== a.c) throw new DomainError("inverse of a non square matrix");
-  const m = mat(n, 2 * n, (i, j) => j < n ? a.d[i * n + j] : i === j - n ? f.one : f.zero);
+  const m = mat(n, 2 * n, (i2, j) => j < n ? a.d[i2 * n + j] : i2 === j - n ? f.one : f.zero);
   for (let c = 0; c < n; c++) {
     let pivot = -1;
     for (let r = c; r < n; r++) {
@@ -2529,7 +2529,7 @@ function matInv(f, a) {
       }
     }
   }
-  return mat(n, n, (i, j) => m.d[i * 2 * n + n + j]);
+  return mat(n, n, (i2, j) => m.d[i2 * 2 * n + n + j]);
 }
 function matDet(f, a) {
   const n = a.r;
@@ -2569,11 +2569,11 @@ function kron(f, a, b) {
   const r = a.r * b.r;
   const c = a.c * b.c;
   const d = new Array(r * c);
-  for (let i = 0; i < a.r; i++) {
+  for (let i2 = 0; i2 < a.r; i2++) {
     for (let j = 0; j < a.c; j++) {
       for (let p = 0; p < b.r; p++) {
         for (let q = 0; q < b.c; q++) {
-          d[(i * b.r + p) * c + (j * b.c + q)] = f.mul(a.d[i * a.c + j], b.d[p * b.c + q]);
+          d[(i2 * b.r + p) * c + (j * b.c + q)] = f.mul(a.d[i2 * a.c + j], b.d[p * b.c + q]);
         }
       }
     }
@@ -2583,13 +2583,13 @@ function kron(f, a, b) {
 function hadamard(f, a, b) {
   if (a.r !== b.r || a.c !== b.c) throw new Error("shape mismatch in hadamard");
   const d = new Array(a.r * a.c);
-  for (let i = 0; i < d.length; i++) d[i] = f.mul(a.d[i], b.d[i]);
+  for (let i2 = 0; i2 < d.length; i2++) d[i2] = f.mul(a.d[i2], b.d[i2]);
   return { r: a.r, c: a.c, d };
 }
 function inner(f, a, b) {
   if (a.r !== b.r || a.c !== b.c) throw new Error("shape mismatch in inner");
   let s = f.zero;
-  for (let i = 0; i < a.d.length; i++) s = f.add(s, f.mul(a.d[i], b.d[i]));
+  for (let i2 = 0; i2 < a.d.length; i2++) s = f.add(s, f.mul(a.d[i2], b.d[i2]));
   return s;
 }
 function norm2(f, a) {
@@ -2601,7 +2601,7 @@ function vec(a) {
 function diag(f, v) {
   const n = v.r * v.c;
   const d = new Array(n * n).fill(f.zero);
-  for (let i = 0; i < n; i++) d[i * n + i] = v.d[i];
+  for (let i2 = 0; i2 < n; i2++) d[i2 * n + i2] = v.d[i2];
   return { r: n, c: n, d };
 }
 function block(rows) {
@@ -2611,10 +2611,10 @@ function block(rows) {
   const c = rows.reduce((s, row) => s + row[0].c, 0);
   const d = new Array(r * c);
   let oi = 0;
-  for (let i = 0; i < R; i++) {
+  for (let i2 = 0; i2 < R; i2++) {
     let oj = 0;
     for (let j = 0; j < C; j++) {
-      const blk = rows[i][j];
+      const blk = rows[i2][j];
       for (let bi = 0; bi < blk.r; bi++) {
         for (let bj = 0; bj < blk.c; bj++) {
           d[(oi + bi) * c + (oj + bj)] = blk.d[bi * blk.c + bj];
@@ -2622,7 +2622,7 @@ function block(rows) {
       }
       oj += blk.c;
     }
-    oi += rows[i][0].r;
+    oi += rows[i2][0].r;
   }
   return { r, c, d };
 }
@@ -3033,10 +3033,10 @@ function evaluateExpectation(f, body, vars, evaluate) {
       const atoms = [];
       let local2 = local;
       for (let d = 0; d < dim; d++) {
-        const i = local2 % k;
+        const i2 = local2 % k;
         local2 = Math.floor(local2 / k);
-        atoms.push(rule.atoms[i]);
-        weight = f.mul(weight, f.fromRational(rule.weights[i].n, rule.weights[i].d));
+        atoms.push(rule.atoms[i2]);
+        weight = f.mul(weight, f.fromRational(rule.weights[i2].n, rule.weights[i2].d));
       }
       values.set(vars[v].name, atomValue(f, vars[v], atoms));
     }
@@ -3127,9 +3127,9 @@ function evalNode(f, node, env) {
       const lo = node.lo ? Math.round(f.toNumber(requireScalar(evalNode(f, node.lo, env), "a sum bound"))) : 1;
       const hi = node.hi ? Math.round(f.toNumber(requireScalar(evalNode(f, node.hi, env), "a sum bound"))) : lo;
       let acc = null;
-      for (let i = lo; i <= hi; i++) {
+      for (let i2 = lo; i2 <= hi; i2++) {
         const saved = env.values.get(node.idx);
-        env.values.set(node.idx, scalar(f.fromRational(i, 1)));
+        env.values.set(node.idx, scalar(f.fromRational(i2, 1)));
         env.memo.delete(node.idx);
         const term = evalNode(f, node.body, env);
         env.memo.delete(node.idx);
@@ -3286,7 +3286,7 @@ function evalOp(f, op, args, _env) {
       const k = nodeExponent(args[1]);
       if (isScalarVal(a)) {
         let acc = f.one;
-        for (let i = 0; i < k; i++) acc = f.mul(acc, a.v);
+        for (let i2 = 0; i2 < k; i2++) acc = f.mul(acc, a.v);
         return scalar(acc);
       }
       return { k: "m", m: matPow(f, requireMatrix(a, "a power"), k) };
@@ -3313,18 +3313,18 @@ function evalOp(f, op, args, _env) {
       const a = requireMatrix(args[0], "an adjugate");
       const n = a.r;
       const cofactors = zeros(n, n, f.zero);
-      for (let i = 0; i < n; i++) {
+      for (let i2 = 0; i2 < n; i2++) {
         for (let j = 0; j < n; j++) {
           const minor = zeros(n - 1, n - 1, f.zero);
           for (let r = 0; r < n - 1; r++) {
             for (let c = 0; c < n - 1; c++) {
-              const sr = r < i ? r : r + 1;
+              const sr = r < i2 ? r : r + 1;
               const sc = c < j ? c : c + 1;
               minor.d[r * (n - 1) + c] = a.d[sr * n + sc];
             }
           }
           const det = n === 1 ? f.one : matDet(f, minor);
-          cofactors.d[j * n + i] = (i + j) % 2 === 0 ? det : f.neg(det);
+          cofactors.d[j * n + i2] = (i2 + j) % 2 === 0 ? det : f.neg(det);
         }
       }
       return { k: "m", m: cofactors };
@@ -3373,16 +3373,16 @@ function evalCall(f, fn, args, _env) {
     case "tanh":
     case "sigmoid":
     case "relu": {
-      const unary = (x) => {
-        if (fn === "exp") return f.exp(x);
-        if (fn === "log" || fn === "ln") return f.log(x);
-        if (fn === "sqrt") return f.sqrt(x);
-        if (fn === "sin") return f.sin(x);
-        if (fn === "cos") return f.cos(x);
-        if (fn === "tan") return f.div(f.sin(x), f.cos(x));
-        if (fn === "tanh") return f.tanh(x);
-        if (fn === "sigmoid") return f.div(f.one, f.add(f.one, f.exp(f.neg(x))));
-        return f.cmp(x, f.zero) > 0 ? x : f.zero;
+      const unary = (x2) => {
+        if (fn === "exp") return f.exp(x2);
+        if (fn === "log" || fn === "ln") return f.log(x2);
+        if (fn === "sqrt") return f.sqrt(x2);
+        if (fn === "sin") return f.sin(x2);
+        if (fn === "cos") return f.cos(x2);
+        if (fn === "tan") return f.div(f.sin(x2), f.cos(x2));
+        if (fn === "tanh") return f.tanh(x2);
+        if (fn === "sigmoid") return f.div(f.one, f.add(f.one, f.exp(f.neg(x2))));
+        return f.cmp(x2, f.zero) > 0 ? x2 : f.zero;
       };
       if (isScalarVal(a0)) return scalar(unary(a0.v));
       const m = a0.m;
@@ -3406,13 +3406,13 @@ function evalCall(f, fn, args, _env) {
       return scalar(f.log(matDet(f, m)));
     }
     case "normalDensity": {
-      const x = requireMatrix(args[0], "a density");
+      const x2 = requireMatrix(args[0], "a density");
       const mu = requireMatrix(args[1], "a density");
       const sigma = requireMatrix(args[2], "a density");
-      const diff = matSub(f, x, mu);
+      const diff = matSub(f, x2, mu);
       const inv = matInv(f, sigma);
       const quad = inner(f, diff, matMul(f, inv, diff));
-      const n = x.c;
+      const n = x2.c;
       const logNorm = f.mul(f.fromRational(-1, 2), f.log(matDet(f, sigma)));
       const logTwoPi = f.mul(f.fromRational(-1, 2), f.mul(f.fromRational(n, 1), f.log(f.mul(f.fromRational(2, 1), f.log(f.exp(f.one))))));
       return scalar(f.exp(f.add(f.add(logNorm, logTwoPi), f.mul(f.fromRational(-1, 2), quad))));
@@ -3424,13 +3424,13 @@ function evalCall(f, fn, args, _env) {
   }
 }
 function toDual(f, m) {
-  return { r: m.r, c: m.c, d: m.d.map((x) => ({ v: x, t: f.zero })) };
+  return { r: m.r, c: m.c, d: m.d.map((x2) => ({ v: x2, t: f.zero })) };
 }
 function toHyperDual(f, m) {
   return {
     r: m.r,
     c: m.c,
-    d: m.d.map((x) => ({ v: x, e1: f.zero, e2: f.zero, e12: f.zero }))
+    d: m.d.map((x2) => ({ v: x2, e1: f.zero, e2: f.zero, e12: f.zero }))
   };
 }
 function dualEnv(env, dual) {
@@ -3461,12 +3461,12 @@ function directionalDerivative(base, fnNode, env, wrtName, baseValue, direction)
     const bm = isMatrixVal(baseValue) ? baseValue.m : { r: 1, c: 1, d: [baseValue.v] };
     const dm = isMatrixVal(direction) ? direction.m : { r: 1, c: 1, d: [direction.v] };
     const dMat = toDual(base, bm);
-    for (let i = 0; i < dMat.d.length; i++) dMat.d[i] = { v: dMat.d[i].v, t: dm.d[i] };
+    for (let i2 = 0; i2 < dMat.d.length; i2++) dMat.d[i2] = { v: dMat.d[i2].v, t: dm.d[i2] };
     dEnv.values.set(wrtName, { k: "m", m: dMat });
   }
   const result = evalNode(dual, fnNode, dEnv);
   if (isScalarVal(result)) return scalar(result.v.t);
-  return { k: "m", m: { r: result.m.r, c: result.m.c, d: result.m.d.map((x) => x.t) } };
+  return { k: "m", m: { r: result.m.r, c: result.m.c, d: result.m.d.map((x2) => x2.t) } };
 }
 function mixedSecondDerivative(base, fnNode, env, wrtName, baseValue, v, w) {
   const hyper = new HyperDualField(base);
@@ -3481,14 +3481,14 @@ function mixedSecondDerivative(base, fnNode, env, wrtName, baseValue, v, w) {
     const vm = isMatrixVal(v) ? v.m : { r: 1, c: 1, d: [v.v] };
     const wm = isMatrixVal(w) ? w.m : { r: 1, c: 1, d: [w.v] };
     const hMat = toHyperDual(base, bm);
-    for (let i = 0; i < hMat.d.length; i++) {
-      hMat.d[i] = { v: hMat.d[i].v, e1: vm.d[i], e2: wm.d[i], e12: base.zero };
+    for (let i2 = 0; i2 < hMat.d.length; i2++) {
+      hMat.d[i2] = { v: hMat.d[i2].v, e1: vm.d[i2], e2: wm.d[i2], e12: base.zero };
     }
     hEnv.values.set(wrtName, { k: "m", m: hMat });
   }
   const result = evalNode(hyper, fnNode, hEnv);
   if (isScalarVal(result)) return scalar(result.v.e12);
-  return { k: "m", m: { r: result.m.r, c: result.m.c, d: result.m.d.map((x) => x.e12) } };
+  return { k: "m", m: { r: result.m.r, c: result.m.c, d: result.m.d.map((x2) => x2.e12) } };
 }
 
 // src/core/prng.ts
@@ -3515,8 +3515,8 @@ function sfc32(a, b, c, d) {
 }
 function hashString(text) {
   let h = 2166136261;
-  for (let i = 0; i < text.length; i++) {
-    h ^= text.charCodeAt(i);
+  for (let i2 = 0; i2 < text.length; i2++) {
+    h ^= text.charCodeAt(i2);
     h = Math.imul(h, 16777619);
   }
   return h >>> 0;
@@ -3551,7 +3551,7 @@ var Sampler = class {
   /** Samples one symbol. Returns null when the constraints cannot be met. */
   sample(spec) {
     const { r, c, props } = spec;
-    const has = (p) => props.some((x) => typeof x === "string" ? x === p : false);
+    const has = (p) => props.some((x2) => typeof x2 === "string" ? x2 === p : false);
     if (has("ident")) return { k: "m", m: identity(r, this.field.one, this.field.zero) };
     if (has("zero")) return { k: "m", m: zeros(r, c, this.field.zero) };
     if (has("ones")) return { k: "m", m: this.mat(r, c, () => this.field.one) };
@@ -3576,7 +3576,7 @@ var Sampler = class {
   }
   mat(r, c, f) {
     const d = new Array(r * c);
-    for (let i = 0; i < r; i++) for (let j = 0; j < c; j++) d[i * c + j] = f(i, j);
+    for (let i2 = 0; i2 < r; i2++) for (let j = 0; j < c; j++) d[i2 * c + j] = f(i2, j);
     return { r, c, d };
   }
   /** One random element of the field. */
@@ -3592,17 +3592,17 @@ var Sampler = class {
   /** The upper triangle is mirrored. */
   sampleSymmetric(r, c) {
     const upper = this.sampleGeneral(r, c);
-    return this.mat(r, c, (i, j) => i <= j ? upper.d[i * c + j] : upper.d[j * c + i]);
+    return this.mat(r, c, (i2, j) => i2 <= j ? upper.d[i2 * c + j] : upper.d[j * c + i2]);
   }
   /** A diagonal matrix. */
   sampleDiagonal(r, c) {
-    return this.mat(r, c, (i, j) => i === j ? this.element() : this.field.zero);
+    return this.mat(r, c, (i2, j) => i2 === j ? this.element() : this.field.zero);
   }
   /** Upper or lower triangular. */
   sampleTriangular(r, c, upper) {
-    return this.mat(r, c, (i, j) => {
-      if (i === j) return this.element();
-      const inUpper = i < j;
+    return this.mat(r, c, (i2, j) => {
+      if (i2 === j) return this.element();
+      const inUpper = i2 < j;
       return inUpper === upper ? this.element() : this.field.zero;
     });
   }
@@ -3610,7 +3610,7 @@ var Sampler = class {
   sampleSkew(r, c) {
     const f = this.field;
     const upper = this.sampleGeneral(r, c);
-    return this.mat(r, c, (i, j) => i === j ? f.zero : i < j ? upper.d[i * c + j] : f.neg(upper.d[j * c + i]));
+    return this.mat(r, c, (i2, j) => i2 === j ? f.zero : i2 < j ? upper.d[i2 * c + j] : f.neg(upper.d[j * c + i2]));
   }
   /**
    * An orthogonal matrix.
@@ -3638,22 +3638,22 @@ var Sampler = class {
     const cols = [];
     for (let j = 0; j < n; j++) {
       const v = { r: n, c: 1, d: new Array(n).fill(f.zero) };
-      for (let i = 0; i < n; i++) v.d[i] = a.d[i * n + j];
+      for (let i2 = 0; i2 < n; i2++) v.d[i2] = a.d[i2 * n + j];
       for (const q of cols) {
         let proj = f.zero;
-        for (let i = 0; i < n; i++) proj = f.add(proj, f.mul(q.d[i], v.d[i]));
-        for (let i = 0; i < n; i++) v.d[i] = f.sub(v.d[i], f.mul(proj, q.d[i]));
+        for (let i2 = 0; i2 < n; i2++) proj = f.add(proj, f.mul(q.d[i2], v.d[i2]));
+        for (let i2 = 0; i2 < n; i2++) v.d[i2] = f.sub(v.d[i2], f.mul(proj, q.d[i2]));
       }
       let norm = f.zero;
-      for (let i = 0; i < n; i++) norm = f.add(norm, f.mul(v.d[i], v.d[i]));
+      for (let i2 = 0; i2 < n; i2++) norm = f.add(norm, f.mul(v.d[i2], v.d[i2]));
       let normNum = Math.sqrt(f.toNumber(norm));
       if (normNum < 1e-9) normNum = 1;
       if (f.toNumber(v.d[n - 1]) < 0) normNum = -normNum;
       const scale = f.fromRational(Math.round(normNum * 1e6), 1e6);
-      for (let i = 0; i < n; i++) v.d[i] = f.div(v.d[i], scale);
+      for (let i2 = 0; i2 < n; i2++) v.d[i2] = f.div(v.d[i2], scale);
       cols.push(v);
     }
-    return this.mat(n, n, (i, j) => cols[j].d[i]);
+    return this.mat(n, n, (i2, j) => cols[j].d[i2]);
   }
   /** An idempotent matrix of rank k: U (V^T U)^-1 V^T. */
   sampleIdempotent(r, c) {
@@ -3671,31 +3671,31 @@ var Sampler = class {
     if (f instanceof GFpField) {
       const t = this.sampleGeneral(c - 1, 1);
       let sq = f.zero;
-      for (const x of t.d) sq = f.add(sq, f.mul(x, x));
+      for (const x2 of t.d) sq = f.add(sq, f.mul(x2, x2));
       const den = f.add(sq, f.one);
       const inv = f.inv(den);
-      return this.mat(r, c, (i, j) => {
+      return this.mat(r, c, (i2, j) => {
         if (c === 1) return f.one;
         if (j === c - 1) return f.mul(f.sub(sq, f.one), inv);
-        return f.mul(f.mul(f.fromRational(2, 1), t.d[i * t.c + j]), inv);
+        return f.mul(f.mul(f.fromRational(2, 1), t.d[i2 * t.c + j]), inv);
       });
     }
     const v = this.sampleGeneral(r, c);
     let norm = f.zero;
-    for (const x of v.d) norm = f.add(norm, f.mul(x, x));
+    for (const x2 of v.d) norm = f.add(norm, f.mul(x2, x2));
     const s = Math.sqrt(f.toNumber(norm)) || 1;
     const scale = f.fromRational(Math.round(s * 1e9), 1e9);
-    return this.mat(r, c, (i, j) => f.div(v.d[i * c + j], scale));
+    return this.mat(r, c, (i2, j) => f.div(v.d[i2 * c + j], scale));
   }
   /** Row stochastic: the rows are positive and sum to one. */
   sampleStochastic(r, c) {
     const f = this.field;
     const raw = this.sampleGeneral(r, c);
-    return this.mat(r, c, (i, j) => {
+    return this.mat(r, c, (i2, j) => {
       let sum2 = f.zero;
-      for (let k = 0; k < c; k++) sum2 = f.add(sum2, raw.d[i * c + k]);
+      for (let k = 0; k < c; k++) sum2 = f.add(sum2, raw.d[i2 * c + k]);
       if (f.isZero(sum2)) return f.zero;
-      return f.div(raw.d[i * c + j], sum2);
+      return f.div(raw.d[i2 * c + j], sum2);
     });
   }
   /** A scalar drawn from the field. */
@@ -4029,39 +4029,39 @@ var OPERATOR_CHARS = "+-*/=<>!:";
 function tokenize(src) {
   const text = foldUnicode(src);
   const tokens = [];
-  let i = 0;
+  let i2 = 0;
   const n = text.length;
   const push = (type, value, from, to) => {
     tokens.push({ type, value, from, to });
   };
-  while (i < n) {
-    const ch = text[i];
+  while (i2 < n) {
+    const ch = text[i2];
     if (ch === " " || ch === "	" || ch === "\n" || ch === "\r") {
-      i++;
+      i2++;
       continue;
     }
     if (ch === "%") {
-      while (i < n && text[i] !== "\n") i++;
+      while (i2 < n && text[i2] !== "\n") i2++;
       continue;
     }
     if (ch === "\\") {
-      const start = i;
-      i++;
-      if (i >= n) {
-        push("csym", "\\", start, i);
+      const start = i2;
+      i2++;
+      if (i2 >= n) {
+        push("csym", "\\", start, i2);
         break;
       }
-      const c = text[i];
+      const c = text[i2];
       if (/[A-Za-z]/.test(c)) {
-        let j = i;
+        let j = i2;
         while (j < n && /[A-Za-z]/.test(text[j])) j++;
-        const name = text.slice(i, j);
-        i = j;
+        const name = text.slice(i2, j);
+        i2 = j;
         if (name === "begin" || name === "end") {
-          const env = readBracedName(text, i);
+          const env = readBracedName(text, i2);
           if (env) {
-            i = env.next;
-            push(name === "begin" ? "begin" : "end", env.name, start, i);
+            i2 = env.next;
+            push(name === "begin" ? "begin" : "end", env.name, start, i2);
             continue;
           }
         }
@@ -4071,120 +4071,120 @@ function tokenize(src) {
         if (DROP_COMMANDS.has(name)) {
           continue;
         }
-        push("cmd", name, start, i);
+        push("cmd", name, start, i2);
         continue;
       }
-      const sym = text[i];
-      i += 1;
+      const sym = text[i2];
+      i2 += 1;
       if (sym === "\\") {
-        if (text[i] === "\\") i += 1;
-        push("nl", "\\\\", start, i);
+        if (text[i2] === "\\") i2 += 1;
+        push("nl", "\\\\", start, i2);
         continue;
       }
       if (sym === "{" || sym === "}") {
-        push(sym === "{" ? "lbrace" : "rbrace", sym, start, i);
+        push(sym === "{" ? "lbrace" : "rbrace", sym, start, i2);
         continue;
       }
       if (sym === "," || sym === ";" || sym === ":" || sym === "!" || sym === " ") continue;
-      push("csym", sym === "|" ? "\\|" : sym, start, i);
+      push("csym", sym === "|" ? "\\|" : sym, start, i2);
       continue;
     }
     if (ch === "{") {
-      push("lbrace", ch, i, i + 1);
-      i++;
+      push("lbrace", ch, i2, i2 + 1);
+      i2++;
       continue;
     }
     if (ch === "}") {
-      push("rbrace", ch, i, i + 1);
-      i++;
+      push("rbrace", ch, i2, i2 + 1);
+      i2++;
       continue;
     }
     if (ch === "(") {
-      push("lparen", ch, i, i + 1);
-      i++;
+      push("lparen", ch, i2, i2 + 1);
+      i2++;
       continue;
     }
     if (ch === ")") {
-      push("rparen", ch, i, i + 1);
-      i++;
+      push("rparen", ch, i2, i2 + 1);
+      i2++;
       continue;
     }
     if (ch === "[") {
-      push("lbrack", ch, i, i + 1);
-      i++;
+      push("lbrack", ch, i2, i2 + 1);
+      i2++;
       continue;
     }
     if (ch === "]") {
-      push("rbrack", ch, i, i + 1);
-      i++;
+      push("rbrack", ch, i2, i2 + 1);
+      i2++;
       continue;
     }
     if (ch === "^") {
-      push("sup", ch, i, i + 1);
-      i++;
+      push("sup", ch, i2, i2 + 1);
+      i2++;
       continue;
     }
     if (ch === "_") {
-      push("sub", ch, i, i + 1);
-      i++;
+      push("sub", ch, i2, i2 + 1);
+      i2++;
       continue;
     }
     if (ch === "&") {
-      push("amp", ch, i, i + 1);
-      i++;
+      push("amp", ch, i2, i2 + 1);
+      i2++;
       continue;
     }
     if (ch === ",") {
-      push("comma", ch, i, i + 1);
-      i++;
+      push("comma", ch, i2, i2 + 1);
+      i2++;
       continue;
     }
     if (ch === ";") {
-      push("semi", ch, i, i + 1);
-      i++;
+      push("semi", ch, i2, i2 + 1);
+      i2++;
       continue;
     }
     if (ch === "'") {
-      push("csym", "'", i, i + 1);
-      i++;
+      push("csym", "'", i2, i2 + 1);
+      i2++;
       continue;
     }
     if (OPERATOR_CHARS.includes(ch)) {
-      push("op", ch, i, i + 1);
-      i++;
+      push("op", ch, i2, i2 + 1);
+      i2++;
       continue;
     }
     if (ch === "|") {
-      push("csym", "|", i, i + 1);
-      i++;
+      push("csym", "|", i2, i2 + 1);
+      i2++;
       continue;
     }
-    if (/[0-9]/.test(ch) || ch === "." && /[0-9]/.test(text[i + 1] ?? "")) {
-      let j = i;
+    if (/[0-9]/.test(ch) || ch === "." && /[0-9]/.test(text[i2 + 1] ?? "")) {
+      let j = i2;
       while (j < n && /[0-9]/.test(text[j])) j++;
       if (text[j] === ".") {
         j++;
         while (j < n && /[0-9]/.test(text[j])) j++;
       }
-      push("num", text.slice(i, j), i, j);
-      i = j;
+      push("num", text.slice(i2, j), i2, j);
+      i2 = j;
       continue;
     }
     if (/[A-Za-z]/.test(ch)) {
-      let j = i;
+      let j = i2;
       while (j < n && /[A-Za-z0-9]/.test(text[j])) j++;
-      push("ident", text.slice(i, j), i, j);
-      i = j;
+      push("ident", text.slice(i2, j), i2, j);
+      i2 = j;
       continue;
     }
-    push("op", ch, i, i + 1);
-    i++;
+    push("op", ch, i2, i2 + 1);
+    i2++;
   }
   push("eof", "", n, n);
   return tokens;
 }
-function readBracedName(text, i) {
-  let j = i;
+function readBracedName(text, i2) {
+  let j = i2;
   while (j < text.length && /\s/.test(text[j])) j++;
   if (text[j] !== "{") return null;
   const end = text.indexOf("}", j);
@@ -4681,10 +4681,10 @@ var Parser = class _Parser {
         this.pos++;
         if (t.value.length > 1 && !this.isFnName(t.value)) {
           const parts = [];
-          for (let i = 0; i < t.value.length; i++) {
-            const ch = t.value[i];
-            const sym2 = this.makeSym([], ch, null, null, { from: t.from + i, to: t.from + i + 1 });
-            parts.push(i === t.value.length - 1 ? this.applyScripts(sym2, [], ch) : sym2);
+          for (let i2 = 0; i2 < t.value.length; i2++) {
+            const ch = t.value[i2];
+            const sym2 = this.makeSym([], ch, null, null, { from: t.from + i2, to: t.from + i2 + 1 });
+            parts.push(i2 === t.value.length - 1 ? this.applyScripts(sym2, [], ch) : sym2);
           }
           return parts.reduce((a, b) => ({
             k: "op",
@@ -5071,19 +5071,19 @@ var Parser = class _Parser {
     const f = numParser.parseExpression();
     const wrt = [];
     let denOrder = 1;
-    let i = 0;
-    while (i < denTokens.length) {
-      const t = denTokens[i];
+    let i2 = 0;
+    while (i2 < denTokens.length) {
+      const t = denTokens[i2];
       if (t.type === "cmd" && t.value === "partial") {
-        i++;
-        let nameEnd = i;
+        i2++;
+        let nameEnd = i2;
         let text = "";
-        if (denTokens[i]?.type === "ident") {
-          text = denTokens[i].value;
-          nameEnd = i + 1;
-        } else if (denTokens[i]?.type === "lbrace") {
+        if (denTokens[i2]?.type === "ident") {
+          text = denTokens[i2].value;
+          nameEnd = i2 + 1;
+        } else if (denTokens[i2]?.type === "lbrace") {
           let depth = 1;
-          let j = i + 1;
+          let j = i2 + 1;
           while (j < denTokens.length && depth > 0) {
             if (denTokens[j].type === "lbrace") depth++;
             if (denTokens[j].type === "rbrace") {
@@ -5092,7 +5092,7 @@ var Parser = class _Parser {
             }
             j++;
           }
-          text = renderTokens(denTokens.slice(i + 1, j));
+          text = renderTokens(denTokens.slice(i2 + 1, j));
           nameEnd = j;
         }
         let sub2 = null;
@@ -5130,10 +5130,10 @@ var Parser = class _Parser {
           display: toDisplay(sub2 ? `${text}_${sub2}` : text),
           span: { from: t.from, to: k > 0 ? denTokens[Math.min(k, denTokens.length) - 1].to : t.to }
         });
-        i = k;
+        i2 = k;
         continue;
       }
-      i++;
+      i2++;
     }
     if (wrt.length >= 2) denOrder = 2;
     if (order === 1 && denOrder === 2) order = 2;
@@ -5350,8 +5350,8 @@ function findRelations(tokens) {
   const out = [];
   let depth = 0;
   let inText = 0;
-  for (let i = 0; i < tokens.length; i++) {
-    const t = tokens[i];
+  for (let i2 = 0; i2 < tokens.length; i2++) {
+    const t = tokens[i2];
     if (t.type === "lbrace") {
       depth++;
       continue;
@@ -5372,25 +5372,25 @@ function findRelations(tokens) {
     }
     if (depth > 0) continue;
     if (t.type === "op" && t.value === "=") {
-      out.push({ index: i, relation: "=", text: "=", length: 1 });
+      out.push({ index: i2, relation: "=", text: "=", length: 1 });
       continue;
     }
-    if (t.type === "op" && t.value === ":" && tokens[i + 1]?.type === "op" && tokens[i + 1]?.value === "=") {
-      out.push({ index: i, relation: ":=", text: ":=", length: 2 });
-      i++;
+    if (t.type === "op" && t.value === ":" && tokens[i2 + 1]?.type === "op" && tokens[i2 + 1]?.value === "=") {
+      out.push({ index: i2, relation: ":=", text: ":=", length: 2 });
+      i2++;
       continue;
     }
     if (t.type === "op" && t.value === "<") {
-      out.push({ index: i, relation: "lt", text: "<", length: 1 });
+      out.push({ index: i2, relation: "lt", text: "<", length: 1 });
       continue;
     }
     if (t.type === "op" && t.value === ">") {
-      out.push({ index: i, relation: "gt", text: ">", length: 1 });
+      out.push({ index: i2, relation: "gt", text: ">", length: 1 });
       continue;
     }
     if (t.type === "cmd") {
       const rel = RELATION_COMMANDS[t.value];
-      if (rel) out.push({ index: i, relation: rel, text: `\\${t.value}`, length: 1 });
+      if (rel) out.push({ index: i2, relation: rel, text: `\\${t.value}`, length: 1 });
     }
   }
   return out;
@@ -5434,10 +5434,10 @@ function parseRow(_src, rowText, offset, index, knownFns) {
     start = r.index + r.length;
   }
   bounds.push(start, tokens.length);
-  for (let i = 0; i < rels.length; i++) {
-    const rel = rels[i];
-    const lhsSeg = i === 0 ? tokens.slice(bounds[0], bounds[1]) : [];
-    let rhsSeg = tokens.slice(bounds[2 * i + 2], bounds[2 * i + 3]);
+  for (let i2 = 0; i2 < rels.length; i2++) {
+    const rel = rels[i2];
+    const lhsSeg = i2 === 0 ? tokens.slice(bounds[0], bounds[1]) : [];
+    let rhsSeg = tokens.slice(bounds[2 * i2 + 2], bounds[2 * i2 + 3]);
     let proportionalTo;
     if (rel.relation === "propto" && rhsSeg[0]?.type === "sub") {
       const parser = new Parser(rhsSeg, "", knownFns ? { knownFns } : {});
@@ -5491,12 +5491,12 @@ function parseNode(tokens, knownFns) {
   }
 }
 function extractAnnotation(tokens) {
-  for (let i = tokens.length - 1; i >= 0; i--) {
-    if (tokens[i].type === "cmd" && tokens[i].value === "text") {
-      const next = tokens[i + 1];
+  for (let i2 = tokens.length - 1; i2 >= 0; i2--) {
+    if (tokens[i2].type === "cmd" && tokens[i2].value === "text") {
+      const next = tokens[i2 + 1];
       if (next && next.type === "lbrace") {
         let depth = 1;
-        let j = i + 2;
+        let j = i2 + 2;
         while (j < tokens.length && depth > 0) {
           const kind = tokens[j].type;
           if (kind === "lbrace") depth++;
@@ -5506,16 +5506,16 @@ function extractAnnotation(tokens) {
           }
           j++;
         }
-        return renderTokens(tokens.slice(i + 2, j)).trim();
+        return renderTokens(tokens.slice(i2 + 2, j)).trim();
       }
     }
   }
   return void 0;
 }
 function stripAnnotation(tokens) {
-  for (let i = tokens.length - 1; i >= 0; i--) {
-    if (tokens[i].type === "cmd" && tokens[i].value === "text") {
-      return tokens.slice(0, i);
+  for (let i2 = tokens.length - 1; i2 >= 0; i2--) {
+    if (tokens[i2].type === "cmd" && tokens[i2].value === "text") {
+      return tokens.slice(0, i2);
     }
   }
   return tokens;
@@ -5546,28 +5546,28 @@ var MATH_ENVS = /* @__PURE__ */ new Set([
 function splitRows(src) {
   const rows = [];
   const prose = [];
-  let i = 0;
+  let i2 = 0;
   const len = src.length;
   const flushProse = (text) => {
     const t = text.trim();
     if (t) prose.push(t);
   };
-  while (i < len) {
-    const beginIdx = src.indexOf("\\begin{", i);
-    const dollarIdx = src.indexOf("$$", i);
-    const bracketIdx = src.indexOf("\\[", i);
+  while (i2 < len) {
+    const beginIdx = src.indexOf("\\begin{", i2);
+    const dollarIdx = src.indexOf("$$", i2);
+    const bracketIdx = src.indexOf("\\[", i2);
     const candidates = [beginIdx, dollarIdx, bracketIdx].filter((v) => v >= 0);
     if (!candidates.length) {
-      flushProse(src.slice(i));
+      flushProse(src.slice(i2));
       break;
     }
     const next = Math.min(...candidates);
-    flushProse(src.slice(i, next));
+    flushProse(src.slice(i2, next));
     if (next === beginIdx) {
       const env = readEnvName(src, beginIdx + 6);
       if (!env) {
         flushProse(src.slice(next, next + 7));
-        i = next + 7;
+        i2 = next + 7;
         continue;
       }
       const envName = env.name;
@@ -5579,7 +5579,7 @@ function splitRows(src) {
       } else {
         flushProse(src.slice(contentStart2, contentEnd2));
       }
-      i = endIdx >= 0 ? endIdx + 1 : len;
+      i2 = endIdx >= 0 ? endIdx + 1 : len;
       continue;
     }
     if (next === dollarIdx) {
@@ -5587,14 +5587,14 @@ function splitRows(src) {
       const contentStart2 = dollarIdx + 2;
       const contentEnd2 = end2 >= 0 ? end2 : len;
       rows.push(...splitMathContent(src, contentStart2, contentEnd2, `$$@${dollarIdx}`));
-      i = end2 >= 0 ? end2 + 2 : len;
+      i2 = end2 >= 0 ? end2 + 2 : len;
       continue;
     }
     const end = src.indexOf("\\]", bracketIdx + 2);
     const contentStart = bracketIdx + 2;
     const contentEnd = end >= 0 ? end : len;
     rows.push(...splitMathContent(src, contentStart, contentEnd, `\\[@${bracketIdx}`));
-    i = end >= 0 ? end + 2 : len;
+    i2 = end >= 0 ? end + 2 : len;
   }
   if (!rows.length) {
     let offset = 0;
@@ -5609,29 +5609,29 @@ function splitRows(src) {
   }
   return rows;
 }
-function readEnvName(src, i) {
-  if (src[i] !== "{") return null;
-  const end = src.indexOf("}", i);
+function readEnvName(src, i2) {
+  if (src[i2] !== "{") return null;
+  const end = src.indexOf("}", i2);
   if (end < 0) return null;
-  return { name: src.slice(i + 1, end), next: end + 1 };
+  return { name: src.slice(i2 + 1, end), next: end + 1 };
 }
 function findEnvEnd(src, start, envName) {
   let depth = 1;
-  let i = start + 1;
+  let i2 = start + 1;
   const open = `\\begin{${envName}}`;
   const close = `\\end{${envName}}`;
-  while (i < src.length) {
-    const openIdx = src.indexOf(open, i);
-    const closeIdx = src.indexOf(close, i);
+  while (i2 < src.length) {
+    const openIdx = src.indexOf(open, i2);
+    const closeIdx = src.indexOf(close, i2);
     if (closeIdx < 0) return -1;
     if (openIdx >= 0 && openIdx < closeIdx) {
       depth++;
-      i = openIdx + open.length;
+      i2 = openIdx + open.length;
       continue;
     }
     depth--;
     if (depth === 0) return closeIdx;
-    i = closeIdx + close.length;
+    i2 = closeIdx + close.length;
   }
   return -1;
 }
@@ -5642,46 +5642,46 @@ function splitMathContent(src, from, to, where) {
   let envDepth = 0;
   let rowStart = 0;
   const chars = content.split("");
-  for (let i = 0; i < content.length; i++) {
-    const ch = chars[i];
+  for (let i2 = 0; i2 < content.length; i2++) {
+    const ch = chars[i2];
     if (ch === "\\") {
-      const next = chars.slice(i, i + 8).join("");
+      const next = chars.slice(i2, i2 + 8).join("");
       if (next.startsWith("\\begin{")) {
         envDepth++;
-        i += 7;
+        i2 += 7;
         continue;
       }
       if (next.startsWith("\\end{")) {
         envDepth = Math.max(0, envDepth - 1);
-        i += 5;
+        i2 += 5;
         continue;
       }
       if (next.startsWith("\\\\")) {
         if (braceDepth === 0 && envDepth === 0) {
-          const seg2 = chars.slice(rowStart, i).join("");
+          const seg2 = chars.slice(rowStart, i2).join("");
           pushRow(rows, seg2, from + rowStart, where);
-          rowStart = i + 2;
-          i += 1;
+          rowStart = i2 + 2;
+          i2 += 1;
           continue;
         }
-        i += 1;
+        i2 += 1;
         continue;
       }
       if (next.startsWith("\\label{") || next.startsWith("\\tag{")) {
-        const end = content.indexOf("}", i);
+        const end = content.indexOf("}", i2);
         if (end > 0) {
-          for (let j = i; j < end; j++) chars[j] = " ";
-          i = end;
+          for (let j = i2; j < end; j++) chars[j] = " ";
+          i2 = end;
           continue;
         }
       }
-      i += 1;
+      i2 += 1;
       continue;
     }
     if (ch === "{") braceDepth++;
     else if (ch === "}") braceDepth--;
     else if (ch === "&" && braceDepth === 0 && envDepth === 0) {
-      chars[i] = " ";
+      chars[i2] = " ";
     }
   }
   const seg = chars.slice(rowStart).join("");
@@ -5744,8 +5744,8 @@ function splitLatexItems(text) {
   const out = [];
   let current = "";
   let depth = 0;
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
+  for (let i2 = 0; i2 < text.length; i2++) {
+    const ch = text[i2];
     if (ch === "{") depth++;
     if (ch === "}") depth--;
     if (depth === 0 && (ch === "\n" || ch === ";")) {
@@ -5753,7 +5753,7 @@ function splitLatexItems(text) {
       current = "";
       continue;
     }
-    if (depth === 0 && ch === "," && looksLikeLatexList(text, i)) {
+    if (depth === 0 && ch === "," && looksLikeLatexList(text, i2)) {
       current += ch;
       continue;
     }
@@ -6054,11 +6054,11 @@ function parseType(name, type) {
   const words = type.split(/\s+/);
   const props = [];
   const dims = [];
-  let i = 0;
-  for (; i < words.length; i++) {
-    const w = words[i].toLowerCase();
+  let i2 = 0;
+  for (; i2 < words.length; i2++) {
+    const w = words[i2].toLowerCase();
     if (w === "rank") {
-      const k = parseDim(words[++i] ?? "");
+      const k = parseDim(words[++i2] ?? "");
       if (k === null) return null;
       props.push({ rank: k });
       continue;
@@ -6069,7 +6069,7 @@ function parseType(name, type) {
     }
     break;
   }
-  const rest = words.slice(i).join(" ");
+  const rest = words.slice(i2).join(" ");
   const dimText2 = rest.replace(/[x×]/g, "\xD7");
   const parts = dimText2.split("\xD7").map((p) => p.trim()).filter(Boolean);
   for (const p of parts) {
@@ -6792,7 +6792,7 @@ function isConstantSymbol(name) {
   return name === "e" || name === "\\pi" || name === "pi";
 }
 function recipeDegree(ctx, name, props, sizes) {
-  const has = (p) => props.some((x) => typeof x === "string" ? x === p : false);
+  const has = (p) => props.some((x2) => typeof x2 === "string" ? x2 === p : false);
   const info = ctx.symbols.get(name);
   const size = info && isMatrix(info.ty) ? dimSize(ctx, info.ty.r, sizes) : 3;
   if (has("orth")) return { n: size, d: size };
@@ -6868,13 +6868,19 @@ function collectDimVarsFor(ctx, lhs, rhs, defs) {
       }
     }
   }
+  const named = /* @__PURE__ */ new Map();
+  for (const declared of ctx.dimVars) {
+    const root = ctx.dims.find(declared);
+    if (!named.has(root)) named.set(root, declared);
+  }
   const out = [];
   for (const declared of ctx.dimVars) {
     const root = ctx.dims.find(declared);
-    if (roots.has(root) && !out.includes(root)) out.push(root);
+    if (roots.has(root) && !out.includes(declared)) out.push(declared);
   }
   for (const root of roots) {
-    if (!out.includes(root) && !root.startsWith("#")) out.push(root);
+    const name = named.get(root) ?? root;
+    if (!out.includes(name) && !name.startsWith("#")) out.push(name);
   }
   return out;
 }
@@ -7005,7 +7011,7 @@ function check(src, opts = {}) {
 }
 function mergeDecls(preset, declared) {
   const out = [...preset];
-  const index = new Map(out.map((d, i) => [d.name, i]));
+  const index = new Map(out.map((d, i2) => [d.name, i2]));
   for (const d of declared) {
     const at = index.get(d.name);
     if (at === void 0) {
@@ -7298,7 +7304,7 @@ function runExactTrial(step, ctx, defs, setting, p, rng) {
   }
   for (const [name, value] of sampled.values.entries()) env.values.set(name, value);
   for (const [name, quadVar] of sampled.quad.entries()) env.quad.set(name, quadVar);
-  const sides = evaluateSides(field, step, env, sampler);
+  const sides = evaluateSides(field, step.lhs, step.rhs, env, sampler);
   if (sides.kind === "unknown") return { kind: "unknown", message: sides.message, domain: sides.domain };
   if (sides.kind === "equal") return { kind: "ok" };
   return {
@@ -7308,14 +7314,17 @@ function runExactTrial(step, ctx, defs, setting, p, rng) {
     counterexample: buildCounterexample(ctx, step, setting, sampled.values, sides.lhs, sides.rhs, field)
   };
 }
-function evaluateSides(field, step, env, sampler) {
-  const derivNode = step.lhs && step.lhs.k === "deriv" ? step.lhs : void 0;
+function compareSides(field, lhs, rhs, env, sampler) {
+  return evaluateSides(field, lhs, rhs, env, sampler);
+}
+function evaluateSides(field, lhsNode, rhsNode, env, sampler) {
+  const derivNode = lhsNode.k === "deriv" ? lhsNode : void 0;
   try {
     if (derivNode) {
-      return compareDerivative(field, derivNode, step.rhs, env, sampler);
+      return compareDerivative(field, derivNode, rhsNode, env, sampler);
     }
-    const lhs = evalNode(field, step.lhs, env);
-    const rhs = evalNode(field, step.rhs, env);
+    const lhs = evalNode(field, lhsNode, env);
+    const rhs = evalNode(field, rhsNode, env);
     if (valuesEqual(field, lhs, rhs)) return { kind: "equal" };
     return { kind: "different", lhs, rhs, message: "the two sides are not equal" };
   } catch (error) {
@@ -7411,14 +7420,14 @@ function compareDerivative(field, deriv, claimed, env, sampler) {
   if (isMatrixVal(tangent) && isMatrixVal(claimedVal)) {
     const product = matMul(field, claimedVal.m, direction.m);
     if (product.r === tangent.m.r && product.c === tangent.m.c) {
-      let same2 = true;
-      for (let i = 0; i < product.d.length; i++) {
-        if (!fieldClose(field, product.d[i], tangent.m.d[i])) {
-          same2 = false;
+      let same = true;
+      for (let i2 = 0; i2 < product.d.length; i2++) {
+        if (!fieldClose(field, product.d[i2], tangent.m.d[i2])) {
+          same = false;
           break;
         }
       }
-      if (same2) return { kind: "equal" };
+      if (same) return { kind: "equal" };
     }
     return {
       kind: "different",
@@ -7436,20 +7445,20 @@ function asScalar(_field, val) {
 }
 function innerProduct(field, g, v) {
   let sum2 = field.zero;
-  for (let i = 0; i < g.r; i++) {
+  for (let i2 = 0; i2 < g.r; i2++) {
     for (let j = 0; j < g.c; j++) {
-      sum2 = field.add(sum2, field.mul(g.d[i * g.c + j], v.d[i * v.c + j]));
+      sum2 = field.add(sum2, field.mul(g.d[i2 * g.c + j], v.d[i2 * v.c + j]));
     }
   }
   return sum2;
 }
 function quadraticForm(field, v, h, w) {
   let sum2 = field.zero;
-  for (let i = 0; i < v.r; i++) {
+  for (let i2 = 0; i2 < v.r; i2++) {
     for (let j = 0; j < h.c; j++) {
       sum2 = field.add(
         sum2,
-        field.mul(field.mul(v.d[i * v.c], h.d[i * h.c + j]), w.d[j * w.c])
+        field.mul(field.mul(v.d[i2 * v.c], h.d[i2 * h.c + j]), w.d[j * w.c])
       );
     }
   }
@@ -7457,7 +7466,7 @@ function quadraticForm(field, v, h, w) {
 }
 function transposeMat(m) {
   const d = new Array(m.r * m.c);
-  for (let i = 0; i < m.r; i++) for (let j = 0; j < m.c; j++) d[j * m.r + i] = m.d[i * m.c + j];
+  for (let i2 = 0; i2 < m.r; i2++) for (let j = 0; j < m.c; j++) d[j * m.r + i2] = m.d[i2 * m.c + j];
   return { r: m.c, c: m.r, d };
 }
 function isFunctionName(ctx, name) {
@@ -7466,10 +7475,10 @@ function isFunctionName(ctx, name) {
 }
 function fieldClose(field, a, b) {
   if (field instanceof GFpField) return field.eq(a, b);
-  const x = field.toNumber(a);
+  const x2 = field.toNumber(a);
   const y = field.toNumber(b);
-  const scale = Math.max(1, Math.abs(x), Math.abs(y));
-  return Math.abs(x - y) <= 1e-12 * scale;
+  const scale = Math.max(1, Math.abs(x2), Math.abs(y));
+  return Math.abs(x2 - y) <= 1e-12 * scale;
 }
 function hasExpectation(step) {
   const check2 = (node) => {
@@ -7599,7 +7608,7 @@ function valuesEqual(field, a, b) {
   if (a.k === "s" && b.k === "m" && b.m.r === 1 && b.m.c === 1) return field.eq(a.v, b.m.d[0]);
   if (a.k === "m" && b.k === "m") {
     if (a.m.r !== b.m.r || a.m.c !== b.m.c) return false;
-    for (let i = 0; i < a.m.d.length; i++) if (!field.eq(a.m.d[i], b.m.d[i])) return false;
+    for (let i2 = 0; i2 < a.m.d.length; i2++) if (!field.eq(a.m.d[i2], b.m.d[i2])) return false;
     return true;
   }
   return false;
@@ -7864,21 +7873,21 @@ function numericDelta(ctx, defs, step, setting, rng, field) {
   if (sampled === "unknown") return null;
   for (const [name, value] of sampled.values.entries()) env.values.set(name, value);
   for (const [name, quadVar] of sampled.quad.entries()) env.quad.set(name, quadVar);
-  const sides = evaluateSides(field, step, env, sampler);
+  const sides = evaluateSides(field, step.lhs, step.rhs, env, sampler);
   if (sides.kind === "unknown") return null;
   if (sides.kind === "equal") return 0;
   return relativeDelta(field, sides.lhs, sides.rhs);
 }
 function relativeDelta(field, a, b) {
-  const flat = (v) => v.k === "s" ? [field.toNumber(v.v)] : v.m.d.map((x) => field.toNumber(x));
+  const flat = (v) => v.k === "s" ? [field.toNumber(v.v)] : v.m.d.map((x2) => field.toNumber(x2));
   const fa = flat(a);
   const fb = flat(b);
   if (fa.length !== fb.length) return Number.POSITIVE_INFINITY;
   let diff = 0;
   let scale = 0;
-  for (let i = 0; i < fa.length; i++) {
-    diff = Math.max(diff, Math.abs(fa[i] - fb[i]));
-    scale = Math.max(scale, Math.abs(fa[i]), Math.abs(fb[i]));
+  for (let i2 = 0; i2 < fa.length; i2++) {
+    diff = Math.max(diff, Math.abs(fa[i2] - fb[i2]));
+    scale = Math.max(scale, Math.abs(fa[i2]), Math.abs(fb[i2]));
   }
   if (scale === 0) return diff === 0 ? 0 : Number.POSITIVE_INFINITY;
   return diff / scale;
@@ -7908,7 +7917,7 @@ function sizeSettings(dimVars) {
   const out = [];
   for (let shift = 0; shift < 3; shift++) {
     const m = /* @__PURE__ */ new Map();
-    dimVars.forEach((v, i) => m.set(v, cycle[(i + shift) % cycle.length]));
+    dimVars.forEach((v, i2) => m.set(v, cycle[(i2 + shift) % cycle.length]));
     out.push(m);
   }
   return out;
@@ -7950,14 +7959,22 @@ var PROP_WORDS2 = {
 function buildCounterexample(_ctx, _step, setting, sampled, lhs, rhs, field) {
   const dims = {};
   for (const [k, v] of setting) dims[k] = v;
-  const values = {};
+  const residues = {};
   for (const [name, val] of sampled) {
-    values[name] = val.k === "s" ? val.v : val.m.d;
+    residues[name] = val.k === "s" ? val.v : val.m.d;
   }
   const lhsVal = lhs.k === "s" ? lhs.v : lhs.m.d;
   const rhsVal = rhs.k === "s" ? rhs.v : rhs.m.d;
-  const diff = lhs.k === "s" && rhs.k === "s" ? field.sub(lhs.v, rhs.v) : lhs.k === "m" && rhs.k === "m" ? lhs.m.d.map((x, i) => field.sub(x, rhs.m.d[i])) : null;
-  return { dims, values, lhs: lhsVal, rhs: rhsVal, diff, numpy: "" };
+  const diff = lhs.k === "s" && rhs.k === "s" ? field.sub(lhs.v, rhs.v) : lhs.k === "m" && rhs.k === "m" ? lhs.m.d.map((x2, i2) => field.sub(x2, rhs.m.d[i2])) : null;
+  return {
+    dims,
+    values: {},
+    lhs: null,
+    rhs: null,
+    diff: null,
+    numpy: "",
+    debug: { residues, lhs: lhsVal, rhs: rhsVal, diff }
+  };
 }
 function checkImplication(step, ctx, defs, opts, card) {
   const premise = step.premise;
@@ -8070,12 +8087,12 @@ function runImplicationTrial(step, ctx, defs, setting, p, rng) {
   if (!pivotValue || pivotValue.k !== "m") return { kind: "unknown", message: `no value for ${pivot}` };
   const n = pivotValue.m.r;
   const dim = pivotValue.m.c;
-  const residual = (x) => {
+  const residual = (x2) => {
     const trialEnv = { ...env, values: new Map(env.values), memo: /* @__PURE__ */ new Map() };
-    trialEnv.values.set(pivot, { k: "m", m: x });
+    trialEnv.values.set(pivot, { k: "m", m: x2 });
     try {
       if (premise.lhs?.k === "deriv") {
-        const grad = gradientAt(field, premise.lhs, trialEnv, pivot, x, n);
+        const grad = gradientAt(field, premise.lhs, trialEnv, pivot, x2, n);
         if (!grad) return null;
         const rhs = premise.rhs ? evalNode(field, premise.rhs, trialEnv) : scalar(field.zero);
         const rhsScalar = asScalar(field, rhs);
@@ -8083,7 +8100,7 @@ function runImplicationTrial(step, ctx, defs, setting, p, rng) {
         return {
           r: grad.r,
           c: grad.c,
-          d: grad.d.map((x2) => field.sub(x2, rhsScalar))
+          d: grad.d.map((x3) => field.sub(x3, rhsScalar))
         };
       }
       const l = evalResidual(field, premise, trialEnv);
@@ -8096,7 +8113,7 @@ function runImplicationTrial(step, ctx, defs, setting, p, rng) {
   const dir = sampler.sampleGeneral(n, dim);
   const second = secondDirectional(field, residual, pivotValue.m, dir);
   if (second === null) return { kind: "unknown", message: "could not evaluate the premise" };
-  if (!second.d.every((x) => field.isZero(x))) {
+  if (!second.d.every((x2) => field.isZero(x2))) {
     return {
       kind: "unknown",
       message: "the premise is not affine in the variable, so the implication is not checked in v1"
@@ -8112,7 +8129,7 @@ function runImplicationTrial(step, ctx, defs, setting, p, rng) {
     e.d[j * dim + (dim - 1)] = field.one;
     const rj = residual(addMat(field, pivotValue.m, e));
     if (!rj) return { kind: "unknown", message: "could not evaluate the premise" };
-    for (let i = 0; i < rows; i++) jac.d[i * n + j] = field.sub(rj.d[i * cols], r0.d[i * cols]);
+    for (let i2 = 0; i2 < rows; i2++) jac.d[i2 * n + j] = field.sub(rj.d[i2 * cols], r0.d[i2 * cols]);
   }
   let stepVec;
   try {
@@ -8145,13 +8162,13 @@ function gradientAt(field, deriv, env, pivotName, baseValue, n) {
   const def = env.defs.get(fnNode.name);
   if (!def) return null;
   const g = { r: n, c: 1, d: new Array(n).fill(field.zero) };
-  for (let i = 0; i < n; i++) {
+  for (let i2 = 0; i2 < n; i2++) {
     const e = { r: n, c: 1, d: new Array(n).fill(field.zero) };
-    e.d[i] = field.one;
+    e.d[i2] = field.one;
     const tangent = directionalDerivative(field, def, env, pivotName, { k: "m", m: baseValue }, { k: "m", m: e });
     const value = asScalar(field, tangent);
     if (value === null) return null;
-    g.d[i] = value;
+    g.d[i2] = value;
   }
   return g;
 }
@@ -8164,23 +8181,23 @@ function evalResidual(field, premise, env) {
 }
 function addMat(field, a, b) {
   const d = new Array(a.r * a.c);
-  for (let i = 0; i < d.length; i++) d[i] = field.add(a.d[i], b.d[i]);
+  for (let i2 = 0; i2 < d.length; i2++) d[i2] = field.add(a.d[i2], b.d[i2]);
   return { r: a.r, c: a.c, d };
 }
 function subMat(field, a, b) {
   const d = new Array(a.r * a.c);
-  for (let i = 0; i < d.length; i++) d[i] = field.sub(a.d[i], b.d[i]);
+  for (let i2 = 0; i2 < d.length; i2++) d[i2] = field.sub(a.d[i2], b.d[i2]);
   return { r: a.r, c: a.c, d };
 }
-function secondDirectional(field, residual, x, dir) {
-  const plus = residual(addMat(field, x, dir));
-  const minus = residual(subMat(field, x, dir));
-  const centre = residual(x);
+function secondDirectional(field, residual, x2, dir) {
+  const plus = residual(addMat(field, x2, dir));
+  const minus = residual(subMat(field, x2, dir));
+  const centre = residual(x2);
   if (!plus || !minus || !centre) return null;
   const d = new Array(plus.d.length);
   const two = field.fromRational(2, 1);
-  for (let i = 0; i < d.length; i++) {
-    d[i] = field.sub(field.add(plus.d[i], minus.d[i]), field.mul(two, centre.d[i]));
+  for (let i2 = 0; i2 < d.length; i2++) {
+    d[i2] = field.sub(field.add(plus.d[i2], minus.d[i2]), field.mul(two, centre.d[i2]));
   }
   return { r: plus.r, c: plus.c, d };
 }
@@ -8299,7 +8316,7 @@ function shrinkCounterexample(ctx, lhs, rhs, defs, sizes, seed, budgetMs = 200) 
   const started = Date.now();
   const names = [...ctx.symbols.keys()].filter((name) => {
     const info = ctx.symbols.get(name);
-    return info && info.ty.t === "mat";
+    return info && info.ty.t === "mat" && !defs.has(name);
   });
   const shrinkCtx = {
     ctx,
@@ -8307,6 +8324,7 @@ function shrinkCounterexample(ctx, lhs, rhs, defs, sizes, seed, budgetMs = 200) 
     rhs,
     defs,
     symbolNames: names,
+    derivedNames: [...defs.keys()],
     sizes,
     propOf: (name) => ctx.symbols.get(name)?.props ?? []
   };
@@ -8333,14 +8351,24 @@ function shrinkCounterexample(ctx, lhs, rhs, defs, sizes, seed, budgetMs = 200) 
     const l = evalNode(field, lhs, env);
     const r = evalNode(field, rhs, env);
     if (!equal(field, l, r)) {
-      return describe(ctx, sizes, values, l, r, field);
+      return describe(ctx, sizes, values, derivedValues(field, env, defs), l, r, field, true);
     }
   } catch {
   }
   return null;
 }
+function derivedValues(field, env, defs) {
+  const out = /* @__PURE__ */ new Map();
+  for (const [name, node] of defs) {
+    try {
+      out.set(name, evalNode(field, node, env));
+    } catch {
+    }
+  }
+  return out;
+}
 function searchSmallIntegers(sh, range, seed) {
-  const field = new GFpField(2147483647);
+  const field = new DecField(50);
   const rng = rngFor(seed, "small", range);
   const { ctx, sizes } = sh;
   for (let attempt = 0; attempt < 40; attempt++) {
@@ -8363,7 +8391,7 @@ function searchSmallIntegers(sh, range, seed) {
       const l = evalNode(field, sh.lhs, env);
       const r = evalNode(field, sh.rhs, env);
       if (equal(field, l, r)) continue;
-      return describe(ctx, sizes, values, l, r, field);
+      return describe(ctx, sizes, values, derivedValues(field, env, sh.defs), l, r, field, false);
     } catch {
       continue;
     }
@@ -8371,38 +8399,45 @@ function searchSmallIntegers(sh, range, seed) {
   return null;
 }
 function smallMatrix(field, r, c, props, rng, range) {
-  const has = (p) => props.some((x) => x === p);
-  const entry = () => {
-    const v = Math.floor(rng() * (2 * range + 1)) - range;
-    return field.mod(v);
-  };
-  const d = new Array(r * c);
-  for (let i = 0; i < r; i++) {
+  const has = (p) => props.some((x2) => x2 === p);
+  const entry = () => Math.floor(rng() * (2 * range + 1)) - range;
+  if ((has("spd") || has("psd")) && r === c) {
+    const l = new Array(r * r).fill(0);
+    for (let i2 = 0; i2 < r; i2++) {
+      for (let j = 0; j <= i2; j++) l[i2 * r + j] = entry();
+    }
+    const d2 = new Array(r * c).fill(0);
+    for (let i2 = 0; i2 < r; i2++) {
+      for (let j = 0; j < r; j++) {
+        let sum2 = 0;
+        for (let k = 0; k < r; k++) sum2 += l[i2 * r + k] * l[j * r + k];
+        d2[i2 * c + j] = sum2 + (i2 === j ? 1 : 0);
+      }
+    }
+    return { r, c, d: d2.map((x2) => field.fromRational(x2, 1)) };
+  }
+  const d = new Array(r * c).fill(0);
+  for (let i2 = 0; i2 < r; i2++) {
     for (let j = 0; j < c; j++) {
-      if (has("sym") || has("spd") || has("psd")) {
-        d[i * c + j] = i <= j ? d[j * c + i] ?? entry() : d[j * c + i];
+      if (has("sym") || has("psd")) {
+        d[i2 * c + j] = i2 <= j ? d[j * c + i2] || entry() : d[j * c + i2];
+        if (i2 > j) d[i2 * c + j] = d[j * c + i2];
       } else if (has("skew")) {
-        d[i * c + j] = i === j ? 0 : i < j ? entry() : field.neg(d[j * c + i]);
+        d[i2 * c + j] = i2 === j ? 0 : i2 < j ? entry() : -d[j * c + i2];
       } else if (has("diag")) {
-        d[i * c + j] = i === j ? entry() : 0;
+        d[i2 * c + j] = i2 === j ? entry() : 0;
       } else if (has("ident")) {
-        d[i * c + j] = i === j ? 1 : 0;
+        d[i2 * c + j] = i2 === j ? 1 : 0;
       } else if (has("zero")) {
-        d[i * c + j] = 0;
+        d[i2 * c + j] = 0;
       } else if (has("ones")) {
-        d[i * c + j] = 1;
+        d[i2 * c + j] = 1;
       } else {
-        d[i * c + j] = entry();
+        d[i2 * c + j] = entry();
       }
     }
   }
-  const m = { r, c, d };
-  if ((has("spd") || has("psd")) && r === c) {
-    for (let i = 0; i < r; i++) {
-      d[i * c + i] = field.add(d[i * c + i], Math.max(1, r));
-      for (let j = 0; j < i; j++) d[i * c + j] = d[j * c + i];
-    }
-  }
+  const m = { r, c, d: d.map((x2) => field.fromRational(x2, 1)) };
   if (r === c && (has("orth") || has("idem") || has("proj"))) return null;
   return m;
 }
@@ -8410,51 +8445,80 @@ function equal(field, a, b) {
   if (a.k === "s" && b.k === "s") return field.eq(a.v, b.v);
   if (a.k === "m" && b.k === "m") {
     if (a.m.r !== b.m.r || a.m.c !== b.m.c) return false;
-    for (let i = 0; i < a.m.d.length; i++) if (!field.eq(a.m.d[i], b.m.d[i])) return false;
+    for (let i2 = 0; i2 < a.m.d.length; i2++) if (!field.eq(a.m.d[i2], b.m.d[i2])) return false;
     return true;
   }
   return false;
 }
-function describe(_ctx, sizes, values, lhs, rhs, field) {
+function describe(ctx, sizes, values, derived, lhs, rhs, field, residue) {
   const dims = {};
-  for (const [k, v] of sizes) dims[k] = v;
-  const signed = (x) => {
+  for (const [root, size] of sizes) {
+    const declared = ctx.dimVars.find((d) => ctx.dims.find(d) === root);
+    if (declared) dims[declared] = size;
+    else if (!root.startsWith("#")) dims[root] = size;
+  }
+  const signed = (x2) => {
+    if (!residue) return x2;
     const p = 2147483647;
-    return x > p / 2 ? x - p : x;
+    return x2 > p / 2 ? x2 - p : x2;
   };
   const plain = {};
   for (const [name, val] of values) {
-    plain[name] = val.k === "s" ? signed(field.toNumber(val.v)) : val.m.d.map((x) => signed(field.toNumber(x)));
+    plain[name] = val.k === "s" ? signed(field.toNumber(val.v)) : val.m.d.map((x2) => signed(field.toNumber(x2)));
   }
-  const lhsPlain = lhs.k === "s" ? signed(field.toNumber(lhs.v)) : lhs.m.d.map((x) => signed(field.toNumber(x)));
-  const rhsPlain = rhs.k === "s" ? signed(field.toNumber(rhs.v)) : rhs.m.d.map((x) => signed(field.toNumber(x)));
-  const diffPlain = lhs.k === "s" && rhs.k === "s" ? signed(field.toNumber(lhs.v) - field.toNumber(rhs.v)) : lhs.k === "m" && rhs.k === "m" ? lhs.m.d.map((x, i) => signed(field.toNumber(x) - field.toNumber(rhs.m.d[i]))) : 0;
+  const derivedPlain = {};
+  for (const [name, val] of derived) {
+    derivedPlain[name] = val.k === "s" ? signed(field.toNumber(val.v)) : val.m.d.map((x2) => signed(field.toNumber(x2)));
+  }
+  const lhsPlain = lhs.k === "s" ? signed(field.toNumber(lhs.v)) : lhs.m.d.map((x2) => signed(field.toNumber(x2)));
+  const rhsPlain = rhs.k === "s" ? signed(field.toNumber(rhs.v)) : rhs.m.d.map((x2) => signed(field.toNumber(x2)));
+  const diffPlain = lhs.k === "s" && rhs.k === "s" ? signed(field.toNumber(lhs.v) - field.toNumber(rhs.v)) : lhs.k === "m" && rhs.k === "m" ? lhs.m.d.map((x2, i2) => signed(field.toNumber(x2) - field.toNumber(rhs.m.d[i2]))) : 0;
   return {
     dims,
     values: plain,
+    derived: derivedPlain,
     lhs: lhsPlain,
     rhs: rhsPlain,
     diff: diffPlain,
-    numpy: toNumpy(plain, dims)
+    numpy: toNumpy(plain, dims, derivedPlain)
   };
 }
-function toNumpy(values, _dims) {
+function toNumpy(values, _dims, derived = {}) {
   const lines = ["import numpy as np"];
   const names = Object.keys(values);
-  names.forEach((name, i) => {
+  names.forEach((name, i2) => {
     const v = values[name];
-    const pyName = `s${i}`;
+    const pyName = `s${i2}`;
     if (typeof v === "number") {
       lines.push(`${pyName} = ${v}`);
     } else {
       const rows = [];
       const c = Math.max(1, Math.round(Math.sqrt(v.length)));
-      for (let i2 = 0; i2 < v.length; i2 += c) {
-        rows.push(`[${v.slice(i2, i2 + c).map((x) => Number(x.toFixed(6))).join(", ")}]`);
+      for (let i3 = 0; i3 < v.length; i3 += c) {
+        rows.push(`[${v.slice(i3, i3 + c).map((x2) => Number(x2.toFixed(6))).join(", ")}]`);
       }
       lines.push(`${pyName} = np.array([${rows.join(", ")}])`);
     }
   });
+  const derivedNames = Object.keys(derived);
+  if (derivedNames.length) {
+    lines.push("");
+    lines.push("# the symbols the derivation defines, computed by SAMOSA from the values above");
+    derivedNames.forEach((name, i2) => {
+      const v = derived[name];
+      const pyName = `d${i2}`;
+      if (typeof v === "number") {
+        lines.push(`${pyName} = ${v}  # ${name}`);
+      } else {
+        const rows = [];
+        const c = Math.max(1, Math.round(Math.sqrt(v.length)));
+        for (let i3 = 0; i3 < v.length; i3 += c) {
+          rows.push(`[${v.slice(i3, i3 + c).map((x2) => Number(x2.toFixed(6))).join(", ")}]`);
+        }
+        lines.push(`${pyName} = np.array([${rows.join(", ")}])  # ${name}`);
+      }
+    });
+  }
   lines.push("");
   lines.push("# the two sides of the step, with these values");
   lines.push("# lhs - rhs is not zero");
@@ -8476,8 +8540,30 @@ function repairs(ctx, lhs, rhs, defs, seed, dimVars, kind) {
   out.push(...assumptionRepairs(sh));
   if (Date.now() - started > BUDGET_MS) return out;
   out.push(...residualRepairs(sh));
-  out.sort((a, b) => editSize(a) - editSize(b));
-  return out.slice(0, 3);
+  const deduped = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const fix of out) {
+    const key = `${fix.edit?.insert ?? ""}|${fix.addDecl ?? ""}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(fix);
+  }
+  deduped.sort((a, b) => priority(a) - priority(b) || editSize(a) - editSize(b));
+  return deduped.slice(0, 3);
+}
+function priority(fix) {
+  switch (fix.kind) {
+    case "mutation":
+      return 0;
+    case "residual":
+      return 1;
+    case "shape":
+      return 2;
+    case "assumption":
+      return 3;
+    default:
+      return 4;
+  }
 }
 var MUTATIONS = [
   {
@@ -8633,7 +8719,7 @@ function isInvertedTwice(node) {
 function walk(node, path = []) {
   const out = [{ node, path }];
   const children = node.k === "op" || node.k === "call" ? node.args : node.k === "deriv" ? [node.f, ...node.wrt] : node.k === "expect" ? node.args : node.k === "bigop" ? [node.body] : node.k === "block" ? node.rows.flat() : [];
-  children.forEach((child, i) => out.push(...walk(child, [...path, i])));
+  children.forEach((child, i2) => out.push(...walk(child, [...path, i2])));
   return out;
 }
 function replaceAt(node, path, replacement) {
@@ -8649,10 +8735,10 @@ function replaceAt(node, path, replacement) {
     const flat = rows.flat();
     flat[head] = replaceAt(flat[head], rest, replacement);
     const out = [];
-    let i = 0;
+    let i2 = 0;
     for (const row of rows) {
-      out.push(flat.slice(i, i + row.length));
-      i += row.length;
+      out.push(flat.slice(i2, i2 + row.length));
+      i2 += row.length;
     }
     return { ...node, rows: out };
   }
@@ -8660,30 +8746,32 @@ function replaceAt(node, path, replacement) {
 }
 function mutationRepairs(sh) {
   const out = [];
-  const candidates = walk(sh.rhs);
   let count = 0;
-  for (const { node, path } of candidates) {
-    if (count > CANDIDATE_LIMIT) break;
-    for (const mutation of MUTATIONS) {
+  for (const side of ["rhs", "lhs"]) {
+    const original = side === "rhs" ? sh.rhs : sh.lhs;
+    for (const { node, path } of walk(original)) {
       if (count > CANDIDATE_LIMIT) break;
-      const mutated = mutation.apply(node);
-      if (!mutated) continue;
-      count++;
-      const candidate = replaceAt(sh.rhs, path, mutated);
-      if (renderNode(candidate) === renderNode(sh.rhs)) continue;
-      if (!holdsWith(sh, candidate)) continue;
-      out.push({
-        kind: "mutation",
-        title: mutation.title,
-        edit: { span: sh.rhs.span, insert: renderNode(candidate) },
-        verified: true,
-        detail: renderNode(candidate)
-      });
+      for (const mutation of MUTATIONS) {
+        if (count > CANDIDATE_LIMIT) break;
+        const mutated = mutation.apply(node);
+        if (!mutated) continue;
+        count++;
+        const candidate = replaceAt(original, path, mutated);
+        if (renderNode(candidate) === renderNode(original)) continue;
+        if (!holdsWith(sh, side, candidate)) continue;
+        out.push({
+          kind: "mutation",
+          title: mutation.title,
+          edit: { span: original.span, insert: renderNode(candidate) },
+          verified: true,
+          detail: renderNode(candidate)
+        });
+      }
     }
   }
   return out;
 }
-function holdsWith(sh, rhs) {
+function holdsWith(sh, side, candidate) {
   const settings = sizeSettings(sh.dimVars);
   const field = new GFpField(2147483647);
   for (const setting of settings.slice(0, 2)) {
@@ -8695,9 +8783,14 @@ function holdsWith(sh, rhs) {
     if (!values) return false;
     for (const [name, value] of values.entries()) if (value) env.values.set(name, value);
     try {
-      const l = evalNode(field, sh.lhs, env);
-      const r = evalNode(field, rhs, env);
-      if (!same(field, l, r)) return false;
+      const sides = compareSides(
+        field,
+        side === "lhs" ? candidate : sh.lhs,
+        side === "rhs" ? candidate : sh.rhs,
+        env,
+        sampler
+      );
+      if (sides.kind !== "equal") return false;
     } catch {
       return false;
     }
@@ -8719,6 +8812,10 @@ function sampleSymbols(ctx, sh, setting, sampler) {
   };
   collect(sh.lhs);
   collect(sh.rhs);
+  for (const name of [...names]) {
+    const def = sh.defs.get(name);
+    if (def) collect(def);
+  }
   for (const name of names) {
     if (sh.defs.has(name)) continue;
     const info = ctx.symbols.get(name);
@@ -8736,15 +8833,6 @@ function sampleSymbols(ctx, sh, setting, sampler) {
   }
   return values;
 }
-function same(field, a, b) {
-  if (a.k === "s" && b.k === "s") return field.eq(a.v, b.v);
-  if (a.k === "m" && b.k === "m") {
-    if (a.m.r !== b.m.r || a.m.c !== b.m.c) return false;
-    for (let i = 0; i < a.m.d.length; i++) if (!field.eq(a.m.d[i], b.m.d[i])) return false;
-    return true;
-  }
-  return false;
-}
 var ASSUMPTION_TRIES = [
   { props: ["sym"], text: "symmetric" },
   { props: ["orth"], text: "orthogonal" },
@@ -8757,6 +8845,7 @@ function assumptionRepairs(sh) {
   );
   for (const symbol of candidates) {
     for (const attempt of ASSUMPTION_TRIES) {
+      if (!canHave(sh.ctx, symbol.name, attempt.props)) continue;
       if (holdsWithProps(sh, symbol.name, attempt.props)) {
         out.push({
           kind: "assumption",
@@ -8769,6 +8858,15 @@ function assumptionRepairs(sh) {
     }
   }
   return out;
+}
+function canHave(ctx, name, props) {
+  const info = ctx.symbols.get(name);
+  if (!info || info.ty.t !== "mat") return false;
+  const r = info.ty.r;
+  const c = info.ty.c;
+  const square = typeof r === "number" && typeof c === "number" ? r === c : typeof r !== "number" && typeof c !== "number" && r.v === c.v;
+  if (props.includes("sym") || props.includes("orth") || props.includes("diag")) return square;
+  return true;
 }
 function dimText(ctx, name) {
   const info = ctx.symbols.get(name);
@@ -8785,7 +8883,7 @@ function holdsWithProps(sh, name, props) {
   const saved = sh.ctx.symbols.get(name);
   if (!saved) return false;
   sh.ctx.symbols.set(name, { ...saved, props });
-  const ok = holdsWith(sh, sh.rhs);
+  const ok = holdsWith(sh, "rhs", sh.rhs);
   sh.ctx.symbols.set(name, saved);
   return ok;
 }
@@ -8833,7 +8931,7 @@ function residualRepairs(sh) {
   const out = [];
   const settings = sizeSettings(sh.dimVars);
   const field = new GFpField(2147483647);
-  const diffs = [];
+  const samples = [];
   for (const setting of settings.slice(0, 2)) {
     const rng = rngFor(sh.seed, "repair", "residual");
     const sampler = new Sampler(field, rng);
@@ -8846,29 +8944,16 @@ function residualRepairs(sh) {
       const l = evalNode(field, sh.lhs, env);
       const r = evalNode(field, sh.rhs, env);
       if (l.k !== "m" || r.k !== "m") return out;
-      const d = l.m.d.map((x, i) => field.sub(x, r.m.d[i]));
-      diffs.push(d);
+      const d = l.m.d.map((x2, i2) => field.sub(x2, r.m.d[i2]));
+      samples.push({ env, diff: d });
     } catch {
       return out;
     }
   }
-  if (diffs.length < 2) return out;
-  const terms = /* @__PURE__ */ new Map();
-  for (const { node } of walk(sh.lhs).concat(walk(sh.rhs))) {
-    if (node.k === "sym") {
-      const sandwich = {
-        k: "op",
-        op: "mul",
-        args: [
-          { k: "op", op: "mul", args: [node, { k: "op", op: "T", args: [node], span: node.span }], span: node.span }
-        ],
-        span: node.span
-      };
-      terms.set(renderNode(sandwich), sandwich);
-    }
-  }
+  if (samples.length < 2) return out;
+  const terms = candidateTerms(sh);
   for (const [text, term] of terms) {
-    const scale = matchesScale(field, term, sh, diffs);
+    const scale = matchesScale(field, term, samples);
     if (scale === null) continue;
     out.push({
       kind: "residual",
@@ -8881,37 +8966,81 @@ function residualRepairs(sh) {
   }
   return out;
 }
-function matchesScale(field, term, sh, diffs) {
-  const settings = sizeSettings(sh.dimVars);
-  const rng = rngFor(sh.seed, "repair", "residual", "term");
-  const sampler = new Sampler(field, rng);
-  const env = makeEnv(field, rng);
-  env.defs = sh.defs;
-  const values = sampleSymbols(sh.ctx, sh, settings[0], sampler);
-  if (!values) return null;
-  for (const [name, value] of values.entries()) if (value) env.values.set(name, value);
-  let termValues;
-  try {
-    const t = evalNode(field, term, env);
-    if (t.k !== "m") return null;
-    termValues = t.m.d;
-  } catch {
-    return null;
+function candidateTerms(sh) {
+  const terms = /* @__PURE__ */ new Map();
+  const symbols = [];
+  const seen = /* @__PURE__ */ new Set();
+  const collect = (node) => {
+    if (node.k !== "sym") return;
+    if (seen.has(node.name)) return;
+    seen.add(node.name);
+    symbols.push(node);
+  };
+  for (const { node } of walk(sh.lhs).concat(walk(sh.rhs))) collect(node);
+  for (const name of [...seen]) {
+    const def = sh.defs.get(name);
+    if (!def) continue;
+    for (const { node } of walk(def)) collect(node);
   }
-  if (termValues.length !== diffs[0].length) return null;
+  const add2 = (node) => {
+    const text = renderNode(node);
+    if (!terms.has(text)) terms.set(text, node);
+  };
+  for (const x2 of symbols) {
+    const xt = { k: "op", op: "T", args: [x2], span: x2.span };
+    add2({
+      k: "op",
+      op: "mul",
+      args: [x2, xt],
+      span: x2.span
+    });
+  }
+  for (const x2 of symbols) {
+    for (const y of symbols) {
+      if (x2 === y) continue;
+      const xt = { k: "op", op: "T", args: [x2], span: x2.span };
+      add2({
+        k: "op",
+        op: "mul",
+        args: [
+          { k: "op", op: "mul", args: [x2, y], span: x2.span },
+          xt
+        ],
+        span: x2.span
+      });
+    }
+  }
+  return terms;
+}
+function matchesScale(field, term, samples) {
+  const termValues = [];
+  for (const { env, diff } of samples) {
+    let value;
+    try {
+      const t = evalNode(field, term, env);
+      if (t.k !== "m") return null;
+      value = t.m.d;
+    } catch {
+      return null;
+    }
+    if (value.length !== diff.length) return null;
+    termValues.push(value);
+  }
+  const scale = niceScale(field, field.div(samples[0].diff[0], termValues[0][0]));
+  if (scale === null) return null;
+  for (let s = 0; s < samples.length; s++) {
+    for (let i2 = 0; i2 < samples[s].diff.length; i2++) {
+      if (field.mul(field.fromRational(scale.n, scale.d), termValues[s][i2]) !== samples[s].diff[i2]) {
+        return null;
+      }
+    }
+  }
+  return scale.n / scale.d;
+}
+function niceScale(field, value) {
   for (let a = -12; a <= 12; a++) {
     for (let b = 1; b <= 12; b++) {
-      let ok = true;
-      for (const diff of diffs) {
-        for (let i = 0; i < diff.length; i++) {
-          if (field.mul(field.fromRational(a, b), termValues[i]) !== diff[i]) {
-            ok = false;
-            break;
-          }
-        }
-        if (!ok) break;
-      }
-      if (ok) return a / b;
+      if (field.fromRational(a, b) === value) return { n: a, d: b };
     }
   }
   return null;
@@ -8943,11 +9072,32 @@ function checkStep2(lhs, rhs, opts = {}) {
   return step;
 }
 function explain(src, stepId, opts = {}) {
+  const parsed = parseForExplain(src, opts);
+  const step = parsed.steps.find((s) => s.id === stepId);
+  if (!step || !step.lhs || !step.rhs) return { fixes: [] };
+  return explainStep(parsed, step, opts);
+}
+function explainAll(src, opts = {}, limit = 8) {
+  const out = /* @__PURE__ */ new Map();
+  const parsed = parseForExplain(src, opts);
+  const deadline = Date.now() + (opts.budgetMs ?? 4e3);
+  let count = 0;
+  for (const step of parsed.steps) {
+    if (count >= limit) break;
+    if (Date.now() > deadline) break;
+    if (!step.lhs || !step.rhs) continue;
+    if (step.relation !== "=" && step.relation !== "shape") continue;
+    out.set(step.id, explainStep(parsed, step, opts));
+    count++;
+  }
+  return out;
+}
+function parseForExplain(src, opts) {
   const rows = splitRows(src);
   const declared = parseDeclarations(opts.decls ?? "");
   const preset = presetDecls(opts.preset);
   const decls = [...preset];
-  const index = new Map(decls.map((d, i) => [d.name, i]));
+  const index = new Map(decls.map((d, i2) => [d.name, i2]));
   for (const d of declared.decls) {
     const at = index.get(d.name);
     if (at === void 0) {
@@ -8994,22 +9144,596 @@ function explain(src, stepId, opts = {}) {
       }
     }
   });
-  const step = steps.find((s) => s.id === stepId);
-  if (!step || !step.lhs || !step.rhs) return { fixes: [] };
+  return { ctx, defs, steps };
+}
+function explainStep(parsed, step, opts) {
+  const { ctx, defs } = parsed;
+  if (!step.lhs || !step.rhs) return { fixes: [] };
   inferType(ctx, step.lhs);
   inferType(ctx, step.rhs);
   const dimVars = collectDimVarsFor(ctx, step.lhs, step.rhs, defs);
-  const sizes = /* @__PURE__ */ new Map();
-  for (const v of dimVars) sizes.set(v, 3);
   const kind = step.relation === "=" ? "wrong" : "shape";
   const fixes = repairs(ctx, step.lhs, step.rhs, defs, opts.seed ?? 5910618, dimVars, kind);
   let counterexample;
-  try {
-    counterexample = shrinkCounterexample(ctx, step.lhs, step.rhs, defs, sizes, opts.seed ?? 5910618) ?? void 0;
-  } catch {
-    counterexample = void 0;
+  const deadline = Date.now() + 600;
+  for (const size of [1, 2, 3]) {
+    const sizes = /* @__PURE__ */ new Map();
+    for (const v of dimVars) sizes.set(ctx.dims.find(v), size);
+    const left = Math.max(50, deadline - Date.now());
+    try {
+      counterexample = shrinkCounterexample(ctx, step.lhs, step.rhs, defs, sizes, opts.seed ?? 5910618, left) ?? void 0;
+    } catch {
+      counterexample = void 0;
+    }
+    if (counterexample) break;
+    if (Date.now() > deadline) break;
   }
   return { fixes, counterexample };
+}
+
+// node_modules/.pnpm/fflate@0.8.3/node_modules/fflate/esm/index.mjs
+import { createRequire } from "module";
+var require2 = createRequire("/");
+var _a;
+var Worker;
+var isMarkedAsUntransferable;
+try {
+  _a = require2("worker_threads"), Worker = _a.Worker, isMarkedAsUntransferable = _a.isMarkedAsUntransferable;
+} catch (e) {
+}
+var u8 = Uint8Array;
+var u16 = Uint16Array;
+var i32 = Int32Array;
+var fleb = new u8([
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  1,
+  1,
+  1,
+  1,
+  2,
+  2,
+  2,
+  2,
+  3,
+  3,
+  3,
+  3,
+  4,
+  4,
+  4,
+  4,
+  5,
+  5,
+  5,
+  5,
+  0,
+  /* unused */
+  0,
+  0,
+  /* impossible */
+  0
+]);
+var fdeb = new u8([
+  0,
+  0,
+  0,
+  0,
+  1,
+  1,
+  2,
+  2,
+  3,
+  3,
+  4,
+  4,
+  5,
+  5,
+  6,
+  6,
+  7,
+  7,
+  8,
+  8,
+  9,
+  9,
+  10,
+  10,
+  11,
+  11,
+  12,
+  12,
+  13,
+  13,
+  /* unused */
+  0,
+  0
+]);
+var clim = new u8([16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15]);
+var freb = function(eb, start) {
+  var b = new u16(31);
+  for (var i2 = 0; i2 < 31; ++i2) {
+    b[i2] = start += 1 << eb[i2 - 1];
+  }
+  var r = new i32(b[30]);
+  for (var i2 = 1; i2 < 30; ++i2) {
+    for (var j = b[i2]; j < b[i2 + 1]; ++j) {
+      r[j] = j - b[i2] << 5 | i2;
+    }
+  }
+  return { b, r };
+};
+var _a = freb(fleb, 2);
+var fl = _a.b;
+var revfl = _a.r;
+fl[28] = 258, revfl[258] = 28;
+var _b = freb(fdeb, 0);
+var fd = _b.b;
+var revfd = _b.r;
+var rev = new u16(32768);
+for (i = 0; i < 32768; ++i) {
+  x = (i & 43690) >> 1 | (i & 21845) << 1;
+  x = (x & 52428) >> 2 | (x & 13107) << 2;
+  x = (x & 61680) >> 4 | (x & 3855) << 4;
+  rev[i] = ((x & 65280) >> 8 | (x & 255) << 8) >> 1;
+}
+var x;
+var i;
+var hMap = (function(cd, mb, r) {
+  var s = cd.length;
+  var i2 = 0;
+  var l = new u16(mb);
+  for (; i2 < s; ++i2) {
+    if (cd[i2])
+      ++l[cd[i2] - 1];
+  }
+  var le = new u16(mb);
+  for (i2 = 1; i2 < mb; ++i2) {
+    le[i2] = le[i2 - 1] + l[i2 - 1] << 1;
+  }
+  var co;
+  if (r) {
+    co = new u16(1 << mb);
+    var rvb = 15 - mb;
+    for (i2 = 0; i2 < s; ++i2) {
+      if (cd[i2]) {
+        var sv = i2 << 4 | cd[i2];
+        var r_1 = mb - cd[i2];
+        var v = le[cd[i2] - 1]++ << r_1;
+        for (var m = v | (1 << r_1) - 1; v <= m; ++v) {
+          co[rev[v] >> rvb] = sv;
+        }
+      }
+    }
+  } else {
+    co = new u16(s);
+    for (i2 = 0; i2 < s; ++i2) {
+      if (cd[i2]) {
+        co[i2] = rev[le[cd[i2] - 1]++] >> 15 - cd[i2];
+      }
+    }
+  }
+  return co;
+});
+var flt = new u8(288);
+for (i = 0; i < 144; ++i)
+  flt[i] = 8;
+var i;
+for (i = 144; i < 256; ++i)
+  flt[i] = 9;
+var i;
+for (i = 256; i < 280; ++i)
+  flt[i] = 7;
+var i;
+for (i = 280; i < 288; ++i)
+  flt[i] = 8;
+var i;
+var fdt = new u8(32);
+for (i = 0; i < 32; ++i)
+  fdt[i] = 5;
+var i;
+var flm = /* @__PURE__ */ hMap(flt, 9, 0);
+var fdm = /* @__PURE__ */ hMap(fdt, 5, 0);
+var shft = function(p) {
+  return (p + 7) / 8 | 0;
+};
+var slc = function(v, s, e) {
+  if (s == null || s < 0)
+    s = 0;
+  if (e == null || e > v.length)
+    e = v.length;
+  return new u8(v.subarray(s, e));
+};
+var wbits = function(d, p, v) {
+  v <<= p & 7;
+  var o = p / 8 | 0;
+  d[o] |= v;
+  d[o + 1] |= v >> 8;
+};
+var wbits16 = function(d, p, v) {
+  v <<= p & 7;
+  var o = p / 8 | 0;
+  d[o] |= v;
+  d[o + 1] |= v >> 8;
+  d[o + 2] |= v >> 16;
+};
+var hTree = function(d, mb) {
+  var t = [];
+  for (var i2 = 0; i2 < d.length; ++i2) {
+    if (d[i2])
+      t.push({ s: i2, f: d[i2] });
+  }
+  var s = t.length;
+  var t2 = t.slice();
+  if (!s)
+    return { t: et, l: 0 };
+  if (s == 1) {
+    var v = new u8(t[0].s + 1);
+    v[t[0].s] = 1;
+    return { t: v, l: 1 };
+  }
+  t.sort(function(a, b) {
+    return a.f - b.f;
+  });
+  t.push({ s: -1, f: 25001 });
+  var l = t[0], r = t[1], i0 = 0, i1 = 1, i22 = 2;
+  t[0] = { s: -1, f: l.f + r.f, l, r };
+  while (i1 != s - 1) {
+    l = t[t[i0].f < t[i22].f ? i0++ : i22++];
+    r = t[i0 != i1 && t[i0].f < t[i22].f ? i0++ : i22++];
+    t[i1++] = { s: -1, f: l.f + r.f, l, r };
+  }
+  var maxSym = t2[0].s;
+  for (var i2 = 1; i2 < s; ++i2) {
+    if (t2[i2].s > maxSym)
+      maxSym = t2[i2].s;
+  }
+  var tr = new u16(maxSym + 1);
+  var mbt = ln2(t[i1 - 1], tr, 0);
+  if (mbt > mb) {
+    var i2 = 0, dt = 0;
+    var lft = mbt - mb, cst = 1 << lft;
+    t2.sort(function(a, b) {
+      return tr[b.s] - tr[a.s] || a.f - b.f;
+    });
+    for (; i2 < s; ++i2) {
+      var i2_1 = t2[i2].s;
+      if (tr[i2_1] > mb) {
+        dt += cst - (1 << mbt - tr[i2_1]);
+        tr[i2_1] = mb;
+      } else
+        break;
+    }
+    dt >>= lft;
+    while (dt > 0) {
+      var i2_2 = t2[i2].s;
+      if (tr[i2_2] < mb)
+        dt -= 1 << mb - tr[i2_2]++ - 1;
+      else
+        ++i2;
+    }
+    for (; i2 >= 0 && dt; --i2) {
+      var i2_3 = t2[i2].s;
+      if (tr[i2_3] == mb) {
+        --tr[i2_3];
+        ++dt;
+      }
+    }
+    mbt = mb;
+  }
+  return { t: new u8(tr), l: mbt };
+};
+var ln2 = function(n, l, d) {
+  return n.s == -1 ? Math.max(ln2(n.l, l, d + 1), ln2(n.r, l, d + 1)) : l[n.s] = d;
+};
+var lc = function(c) {
+  var s = c.length;
+  while (s && !c[--s])
+    ;
+  var cl = new u16(++s);
+  var cli = 0, cln = c[0], cls = 1;
+  var w = function(v) {
+    cl[cli++] = v;
+  };
+  for (var i2 = 1; i2 <= s; ++i2) {
+    if (c[i2] == cln && i2 != s)
+      ++cls;
+    else {
+      if (!cln && cls > 2) {
+        for (; cls > 138; cls -= 138)
+          w(32754);
+        if (cls > 2) {
+          w(cls > 10 ? cls - 11 << 5 | 28690 : cls - 3 << 5 | 12305);
+          cls = 0;
+        }
+      } else if (cls > 3) {
+        w(cln), --cls;
+        for (; cls > 6; cls -= 6)
+          w(8304);
+        if (cls > 2)
+          w(cls - 3 << 5 | 8208), cls = 0;
+      }
+      while (cls--)
+        w(cln);
+      cls = 1;
+      cln = c[i2];
+    }
+  }
+  return { c: cl.subarray(0, cli), n: s };
+};
+var clen = function(cf, cl) {
+  var l = 0;
+  for (var i2 = 0; i2 < cl.length; ++i2)
+    l += cf[i2] * cl[i2];
+  return l;
+};
+var wfblk = function(out, pos, dat) {
+  var s = dat.length;
+  var o = shft(pos + 2);
+  out[o] = s & 255;
+  out[o + 1] = s >> 8;
+  out[o + 2] = out[o] ^ 255;
+  out[o + 3] = out[o + 1] ^ 255;
+  for (var i2 = 0; i2 < s; ++i2)
+    out[o + i2 + 4] = dat[i2];
+  return (o + 4 + s) * 8;
+};
+var wblk = function(dat, out, final, syms, lf, df, eb, li, bs, bl, p) {
+  wbits(out, p++, final);
+  ++lf[256];
+  var _a2 = hTree(lf, 15), dlt = _a2.t, mlb = _a2.l;
+  var _b2 = hTree(df, 15), ddt = _b2.t, mdb = _b2.l;
+  var _c = lc(dlt), lclt = _c.c, nlc = _c.n;
+  var _d = lc(ddt), lcdt = _d.c, ndc = _d.n;
+  var lcfreq = new u16(19);
+  for (var i2 = 0; i2 < lclt.length; ++i2)
+    ++lcfreq[lclt[i2] & 31];
+  for (var i2 = 0; i2 < lcdt.length; ++i2)
+    ++lcfreq[lcdt[i2] & 31];
+  var _e = hTree(lcfreq, 7), lct = _e.t, mlcb = _e.l;
+  var nlcc = 19;
+  for (; nlcc > 4 && !lct[clim[nlcc - 1]]; --nlcc)
+    ;
+  var flen = bl + 5 << 3;
+  var ftlen = clen(lf, flt) + clen(df, fdt) + eb;
+  var dtlen = clen(lf, dlt) + clen(df, ddt) + eb + 14 + 3 * nlcc + clen(lcfreq, lct) + 2 * lcfreq[16] + 3 * lcfreq[17] + 7 * lcfreq[18];
+  if (bs >= 0 && flen <= ftlen && flen <= dtlen)
+    return wfblk(out, p, dat.subarray(bs, bs + bl));
+  var lm, ll, dm, dl;
+  wbits(out, p, 1 + (dtlen < ftlen)), p += 2;
+  if (dtlen < ftlen) {
+    lm = hMap(dlt, mlb, 0), ll = dlt, dm = hMap(ddt, mdb, 0), dl = ddt;
+    var llm = hMap(lct, mlcb, 0);
+    wbits(out, p, nlc - 257);
+    wbits(out, p + 5, ndc - 1);
+    wbits(out, p + 10, nlcc - 4);
+    p += 14;
+    for (var i2 = 0; i2 < nlcc; ++i2)
+      wbits(out, p + 3 * i2, lct[clim[i2]]);
+    p += 3 * nlcc;
+    var lcts = [lclt, lcdt];
+    for (var it = 0; it < 2; ++it) {
+      var clct = lcts[it];
+      for (var i2 = 0; i2 < clct.length; ++i2) {
+        var len = clct[i2] & 31;
+        wbits(out, p, llm[len]), p += lct[len];
+        if (len > 15)
+          wbits(out, p, clct[i2] >> 5 & 127), p += clct[i2] >> 12;
+      }
+    }
+  } else {
+    lm = flm, ll = flt, dm = fdm, dl = fdt;
+  }
+  for (var i2 = 0; i2 < li; ++i2) {
+    var sym = syms[i2];
+    if (sym > 255) {
+      var len = sym >> 18 & 31;
+      wbits16(out, p, lm[len + 257]), p += ll[len + 257];
+      if (len > 7)
+        wbits(out, p, sym >> 23 & 31), p += fleb[len];
+      var dst = sym & 31;
+      wbits16(out, p, dm[dst]), p += dl[dst];
+      if (dst > 3)
+        wbits16(out, p, sym >> 5 & 8191), p += fdeb[dst];
+    } else {
+      wbits16(out, p, lm[sym]), p += ll[sym];
+    }
+  }
+  wbits16(out, p, lm[256]);
+  return p + ll[256];
+};
+var deo = /* @__PURE__ */ new i32([65540, 131080, 131088, 131104, 262176, 1048704, 1048832, 2114560, 2117632]);
+var et = /* @__PURE__ */ new u8(0);
+var dflt = function(dat, lvl, plvl, pre, post, st) {
+  var s = st.z || dat.length;
+  var o = new u8(pre + s + 5 * (1 + Math.ceil(s / 7e3)) + post);
+  var w = o.subarray(pre, o.length - post);
+  var lst = st.l;
+  var pos = (st.r || 0) & 7;
+  if (lvl) {
+    if (pos)
+      w[0] = st.r >> 3;
+    var opt = deo[lvl - 1];
+    var n = opt >> 13, c = opt & 8191;
+    var msk_1 = (1 << plvl) - 1;
+    var prev = st.p || new u16(32768), head = st.h || new u16(msk_1 + 1);
+    var bs1_1 = Math.ceil(plvl / 3), bs2_1 = 2 * bs1_1;
+    var hsh = function(i3) {
+      return (dat[i3] ^ dat[i3 + 1] << bs1_1 ^ dat[i3 + 2] << bs2_1) & msk_1;
+    };
+    var syms = new i32(25e3);
+    var lf = new u16(288), df = new u16(32);
+    var lc_1 = 0, eb = 0, i2 = st.i || 0, li = 0, wi = st.w || 0, bs = 0;
+    for (; i2 + 2 < s; ++i2) {
+      var hv = hsh(i2);
+      var imod = i2 & 32767, pimod = head[hv];
+      prev[imod] = pimod;
+      head[hv] = imod;
+      if (wi <= i2) {
+        var rem = s - i2;
+        if ((lc_1 > 7e3 || li > 24576) && (rem > 423 || !lst)) {
+          pos = wblk(dat, w, 0, syms, lf, df, eb, li, bs, i2 - bs, pos);
+          li = lc_1 = eb = 0, bs = i2;
+          for (var j = 0; j < 286; ++j)
+            lf[j] = 0;
+          for (var j = 0; j < 30; ++j)
+            df[j] = 0;
+        }
+        var l = 2, d = 0, ch_1 = c, dif = imod - pimod & 32767;
+        if (rem > 2 && hv == hsh(i2 - dif)) {
+          var maxn = Math.min(n, rem) - 1;
+          var maxd = Math.min(32767, i2);
+          var ml = Math.min(258, rem);
+          while (dif <= maxd && --ch_1 && imod != pimod) {
+            if (dat[i2 + l] == dat[i2 + l - dif]) {
+              var nl = 0;
+              for (; nl < ml && dat[i2 + nl] == dat[i2 + nl - dif]; ++nl)
+                ;
+              if (nl > l) {
+                l = nl, d = dif;
+                if (nl > maxn)
+                  break;
+                var mmd = Math.min(dif, nl - 2);
+                var md = 0;
+                for (var j = 0; j < mmd; ++j) {
+                  var ti = i2 - dif + j & 32767;
+                  var pti = prev[ti];
+                  var cd = ti - pti & 32767;
+                  if (cd > md)
+                    md = cd, pimod = ti;
+                }
+              }
+            }
+            imod = pimod, pimod = prev[imod];
+            dif += imod - pimod & 32767;
+          }
+        }
+        if (d) {
+          syms[li++] = 268435456 | revfl[l] << 18 | revfd[d];
+          var lin = revfl[l] & 31, din = revfd[d] & 31;
+          eb += fleb[lin] + fdeb[din];
+          ++lf[257 + lin];
+          ++df[din];
+          wi = i2 + l;
+          ++lc_1;
+        } else {
+          syms[li++] = dat[i2];
+          ++lf[dat[i2]];
+        }
+      }
+    }
+    for (i2 = Math.max(i2, wi); i2 < s; ++i2) {
+      syms[li++] = dat[i2];
+      ++lf[dat[i2]];
+    }
+    pos = wblk(dat, w, lst, syms, lf, df, eb, li, bs, i2 - bs, pos);
+    if (!lst) {
+      st.r = pos & 7 | w[pos / 8 | 0] << 3;
+      pos -= 7;
+      st.h = head, st.p = prev, st.i = i2, st.w = wi;
+    }
+  } else {
+    for (var i2 = st.w || 0; i2 < s + lst; i2 += 65535) {
+      var e = i2 + 65535;
+      if (e >= s) {
+        w[pos / 8 | 0] = lst;
+        e = s;
+      }
+      pos = wfblk(w, pos + 1, dat.subarray(i2, e));
+    }
+    st.i = s;
+  }
+  return slc(o, 0, pre + shft(pos) + post);
+};
+var dopt = function(dat, opt, pre, post, st) {
+  if (!st) {
+    st = { l: 1 };
+    if (opt.dictionary) {
+      var dict = opt.dictionary.subarray(-32768);
+      var newDat = new u8(dict.length + dat.length);
+      newDat.set(dict);
+      newDat.set(dat, dict.length);
+      dat = newDat;
+      st.w = dict.length;
+    }
+  }
+  return dflt(dat, opt.level == null ? 6 : opt.level, opt.mem == null ? st.l ? Math.ceil(Math.max(8, Math.min(13, Math.log(dat.length))) * 1.5) : 20 : 12 + opt.mem, pre, post, st);
+};
+function deflateSync(data, opts) {
+  return dopt(data, opts || {}, 0, 0);
+}
+var te = typeof TextEncoder != "undefined" && /* @__PURE__ */ new TextEncoder();
+var td = typeof TextDecoder != "undefined" && /* @__PURE__ */ new TextDecoder();
+var tds = 0;
+try {
+  td.decode(et, { stream: true });
+  tds = 1;
+} catch (e) {
+}
+function strToU8(str, latin1) {
+  if (latin1) {
+    var ar_1 = new u8(str.length);
+    for (var i2 = 0; i2 < str.length; ++i2)
+      ar_1[i2] = str.charCodeAt(i2);
+    return ar_1;
+  }
+  if (te)
+    return te.encode(str);
+  var l = str.length;
+  var ar = new u8(str.length + (str.length >> 1));
+  var ai = 0;
+  var w = function(v) {
+    ar[ai++] = v;
+  };
+  for (var i2 = 0; i2 < l; ++i2) {
+    if (ai + 5 > ar.length) {
+      var n = new u8(ai + 8 + (l - i2 << 1));
+      n.set(ar);
+      ar = n;
+    }
+    var c = str.charCodeAt(i2);
+    if (c < 128 || latin1)
+      w(c);
+    else if (c < 2048)
+      w(192 | c >> 6), w(128 | c & 63);
+    else if (c > 55295 && c < 57344)
+      c = 65536 + (c & 1023 << 10) | str.charCodeAt(++i2) & 1023, w(240 | c >> 18), w(128 | c >> 12 & 63), w(128 | c >> 6 & 63), w(128 | c & 63);
+    else
+      w(224 | c >> 12), w(128 | c >> 6 & 63), w(128 | c & 63);
+  }
+  return slc(ar, 0, ai);
+}
+
+// src/core/share.ts
+var SHARE_VERSION = "v1";
+function encodeShare(payload) {
+  const json = JSON.stringify(payload);
+  const compressed = deflateSync(strToU8(json), { level: 9 });
+  return bytesToBase64Url(compressed);
+}
+function shareLink(base, payload) {
+  const root = base.replace(/\/+$/, "");
+  return `${root}/app/#${SHARE_VERSION}.${encodeShare(payload)}`;
+}
+var ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+function bytesToBase64Url(bytes) {
+  let out = "";
+  for (let i2 = 0; i2 < bytes.length; i2 += 3) {
+    const a = bytes[i2];
+    const b = bytes[i2 + 1];
+    const c = bytes[i2 + 2];
+    out += ALPHABET[a >> 2];
+    out += ALPHABET[(a & 3) << 4 | (b === void 0 ? 0 : b >> 4)];
+    out += b === void 0 ? "" : ALPHABET[(b & 15) << 2 | (c === void 0 ? 0 : c >> 6)];
+    out += c === void 0 ? "" : ALPHABET[c & 63];
+  }
+  return out.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
 // mcp/server.ts
@@ -9049,13 +9773,8 @@ function summarise(report) {
   return `${report.steps.length} rows: ${parts.join(", ")}`;
 }
 var shareBase = process.env.SAMOSA_SHARE_BASE ?? "https://samosa-math.vercel.app";
-function shareUrl(source) {
-  const json = JSON.stringify({ src: source });
-  const bytes = new TextEncoder().encode(json);
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  const base64 = btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-  return `${shareBase}/#v1.${base64}`;
+function shareUrl(source, declarations) {
+  return shareLink(shareBase, { src: source, decls: declarations });
 }
 server.registerTool(
   "check_derivation",
@@ -9076,17 +9795,27 @@ server.registerTool(
       preset: args.preset,
       seed: args.seed
     });
+    const explanations = explainAll(args.latex, {
+      decls: args.declarations,
+      preset: args.preset,
+      seed: args.seed
+    });
     const structured = {
       summary: summarise(report),
-      steps: report.steps.map((step) => ({
-        row: step.row,
-        verdict: step.verdict,
-        mode: step.mode ?? null,
-        message: step.message,
-        relation: step.relation,
-        card: step.card
-      })),
-      shareUrl: shareUrl(args.latex)
+      steps: report.steps.map((step) => {
+        const explanation = explanations.get(step.id);
+        return {
+          row: step.row,
+          verdict: step.verdict,
+          mode: step.mode ?? null,
+          message: step.message,
+          relation: step.relation,
+          card: step.card,
+          fixes: explanation?.fixes ?? [],
+          counterexample: explanation?.counterexample ?? null
+        };
+      }),
+      shareUrl: shareUrl(args.latex, args.declarations)
     };
     return {
       content: [{ type: "text", text: summarise(report) }],
@@ -9109,6 +9838,8 @@ server.registerTool(
   },
   async (args) => {
     const step = checkStep2(args.lhs, args.rhs, { decls: args.declarations });
+    const source = `${args.lhs} = ${args.rhs}`;
+    const explanation = explain(source, "s0", { decls: args.declarations });
     const structured = {
       summary: `${step.verdict}: ${step.message}`,
       steps: [
@@ -9118,9 +9849,12 @@ server.registerTool(
           mode: step.mode ?? null,
           message: step.message,
           relation: step.relation,
-          card: step.card
+          card: step.card,
+          fixes: explanation.fixes,
+          counterexample: explanation.counterexample ?? null
         }
-      ]
+      ],
+      shareUrl: shareUrl(source, args.declarations)
     };
     return {
       content: [{ type: "text", text: `${step.verdict}: ${step.message}` }],

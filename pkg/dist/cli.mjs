@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 // cli/bin.ts
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { basename, extname } from "node:path";
 
 // src/core/fields/f64.ts
@@ -6069,8 +6069,8 @@ function parseType(name, type) {
     break;
   }
   const rest = words.slice(i).join(" ");
-  const dimText = rest.replace(/[x×]/g, "\xD7");
-  const parts = dimText.split("\xD7").map((p) => p.trim()).filter(Boolean);
+  const dimText2 = rest.replace(/[x×]/g, "\xD7");
+  const parts = dimText2.split("\xD7").map((p) => p.trim()).filter(Boolean);
   for (const p of parts) {
     const d = parseDim(p);
     if (d === null) return null;
@@ -6867,13 +6867,19 @@ function collectDimVarsFor(ctx, lhs, rhs, defs) {
       }
     }
   }
+  const named = /* @__PURE__ */ new Map();
+  for (const declared of ctx.dimVars) {
+    const root = ctx.dims.find(declared);
+    if (!named.has(root)) named.set(root, declared);
+  }
   const out = [];
   for (const declared of ctx.dimVars) {
     const root = ctx.dims.find(declared);
-    if (roots.has(root) && !out.includes(root)) out.push(root);
+    if (roots.has(root) && !out.includes(declared)) out.push(declared);
   }
   for (const root of roots) {
-    if (!out.includes(root) && !root.startsWith("#")) out.push(root);
+    const name = named.get(root) ?? root;
+    if (!out.includes(name) && !name.startsWith("#")) out.push(name);
   }
   return out;
 }
@@ -7297,7 +7303,7 @@ function runExactTrial(step, ctx, defs, setting, p, rng) {
   }
   for (const [name, value] of sampled.values.entries()) env.values.set(name, value);
   for (const [name, quadVar] of sampled.quad.entries()) env.quad.set(name, quadVar);
-  const sides = evaluateSides(field, step, env, sampler);
+  const sides = evaluateSides(field, step.lhs, step.rhs, env, sampler);
   if (sides.kind === "unknown") return { kind: "unknown", message: sides.message, domain: sides.domain };
   if (sides.kind === "equal") return { kind: "ok" };
   return {
@@ -7307,14 +7313,17 @@ function runExactTrial(step, ctx, defs, setting, p, rng) {
     counterexample: buildCounterexample(ctx, step, setting, sampled.values, sides.lhs, sides.rhs, field)
   };
 }
-function evaluateSides(field, step, env, sampler) {
-  const derivNode = step.lhs && step.lhs.k === "deriv" ? step.lhs : void 0;
+function compareSides(field, lhs, rhs, env, sampler) {
+  return evaluateSides(field, lhs, rhs, env, sampler);
+}
+function evaluateSides(field, lhsNode, rhsNode, env, sampler) {
+  const derivNode = lhsNode.k === "deriv" ? lhsNode : void 0;
   try {
     if (derivNode) {
-      return compareDerivative(field, derivNode, step.rhs, env, sampler);
+      return compareDerivative(field, derivNode, rhsNode, env, sampler);
     }
-    const lhs = evalNode(field, step.lhs, env);
-    const rhs = evalNode(field, step.rhs, env);
+    const lhs = evalNode(field, lhsNode, env);
+    const rhs = evalNode(field, rhsNode, env);
     if (valuesEqual(field, lhs, rhs)) return { kind: "equal" };
     return { kind: "different", lhs, rhs, message: "the two sides are not equal" };
   } catch (error) {
@@ -7863,7 +7872,7 @@ function numericDelta(ctx, defs, step, setting, rng, field) {
   if (sampled === "unknown") return null;
   for (const [name, value] of sampled.values.entries()) env.values.set(name, value);
   for (const [name, quadVar] of sampled.quad.entries()) env.quad.set(name, quadVar);
-  const sides = evaluateSides(field, step, env, sampler);
+  const sides = evaluateSides(field, step.lhs, step.rhs, env, sampler);
   if (sides.kind === "unknown") return null;
   if (sides.kind === "equal") return 0;
   return relativeDelta(field, sides.lhs, sides.rhs);
@@ -7949,14 +7958,22 @@ var PROP_WORDS2 = {
 function buildCounterexample(_ctx, _step, setting, sampled, lhs, rhs, field) {
   const dims = {};
   for (const [k, v] of setting) dims[k] = v;
-  const values = {};
+  const residues = {};
   for (const [name, val] of sampled) {
-    values[name] = val.k === "s" ? val.v : val.m.d;
+    residues[name] = val.k === "s" ? val.v : val.m.d;
   }
   const lhsVal = lhs.k === "s" ? lhs.v : lhs.m.d;
   const rhsVal = rhs.k === "s" ? rhs.v : rhs.m.d;
   const diff = lhs.k === "s" && rhs.k === "s" ? field.sub(lhs.v, rhs.v) : lhs.k === "m" && rhs.k === "m" ? lhs.m.d.map((x, i) => field.sub(x, rhs.m.d[i])) : null;
-  return { dims, values, lhs: lhsVal, rhs: rhsVal, diff, numpy: "" };
+  return {
+    dims,
+    values: {},
+    lhs: null,
+    rhs: null,
+    diff: null,
+    numpy: "",
+    debug: { residues, lhs: lhsVal, rhs: rhsVal, diff }
+  };
 }
 function checkImplication(step, ctx, defs, opts, card) {
   const premise = step.premise;
@@ -8182,6 +8199,951 @@ function secondDirectional(field, residual, x, dir) {
     d[i] = field.sub(field.add(plus.d[i], minus.d[i]), field.mul(two, centre.d[i]));
   }
   return { r: plus.r, c: plus.c, d };
+}
+
+// src/core/render.ts
+function renderNode(node) {
+  switch (node.k) {
+    case "num": {
+      const v = node.value;
+      if (v.d === 1) return String(v.n);
+      if (v.d < 0) return `-${-v.n}/${-v.d}`;
+      return `\\frac{${v.n}}{${v.d}}`;
+    }
+    case "sym":
+      return renderSymbol(node.name);
+    case "op":
+      return renderOp(node);
+    case "call":
+      return `${node.fn}\\left(${node.args.map(renderNode).join(", ")}\\right)`;
+    case "deriv": {
+      const wrt = node.wrt.map((w) => `\\partial ${renderNode(w)}`).join(" ");
+      return `\\frac{\\partial${node.order === 2 ? "^2" : ""} ${renderNode(node.f)}}{${wrt}}`;
+    }
+    case "expect": {
+      const op = node.op === "E" ? "\\mathbb{E}" : node.op === "Var" ? "\\operatorname{Var}" : "\\operatorname{Cov}";
+      return `${op}\\left[${node.args.map(renderNode).join(", ")}\\right]`;
+    }
+    case "bigop": {
+      const op = node.kind === "sum" ? "\\sum" : "\\prod";
+      const lo = node.lo ? renderNode(node.lo) : "";
+      const hi = node.hi ? renderNode(node.hi) : "";
+      return `${op}_{${node.idx}=${lo}}^{${hi}} ${renderNode(node.body)}`;
+    }
+    case "block": {
+      const rows = node.rows.map((row) => row.map(renderNode).join(" & ")).join(" \\\\ ");
+      return `\\begin{bmatrix} ${rows} \\end{bmatrix}`;
+    }
+    case "raw":
+      return node.text;
+  }
+}
+function renderSymbol(name) {
+  const supIndex = name.indexOf("^");
+  const subIndex = name.indexOf("_");
+  let base = name;
+  let sub2 = "";
+  let sup = "";
+  if (subIndex >= 0 && (supIndex < 0 || subIndex < supIndex)) {
+    base = name.slice(0, subIndex);
+    const rest = name.slice(subIndex + 1);
+    if (supIndex > subIndex) {
+      sub2 = rest.slice(0, supIndex - subIndex - 1);
+      sup = rest.slice(supIndex - subIndex);
+    } else {
+      sub2 = rest;
+    }
+  } else if (supIndex >= 0) {
+    base = name.slice(0, supIndex);
+    sup = name.slice(supIndex);
+  }
+  let out = base;
+  if (sub2) out += sub2.length === 1 ? `_${sub2}` : `_{${sub2}}`;
+  if (sup) out += sup.length === 1 ? `^${sup}` : `^{${sup}}`;
+  return out;
+}
+function renderOp(node) {
+  const a = node.args.map(renderNode);
+  switch (node.op) {
+    case "add":
+      return `${a[0]} + ${a[1]}`;
+    case "sub":
+      return `${a[0]} - ${a[1]}`;
+    case "neg":
+      return `-${a[0]}`;
+    case "mul":
+      return `${a[0]} ${a[1]}`;
+    case "div":
+      return `\\frac{${a[0]}}{${a[1]}}`;
+    case "pow":
+      return `{${a[0]}}^{${a[1]}}`;
+    case "inv":
+      return `{${a[0]}}^{-1}`;
+    case "invT":
+      return `{${a[0]}}^{-\\top}`;
+    case "T":
+      return `{${a[0]}}^\\top`;
+    case "tr":
+      return `\\operatorname{tr}\\left(${a[0]}\\right)`;
+    case "det":
+      return `\\det\\left(${a[0]}\\right)`;
+    case "adj":
+      return `\\operatorname{adj}\\left(${a[0]}\\right)`;
+    case "kron":
+      return `${a[0]} \\otimes ${a[1]}`;
+    case "had":
+      return `${a[0]} \\odot ${a[1]}`;
+    case "inner":
+      return `\\left\\langle ${a[0]}, ${a[1]} \\right\\rangle`;
+    case "norm2":
+      return `\\left\\|${a[0]}\\right\\|^{2}`;
+    case "frob":
+      return `\\left\\|${a[0]}\\right\\|_{F}^{2}`;
+    case "vec":
+      return `\\operatorname{vec}\\left(${a[0]}\\right)`;
+    case "diag":
+      return `\\operatorname{diag}\\left(${a[0]}\\right)`;
+    case "abs":
+      return `\\left|${a[0]}\\right|`;
+    case "sqrtm":
+      return `\\sqrt{${a[0]}}`;
+  }
+}
+
+// src/core/shrink.ts
+function shrinkCounterexample(ctx, lhs, rhs, defs, sizes, seed, budgetMs = 200) {
+  const started = Date.now();
+  const names = [...ctx.symbols.keys()].filter((name) => {
+    const info = ctx.symbols.get(name);
+    return info && info.ty.t === "mat" && !defs.has(name);
+  });
+  const shrinkCtx = {
+    ctx,
+    lhs,
+    rhs,
+    defs,
+    symbolNames: names,
+    derivedNames: [...defs.keys()],
+    sizes,
+    propOf: (name) => ctx.symbols.get(name)?.props ?? []
+  };
+  for (const range of [2, 5]) {
+    const candidate = searchSmallIntegers(shrinkCtx, range, seed);
+    if (candidate) return candidate;
+    if (Date.now() - started > budgetMs) break;
+  }
+  const field = new GFpField(2147483647);
+  const sampler = new Sampler(field, rngFor(seed, "shrink"));
+  const env = makeEnv(field, rngFor(seed, "shrink"));
+  env.defs = defs;
+  const values = /* @__PURE__ */ new Map();
+  for (const name of names) {
+    const info = ctx.symbols.get(name);
+    if (!info || info.ty.t !== "mat") continue;
+    const r = dimSizeOf(ctx, info.ty.r, sizes);
+    const c = dimSizeOf(ctx, info.ty.c, sizes);
+    const val = sampler.sample({ name, r, c, props: info.props });
+    if (val && val.k === "m") values.set(name, val);
+  }
+  for (const [name, value] of values.entries()) env.values.set(name, value);
+  try {
+    const l = evalNode(field, lhs, env);
+    const r = evalNode(field, rhs, env);
+    if (!equal(field, l, r)) {
+      return describe(ctx, sizes, values, derivedValues(field, env, defs), l, r, field, true);
+    }
+  } catch {
+  }
+  return null;
+}
+function derivedValues(field, env, defs) {
+  const out = /* @__PURE__ */ new Map();
+  for (const [name, node] of defs) {
+    try {
+      out.set(name, evalNode(field, node, env));
+    } catch {
+    }
+  }
+  return out;
+}
+function searchSmallIntegers(sh, range, seed) {
+  const field = new DecField(50);
+  const rng = rngFor(seed, "small", range);
+  const { ctx, sizes } = sh;
+  for (let attempt = 0; attempt < 40; attempt++) {
+    const values = /* @__PURE__ */ new Map();
+    for (const name of sh.symbolNames) {
+      const info = ctx.symbols.get(name);
+      if (!info || info.ty.t !== "mat") continue;
+      const r = dimSizeOf(ctx, info.ty.r, sizes);
+      const c = dimSizeOf(ctx, info.ty.c, sizes);
+      const props = sh.propOf(name);
+      const m = smallMatrix(field, r, c, props, rng, range);
+      if (!m) continue;
+      values.set(name, { k: "m", m });
+    }
+    if (!values.size) continue;
+    const env = makeEnv(field, rng);
+    env.defs = sh.defs;
+    for (const [name, value] of values.entries()) env.values.set(name, value);
+    try {
+      const l = evalNode(field, sh.lhs, env);
+      const r = evalNode(field, sh.rhs, env);
+      if (equal(field, l, r)) continue;
+      return describe(ctx, sizes, values, derivedValues(field, env, sh.defs), l, r, field, false);
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
+function smallMatrix(field, r, c, props, rng, range) {
+  const has = (p) => props.some((x) => x === p);
+  const entry = () => Math.floor(rng() * (2 * range + 1)) - range;
+  if ((has("spd") || has("psd")) && r === c) {
+    const l = new Array(r * r).fill(0);
+    for (let i = 0; i < r; i++) {
+      for (let j = 0; j <= i; j++) l[i * r + j] = entry();
+    }
+    const d2 = new Array(r * c).fill(0);
+    for (let i = 0; i < r; i++) {
+      for (let j = 0; j < r; j++) {
+        let sum2 = 0;
+        for (let k = 0; k < r; k++) sum2 += l[i * r + k] * l[j * r + k];
+        d2[i * c + j] = sum2 + (i === j ? 1 : 0);
+      }
+    }
+    return { r, c, d: d2.map((x) => field.fromRational(x, 1)) };
+  }
+  const d = new Array(r * c).fill(0);
+  for (let i = 0; i < r; i++) {
+    for (let j = 0; j < c; j++) {
+      if (has("sym") || has("psd")) {
+        d[i * c + j] = i <= j ? d[j * c + i] || entry() : d[j * c + i];
+        if (i > j) d[i * c + j] = d[j * c + i];
+      } else if (has("skew")) {
+        d[i * c + j] = i === j ? 0 : i < j ? entry() : -d[j * c + i];
+      } else if (has("diag")) {
+        d[i * c + j] = i === j ? entry() : 0;
+      } else if (has("ident")) {
+        d[i * c + j] = i === j ? 1 : 0;
+      } else if (has("zero")) {
+        d[i * c + j] = 0;
+      } else if (has("ones")) {
+        d[i * c + j] = 1;
+      } else {
+        d[i * c + j] = entry();
+      }
+    }
+  }
+  const m = { r, c, d: d.map((x) => field.fromRational(x, 1)) };
+  if (r === c && (has("orth") || has("idem") || has("proj"))) return null;
+  return m;
+}
+function equal(field, a, b) {
+  if (a.k === "s" && b.k === "s") return field.eq(a.v, b.v);
+  if (a.k === "m" && b.k === "m") {
+    if (a.m.r !== b.m.r || a.m.c !== b.m.c) return false;
+    for (let i = 0; i < a.m.d.length; i++) if (!field.eq(a.m.d[i], b.m.d[i])) return false;
+    return true;
+  }
+  return false;
+}
+function describe(ctx, sizes, values, derived, lhs, rhs, field, residue) {
+  const dims = {};
+  for (const [root, size] of sizes) {
+    const declared = ctx.dimVars.find((d) => ctx.dims.find(d) === root);
+    if (declared) dims[declared] = size;
+    else if (!root.startsWith("#")) dims[root] = size;
+  }
+  const signed = (x) => {
+    if (!residue) return x;
+    const p = 2147483647;
+    return x > p / 2 ? x - p : x;
+  };
+  const plain = {};
+  for (const [name, val] of values) {
+    plain[name] = val.k === "s" ? signed(field.toNumber(val.v)) : val.m.d.map((x) => signed(field.toNumber(x)));
+  }
+  const derivedPlain = {};
+  for (const [name, val] of derived) {
+    derivedPlain[name] = val.k === "s" ? signed(field.toNumber(val.v)) : val.m.d.map((x) => signed(field.toNumber(x)));
+  }
+  const lhsPlain = lhs.k === "s" ? signed(field.toNumber(lhs.v)) : lhs.m.d.map((x) => signed(field.toNumber(x)));
+  const rhsPlain = rhs.k === "s" ? signed(field.toNumber(rhs.v)) : rhs.m.d.map((x) => signed(field.toNumber(x)));
+  const diffPlain = lhs.k === "s" && rhs.k === "s" ? signed(field.toNumber(lhs.v) - field.toNumber(rhs.v)) : lhs.k === "m" && rhs.k === "m" ? lhs.m.d.map((x, i) => signed(field.toNumber(x) - field.toNumber(rhs.m.d[i]))) : 0;
+  return {
+    dims,
+    values: plain,
+    derived: derivedPlain,
+    lhs: lhsPlain,
+    rhs: rhsPlain,
+    diff: diffPlain,
+    numpy: toNumpy(plain, dims, derivedPlain)
+  };
+}
+function toNumpy(values, _dims, derived = {}) {
+  const lines = ["import numpy as np"];
+  const names = Object.keys(values);
+  names.forEach((name, i) => {
+    const v = values[name];
+    const pyName = `s${i}`;
+    if (typeof v === "number") {
+      lines.push(`${pyName} = ${v}`);
+    } else {
+      const rows = [];
+      const c = Math.max(1, Math.round(Math.sqrt(v.length)));
+      for (let i2 = 0; i2 < v.length; i2 += c) {
+        rows.push(`[${v.slice(i2, i2 + c).map((x) => Number(x.toFixed(6))).join(", ")}]`);
+      }
+      lines.push(`${pyName} = np.array([${rows.join(", ")}])`);
+    }
+  });
+  const derivedNames = Object.keys(derived);
+  if (derivedNames.length) {
+    lines.push("");
+    lines.push("# the symbols the derivation defines, computed by SAMOSA from the values above");
+    derivedNames.forEach((name, i) => {
+      const v = derived[name];
+      const pyName = `d${i}`;
+      if (typeof v === "number") {
+        lines.push(`${pyName} = ${v}  # ${name}`);
+      } else {
+        const rows = [];
+        const c = Math.max(1, Math.round(Math.sqrt(v.length)));
+        for (let i2 = 0; i2 < v.length; i2 += c) {
+          rows.push(`[${v.slice(i2, i2 + c).map((x) => Number(x.toFixed(6))).join(", ")}]`);
+        }
+        lines.push(`${pyName} = np.array([${rows.join(", ")}])  # ${name}`);
+      }
+    });
+  }
+  lines.push("");
+  lines.push("# the two sides of the step, with these values");
+  lines.push("# lhs - rhs is not zero");
+  return lines.join("\n");
+}
+
+// src/core/repair.ts
+var CANDIDATE_LIMIT = 300;
+var BUDGET_MS = 150;
+function repairs(ctx, lhs, rhs, defs, seed, dimVars, kind) {
+  const started = Date.now();
+  const sh = { ctx, lhs, rhs, defs, seed, dimVars };
+  const out = [];
+  const shape = kind === "shape" ? shapeRepairs(sh) : [];
+  out.push(...shape);
+  if (Date.now() - started > BUDGET_MS) return out;
+  out.push(...mutationRepairs(sh));
+  if (Date.now() - started > BUDGET_MS) return out;
+  out.push(...assumptionRepairs(sh));
+  if (Date.now() - started > BUDGET_MS) return out;
+  out.push(...residualRepairs(sh));
+  const deduped = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const fix of out) {
+    const key = `${fix.edit?.insert ?? ""}|${fix.addDecl ?? ""}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(fix);
+  }
+  deduped.sort((a, b) => priority(a) - priority(b) || editSize(a) - editSize(b));
+  return deduped.slice(0, 3);
+}
+function priority(fix) {
+  switch (fix.kind) {
+    case "mutation":
+      return 0;
+    case "residual":
+      return 1;
+    case "shape":
+      return 2;
+    case "assumption":
+      return 3;
+    default:
+      return 4;
+  }
+}
+var MUTATIONS = [
+  {
+    id: "T1",
+    title: "the transpose of a product keeps the order",
+    apply: (node) => {
+      if (node.k !== "op" || node.op !== "T") return null;
+      const arg = node.args[0];
+      if (arg.k !== "op" || arg.op !== "mul") return null;
+      return { ...node, args: [{ ...arg, args: [arg.args[1], arg.args[0]] }] };
+    }
+  },
+  {
+    id: "T2",
+    title: "the inverse of a product keeps the order",
+    apply: (node) => {
+      if (node.k !== "op" || node.op !== "inv") return null;
+      const arg = node.args[0];
+      if (arg.k !== "op" || arg.op !== "mul") return null;
+      return {
+        ...node,
+        args: [
+          {
+            ...arg,
+            args: [
+              { k: "op", op: "inv", args: [arg.args[1]], span: arg.args[1].span },
+              { k: "op", op: "inv", args: [arg.args[0]], span: arg.args[0].span }
+            ]
+          }
+        ]
+      };
+    }
+  },
+  {
+    id: "T3",
+    title: "a transpose is missing",
+    apply: (node) => {
+      if (node.k !== "sym") return null;
+      return { k: "op", op: "T", args: [node], span: node.span };
+    }
+  },
+  {
+    id: "T3r",
+    title: "a transpose is not needed",
+    apply: (node) => {
+      if (node.k !== "op" || node.op !== "T") return null;
+      return node.args[0];
+    }
+  },
+  {
+    id: "A4",
+    title: "an inverse where there should be none, or the other way round",
+    apply: (node) => {
+      if (node.k === "op" && node.op === "inv") return node.args[0];
+      if (node.k === "op" && (node.op === "mul" || node.op === "add" || node.op === "sub")) {
+        for (const arg of node.args) {
+          if (arg.k === "op" && arg.op === "inv" && !isInvertedTwice(arg)) {
+            return { ...node, args: node.args.map((a) => a === arg ? a.args[0] : a) };
+          }
+        }
+      }
+      return null;
+    }
+  },
+  {
+    id: "A1",
+    title: "a sign is flipped",
+    apply: (node) => {
+      if (node.k !== "op" || node.op !== "add") return null;
+      const second = node.args[1];
+      if (second.k !== "op" || second.op !== "neg") return null;
+      return { ...node, op: "sub", args: [node.args[0], second.args[0]] };
+    }
+  },
+  {
+    id: "A2",
+    title: "a factor of two",
+    apply: (node) => {
+      if (node.k !== "op" || node.op !== "mul") return null;
+      const a = node.args[0];
+      const b = node.args[1];
+      if (a.k === "num" && a.value.n === 2) return { ...node, args: [a, b] };
+      if (b.k === "num" && b.value.n === 2) return { ...node, args: [a, b] };
+      if (a.k === "num" && a.value.n === 1) {
+        return {
+          ...node,
+          args: [
+            { k: "num", value: { n: 2, d: 1 }, span: a.span },
+            b
+          ]
+        };
+      }
+      return null;
+    }
+  },
+  {
+    id: "C1",
+    title: "two factors are swapped",
+    apply: (node) => {
+      if (node.k !== "op" || node.op !== "mul") return null;
+      return { ...node, args: [node.args[1], node.args[0]] };
+    }
+  },
+  {
+    id: "S1",
+    title: "the inverse of a sum is split",
+    apply: (node) => {
+      if (node.k !== "op" || node.op !== "inv") return null;
+      const arg = node.args[0];
+      if (arg.k !== "op" || arg.op !== "add") return null;
+      return {
+        ...node,
+        args: [
+          {
+            k: "op",
+            op: "add",
+            args: [
+              { k: "op", op: "inv", args: [arg.args[0]], span: arg.args[0].span },
+              { k: "op", op: "inv", args: [arg.args[1]], span: arg.args[1].span }
+            ],
+            span: arg.span
+          }
+        ]
+      };
+    }
+  },
+  {
+    id: "N2",
+    title: "the Frobenius norm uses the wrong trace",
+    apply: (node) => {
+      if (node.k !== "op" || node.op !== "frob") return null;
+      const arg = node.args[0];
+      if (arg.k !== "op" || arg.op !== "T") return null;
+      return { ...node, op: "norm2", args: [arg.args[0]] };
+    }
+  },
+  {
+    id: "G1",
+    title: "the gradient of a quadratic form assumes symmetry",
+    apply: (node) => {
+      if (node.k !== "op" || node.op !== "mul") return null;
+      return null;
+    }
+  }
+];
+function editSize(fix) {
+  if (!fix.edit) return 0;
+  return fix.edit.insert.length;
+}
+function isInvertedTwice(node) {
+  return node.args[0]?.k === "op" && node.args[0].op === "inv";
+}
+function walk(node, path = []) {
+  const out = [{ node, path }];
+  const children = node.k === "op" || node.k === "call" ? node.args : node.k === "deriv" ? [node.f, ...node.wrt] : node.k === "expect" ? node.args : node.k === "bigop" ? [node.body] : node.k === "block" ? node.rows.flat() : [];
+  children.forEach((child, i) => out.push(...walk(child, [...path, i])));
+  return out;
+}
+function replaceAt(node, path, replacement) {
+  if (path.length === 0) return replacement;
+  const [head, ...rest] = path;
+  if (node.k === "op" || node.k === "call") {
+    const args = node.args.slice();
+    args[head] = replaceAt(args[head], rest, replacement);
+    return { ...node, args };
+  }
+  if (node.k === "block") {
+    const rows = node.rows.map((r) => r.slice());
+    const flat = rows.flat();
+    flat[head] = replaceAt(flat[head], rest, replacement);
+    const out = [];
+    let i = 0;
+    for (const row of rows) {
+      out.push(flat.slice(i, i + row.length));
+      i += row.length;
+    }
+    return { ...node, rows: out };
+  }
+  return node;
+}
+function mutationRepairs(sh) {
+  const out = [];
+  let count = 0;
+  for (const side of ["rhs", "lhs"]) {
+    const original = side === "rhs" ? sh.rhs : sh.lhs;
+    for (const { node, path } of walk(original)) {
+      if (count > CANDIDATE_LIMIT) break;
+      for (const mutation of MUTATIONS) {
+        if (count > CANDIDATE_LIMIT) break;
+        const mutated = mutation.apply(node);
+        if (!mutated) continue;
+        count++;
+        const candidate = replaceAt(original, path, mutated);
+        if (renderNode(candidate) === renderNode(original)) continue;
+        if (!holdsWith(sh, side, candidate)) continue;
+        out.push({
+          kind: "mutation",
+          title: mutation.title,
+          edit: { span: original.span, insert: renderNode(candidate) },
+          verified: true,
+          detail: renderNode(candidate)
+        });
+      }
+    }
+  }
+  return out;
+}
+function holdsWith(sh, side, candidate) {
+  const settings = sizeSettings(sh.dimVars);
+  const field = new GFpField(2147483647);
+  for (const setting of settings.slice(0, 2)) {
+    const rng = rngFor(sh.seed, "repair", "mutation");
+    const sampler = new Sampler(field, rng);
+    const env = makeEnv(field, rng);
+    env.defs = sh.defs;
+    const values = sampleSymbols(sh.ctx, sh, setting, sampler);
+    if (!values) return false;
+    for (const [name, value] of values.entries()) if (value) env.values.set(name, value);
+    try {
+      const sides = compareSides(
+        field,
+        side === "lhs" ? candidate : sh.lhs,
+        side === "rhs" ? candidate : sh.rhs,
+        env,
+        sampler
+      );
+      if (sides.kind !== "equal") return false;
+    } catch {
+      return false;
+    }
+  }
+  return true;
+}
+function sampleSymbols(ctx, sh, setting, sampler) {
+  const values = /* @__PURE__ */ new Map();
+  const names = /* @__PURE__ */ new Set();
+  const collect = (node) => {
+    if (node.k === "sym") names.add(node.name);
+    else if (node.k === "op" || node.k === "call") node.args.forEach(collect);
+    else if (node.k === "deriv") {
+      collect(node.f);
+      node.wrt.forEach(collect);
+    } else if (node.k === "expect") node.args.forEach(collect);
+    else if (node.k === "bigop") collect(node.body);
+    else if (node.k === "block") node.rows.flat().forEach(collect);
+  };
+  collect(sh.lhs);
+  collect(sh.rhs);
+  for (const name of [...names]) {
+    const def = sh.defs.get(name);
+    if (def) collect(def);
+  }
+  for (const name of names) {
+    if (sh.defs.has(name)) continue;
+    const info = ctx.symbols.get(name);
+    if (!info) continue;
+    if (info.ty.t === "scalar") {
+      values.set(name, { k: "s", v: sampler.sampleScalar() });
+      continue;
+    }
+    if (info.ty.t !== "mat") continue;
+    const r = dimSizeOf(ctx, info.ty.r, setting);
+    const c = dimSizeOf(ctx, info.ty.c, setting);
+    const val = sampler.sample({ name, r, c, props: info.props });
+    if (!val) return null;
+    values.set(name, val);
+  }
+  return values;
+}
+var ASSUMPTION_TRIES = [
+  { props: ["sym"], text: "symmetric" },
+  { props: ["orth"], text: "orthogonal" },
+  { props: ["diag"], text: "diagonal" }
+];
+function assumptionRepairs(sh) {
+  const out = [];
+  const candidates = [...sh.ctx.symbols.values()].filter(
+    (s) => s.ty.t === "mat" && s.props.length === 0 && s.source !== "preset"
+  );
+  for (const symbol of candidates) {
+    for (const attempt of ASSUMPTION_TRIES) {
+      if (!canHave(sh.ctx, symbol.name, attempt.props)) continue;
+      if (holdsWithProps(sh, symbol.name, attempt.props)) {
+        out.push({
+          kind: "assumption",
+          title: `holds if ${symbol.name} is ${attempt.text}`,
+          addDecl: `${symbol.name}: ${attempt.props[0]} ${dimText(sh.ctx, symbol.name)}`,
+          verified: true
+        });
+        return out;
+      }
+    }
+  }
+  return out;
+}
+function canHave(ctx, name, props) {
+  const info = ctx.symbols.get(name);
+  if (!info || info.ty.t !== "mat") return false;
+  const r = info.ty.r;
+  const c = info.ty.c;
+  const square = typeof r === "number" && typeof c === "number" ? r === c : typeof r !== "number" && typeof c !== "number" && r.v === c.v;
+  if (props.includes("sym") || props.includes("orth") || props.includes("diag")) return square;
+  return true;
+}
+function dimText(ctx, name) {
+  const info = ctx.symbols.get(name);
+  if (!info || info.ty.t !== "mat") return "";
+  const r = info.ty.r;
+  const c = info.ty.c;
+  if (typeof r === "number") return String(r);
+  if (typeof c === "number" || c.v !== r.v) {
+    return `${r.v}\xD7${typeof c === "number" ? c : c.v}`;
+  }
+  return r.v;
+}
+function holdsWithProps(sh, name, props) {
+  const saved = sh.ctx.symbols.get(name);
+  if (!saved) return false;
+  sh.ctx.symbols.set(name, { ...saved, props });
+  const ok = holdsWith(sh, "rhs", sh.rhs);
+  sh.ctx.symbols.set(name, saved);
+  return ok;
+}
+function shapeRepairs(sh) {
+  const out = [];
+  const candidates = walk(sh.rhs);
+  for (const { node, path } of candidates.slice(0, 40)) {
+    if (node.k === "sym") {
+      const flipped = { k: "op", op: "T", args: [node], span: node.span };
+      const candidate = replaceAt(sh.rhs, path, flipped);
+      if (typeChecks(sh, candidate)) {
+        out.push({
+          kind: "shape",
+          title: `did you mean ${renderNode(flipped)}?`,
+          edit: { span: sh.rhs.span, insert: renderNode(candidate) },
+          verified: false
+        });
+        if (out.length >= 3) return out;
+      }
+    }
+  }
+  return out;
+}
+function typeChecks(sh, rhs) {
+  const settings = sizeSettings(sh.dimVars);
+  const field = new GFpField(2147483647);
+  for (const setting of settings.slice(0, 1)) {
+    const rng = rngFor(sh.seed, "repair", "shape");
+    const sampler = new Sampler(field, rng);
+    const env = makeEnv(field, rng);
+    env.defs = sh.defs;
+    const values = sampleSymbols(sh.ctx, sh, setting, sampler);
+    if (!values) continue;
+    for (const [n, value] of values.entries()) if (value) env.values.set(n, value);
+    try {
+      evalNode(field, rhs, env);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+function residualRepairs(sh) {
+  const out = [];
+  const settings = sizeSettings(sh.dimVars);
+  const field = new GFpField(2147483647);
+  const samples = [];
+  for (const setting of settings.slice(0, 2)) {
+    const rng = rngFor(sh.seed, "repair", "residual");
+    const sampler = new Sampler(field, rng);
+    const env = makeEnv(field, rng);
+    env.defs = sh.defs;
+    const values = sampleSymbols(sh.ctx, sh, setting, sampler);
+    if (!values) return out;
+    for (const [name, value] of values.entries()) if (value) env.values.set(name, value);
+    try {
+      const l = evalNode(field, sh.lhs, env);
+      const r = evalNode(field, sh.rhs, env);
+      if (l.k !== "m" || r.k !== "m") return out;
+      const d = l.m.d.map((x, i) => field.sub(x, r.m.d[i]));
+      samples.push({ env, diff: d });
+    } catch {
+      return out;
+    }
+  }
+  if (samples.length < 2) return out;
+  const terms = candidateTerms(sh);
+  for (const [text, term] of terms) {
+    const scale = matchesScale(field, term, samples);
+    if (scale === null) continue;
+    out.push({
+      kind: "residual",
+      title: `this step is off by exactly ${scaleText(scale)} ${text}`,
+      edit: { span: sh.rhs.span, insert: `${renderNode(sh.rhs)} + ${scaleText(scale)} ${text}` },
+      verified: false,
+      detail: text
+    });
+    if (out.length >= 3) break;
+  }
+  return out;
+}
+function candidateTerms(sh) {
+  const terms = /* @__PURE__ */ new Map();
+  const symbols = [];
+  const seen = /* @__PURE__ */ new Set();
+  const collect = (node) => {
+    if (node.k !== "sym") return;
+    if (seen.has(node.name)) return;
+    seen.add(node.name);
+    symbols.push(node);
+  };
+  for (const { node } of walk(sh.lhs).concat(walk(sh.rhs))) collect(node);
+  for (const name of [...seen]) {
+    const def = sh.defs.get(name);
+    if (!def) continue;
+    for (const { node } of walk(def)) collect(node);
+  }
+  const add2 = (node) => {
+    const text = renderNode(node);
+    if (!terms.has(text)) terms.set(text, node);
+  };
+  for (const x of symbols) {
+    const xt = { k: "op", op: "T", args: [x], span: x.span };
+    add2({
+      k: "op",
+      op: "mul",
+      args: [x, xt],
+      span: x.span
+    });
+  }
+  for (const x of symbols) {
+    for (const y of symbols) {
+      if (x === y) continue;
+      const xt = { k: "op", op: "T", args: [x], span: x.span };
+      add2({
+        k: "op",
+        op: "mul",
+        args: [
+          { k: "op", op: "mul", args: [x, y], span: x.span },
+          xt
+        ],
+        span: x.span
+      });
+    }
+  }
+  return terms;
+}
+function matchesScale(field, term, samples) {
+  const termValues = [];
+  for (const { env, diff } of samples) {
+    let value;
+    try {
+      const t = evalNode(field, term, env);
+      if (t.k !== "m") return null;
+      value = t.m.d;
+    } catch {
+      return null;
+    }
+    if (value.length !== diff.length) return null;
+    termValues.push(value);
+  }
+  const scale = niceScale(field, field.div(samples[0].diff[0], termValues[0][0]));
+  if (scale === null) return null;
+  for (let s = 0; s < samples.length; s++) {
+    for (let i = 0; i < samples[s].diff.length; i++) {
+      if (field.mul(field.fromRational(scale.n, scale.d), termValues[s][i]) !== samples[s].diff[i]) {
+        return null;
+      }
+    }
+  }
+  return scale.n / scale.d;
+}
+function niceScale(field, value) {
+  for (let a = -12; a <= 12; a++) {
+    for (let b = 1; b <= 12; b++) {
+      if (field.fromRational(a, b) === value) return { n: a, d: b };
+    }
+  }
+  return null;
+}
+function scaleText(scale) {
+  if (scale === 1) return "+";
+  if (scale === -1) return "-";
+  if (Number.isInteger(scale)) return scale > 0 ? `+ ${scale}` : `- ${-scale}`;
+  return scale > 0 ? `+ ${scale}` : `- ${-scale}`;
+}
+
+// src/core/index.ts
+function explainAll(src, opts = {}, limit = 8) {
+  const out = /* @__PURE__ */ new Map();
+  const parsed = parseForExplain(src, opts);
+  const deadline = Date.now() + (opts.budgetMs ?? 4e3);
+  let count = 0;
+  for (const step of parsed.steps) {
+    if (count >= limit) break;
+    if (Date.now() > deadline) break;
+    if (!step.lhs || !step.rhs) continue;
+    if (step.relation !== "=" && step.relation !== "shape") continue;
+    out.set(step.id, explainStep(parsed, step, opts));
+    count++;
+  }
+  return out;
+}
+function parseForExplain(src, opts) {
+  const rows = splitRows(src);
+  const declared = parseDeclarations(opts.decls ?? "");
+  const preset = presetDecls(opts.preset);
+  const decls = [...preset];
+  const index = new Map(decls.map((d, i) => [d.name, i]));
+  for (const d of declared.decls) {
+    const at = index.get(d.name);
+    if (at === void 0) {
+      index.set(d.name, decls.length);
+      decls.push(d);
+    } else {
+      decls[at] = d;
+    }
+  }
+  const ctx = createContext(decls, opts.layout ?? "denominator");
+  const defs = /* @__PURE__ */ new Map();
+  const steps = [];
+  let previousRhs;
+  rows.forEach((row, rowIndex) => {
+    const parsed = parseRow(src, row.text, row.from, rowIndex);
+    if (parsed.prose || !parsed.parts.length) return;
+    for (const part of parsed.parts) {
+      if (part.relation === "=>" || part.relation === "<=>") {
+        steps.push({
+          id: `s${steps.length}`,
+          lhs: part.conclusion?.lhs,
+          rhs: part.conclusion?.rhs,
+          relation: part.relation,
+          defined: false
+        });
+        previousRhs = part.conclusion?.rhs;
+        continue;
+      }
+      const lhs = part.lhs ?? previousRhs;
+      const rhs = part.rhs;
+      const bareLhs = lhs?.k === "sym" ? lhs.name : void 0;
+      const isDefinition = part.relation === ":=" || bareLhs !== void 0 && !ctx.decls.has(bareLhs) && !defs.has(bareLhs);
+      steps.push({
+        id: `s${steps.length}`,
+        lhs,
+        rhs,
+        relation: part.relation,
+        defined: isDefinition
+      });
+      previousRhs = rhs;
+      if (isDefinition && bareLhs && rhs) {
+        defs.set(bareLhs, rhs);
+        ctx.defs.set(bareLhs, rhs);
+      }
+    }
+  });
+  return { ctx, defs, steps };
+}
+function explainStep(parsed, step, opts) {
+  const { ctx, defs } = parsed;
+  if (!step.lhs || !step.rhs) return { fixes: [] };
+  inferType(ctx, step.lhs);
+  inferType(ctx, step.rhs);
+  const dimVars = collectDimVarsFor(ctx, step.lhs, step.rhs, defs);
+  const kind = step.relation === "=" ? "wrong" : "shape";
+  const fixes = repairs(ctx, step.lhs, step.rhs, defs, opts.seed ?? 5910618, dimVars, kind);
+  let counterexample;
+  const deadline = Date.now() + 600;
+  for (const size of [1, 2, 3]) {
+    const sizes = /* @__PURE__ */ new Map();
+    for (const v of dimVars) sizes.set(ctx.dims.find(v), size);
+    const left = Math.max(50, deadline - Date.now());
+    try {
+      counterexample = shrinkCounterexample(ctx, step.lhs, step.rhs, defs, sizes, opts.seed ?? 5910618, left) ?? void 0;
+    } catch {
+      counterexample = void 0;
+    }
+    if (counterexample) break;
+    if (Date.now() > deadline) break;
+  }
+  return { fixes, counterexample };
 }
 
 // cli/extract.ts
@@ -8428,14 +9390,14 @@ function visit(tree, visitor, options) {
     enter = visitor.enter;
     leave = visitor.leave;
   }
-  walk(tree, {
+  walk3(tree, {
     key: void 0,
     index: void 0,
     parents: [],
     containingArray: void 0,
     context: { ...startingContext }
   });
-  function walk(node, { key, index, parents, context, containingArray }) {
+  function walk3(node, { key, index, parents, context, containingArray }) {
     const nodePassesTest = includeArrays ? test(node, {
       key,
       index,
@@ -8466,7 +9428,7 @@ function visit(tree, visitor, options) {
     })) : result;
     if (Array.isArray(node)) for (let index2 = 0; index2 > -1 && index2 < node.length; index2++) {
       const item = node[index2];
-      const result2 = walk(item, {
+      const result2 = walk3(item, {
         key,
         index: index2,
         parents,
@@ -8501,7 +9463,7 @@ function visit(tree, visitor, options) {
           newContext.inMathMode = true;
           newContext.hasMathModeAncestor = true;
         } else if (mathModeProps.leave.includes(key2)) newContext.inMathMode = false;
-        const result2 = walk(value, {
+        const result2 = walk3(value, {
           key: key2,
           index: void 0,
           parents: grandparents,
@@ -8687,6 +9649,93 @@ function harvestProse(source) {
   return found;
 }
 
+// cli/glob.ts
+import { readdirSync, statSync } from "node:fs";
+import { join, resolve } from "node:path";
+var PATTERN = /[*?{]/;
+function isGlob(pattern) {
+  return PATTERN.test(pattern);
+}
+function expandGlob(pattern, cwd = process.cwd()) {
+  if (!isGlob(pattern)) {
+    return [pattern];
+  }
+  const root = resolve(cwd);
+  const absolute = resolve(root, pattern);
+  const first = pattern.split("*")[0].split("?")[0].split("{")[0];
+  const base = resolve(root, first.endsWith("/") ? first : first.slice(0, Math.max(0, first.lastIndexOf("/") + 1)));
+  const relative = (absolute.startsWith(base) ? absolute.slice(base.length) : pattern).replace(/^\/+/, "");
+  const baseRelative = base === root ? "" : base.slice(root.length + 1);
+  const out = [];
+  walk2(base, "", relative, out, 0, baseRelative);
+  out.sort();
+  return out;
+}
+function walk2(base, prefix, pattern, out, depth, baseRelative) {
+  if (depth > 12) return;
+  let entries;
+  try {
+    entries = readdirSync(join(base, prefix));
+  } catch {
+    return;
+  }
+  for (const entry of entries.sort()) {
+    if (entry.startsWith(".") && entry !== ".") continue;
+    const relative = prefix ? `${prefix}/${entry}` : entry;
+    let isDirectory;
+    try {
+      isDirectory = statSync(join(base, relative)).isDirectory();
+    } catch {
+      continue;
+    }
+    if (isDirectory) {
+      if (patternMatches(relative, pattern) || patternHasDoubleStar(pattern)) {
+        walk2(base, relative, pattern, out, depth + 1, baseRelative);
+      }
+      continue;
+    }
+    if (patternMatches(relative, pattern)) {
+      out.push(baseRelative ? join(baseRelative, relative) : relative);
+    }
+  }
+}
+function patternHasDoubleStar(pattern) {
+  return pattern.includes("**");
+}
+function patternMatches(name, pattern) {
+  let source = "";
+  for (let i = 0; i < pattern.length; i++) {
+    const ch = pattern[i];
+    if (ch === "*") {
+      if (pattern[i + 1] === "*") {
+        source += ".*";
+        i++;
+        if (pattern[i + 1] === "/") i++;
+      } else {
+        source += "[^/]*";
+      }
+      continue;
+    }
+    if (ch === "?") {
+      source += "[^/]";
+      continue;
+    }
+    if (ch === "{") {
+      const end = pattern.indexOf("}", i);
+      if (end < 0) {
+        source += "\\{";
+        continue;
+      }
+      const choices = pattern.slice(i + 1, end).split(",");
+      source += `(?:${choices.map((c) => c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`;
+      i = end;
+      continue;
+    }
+    source += ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+  return new RegExp(`^${source}$`).test(name);
+}
+
 // cli/format.ts
 var ICONS = {
   ok: "\u2713",
@@ -8834,7 +9883,8 @@ function parseArgs(argv) {
       preset: void 0,
       seed: void 0,
       trials: void 0,
-      layout: "denominator"
+      layout: "denominator",
+      noExplain: false
     }
   };
   for (let i = 1; i < argv.length; i++) {
@@ -8853,6 +9903,12 @@ function parseArgs(argv) {
         break;
       case "--fail-on":
         args.options.failOn = (next() ?? "wrong,shape").split(",").map((s) => s.trim());
+        break;
+      case "--no-explain":
+        args.options.noExplain = true;
+        break;
+      case "--output":
+        args.options.output = next();
         break;
       case "--seed":
         args.options.seed = Number(next());
@@ -8900,6 +9956,8 @@ Options:
   --seed <number>             the seed of the sampling
   --trials <number>           the trials per size
   --layout <denominator|numerator>
+  --no-explain                do not look for the fixes and the counterexamples
+  --output <file>             write the report in a file, not on the output
   --version
 `;
 }
@@ -8922,43 +9980,57 @@ ${usage()}`);
   if (!args.files.length) {
     fail("no file to check\n\n" + usage());
   }
+  const files = args.files.flatMap((pattern) => expandGlob(pattern));
+  if (!files.length) {
+    fail(`no file matches ${args.files.join(", ")}
+
+` + usage());
+  }
   const reports = [];
-  for (const file of args.files) {
+  for (const file of files) {
     const source = file === "-" ? readFileSync(0, "utf8") : readFileSync(file, "utf8");
     const isTex = file === "-" ? true : extname(file) === ".tex";
     const extraction = extractDocument(source, isTex);
     const decls = [args.options.decls, ...extraction.decls].filter(Boolean).join("; ");
-    const report = check(extraction.rows.map((r) => r.text).join("\\\\\n"), {
-      ...args.options,
-      decls
-    });
+    const rows = extraction.rows.map((r) => r.text).join("\\\\\n");
+    const report = check(rows, { ...args.options, decls });
     for (const step of report.steps) {
       const row = extraction.rows.find((r) => step.text?.startsWith(r.text));
       step.line = row?.line ?? 0;
       step.column = 1;
     }
+    if (!args.options.noExplain) {
+      const explanations = explainAll(rows, { ...args.options, decls });
+      for (const step of report.steps) {
+        const explanation = explanations.get(step.id);
+        if (!explanation) continue;
+        step.fixes = explanation.fixes;
+        if (explanation.counterexample) step.counterexample = explanation.counterexample;
+      }
+    }
     reports.push({ file: file === "-" ? "stdin" : file, report, line: 0, column: 0 });
   }
-  switch (args.options.format) {
-    case "json":
-      print(
-        JSON.stringify(
+  const text = () => {
+    switch (args.options.format) {
+      case "json":
+        return JSON.stringify(
           reports.length === 1 ? reports[0].report : reports.map((r) => ({ file: r.file, ...r.report })),
           null,
           2
-        )
-      );
-      break;
-    case "sarif":
-      print(formatSarif(reports.map((r) => ({ file: r.file, report: r.report }))));
-      break;
-    case "github":
-      print(formatGithub(reports.map((r) => ({ file: r.file, report: r.report }))));
-      break;
-    default:
-      for (const r of reports) {
-        print(formatPretty(r.report, { file: r.file }));
-      }
+        );
+      case "sarif":
+        return formatSarif(reports.map((r) => ({ file: r.file, report: r.report })));
+      case "github":
+        return formatGithub(reports.map((r) => ({ file: r.file, report: r.report })));
+      default:
+        return reports.map((r) => formatPretty(r.report, { file: r.file })).join("\n");
+    }
+  };
+  if (args.options.output) {
+    writeFileSync(args.options.output, `${text()}
+`);
+  } else {
+    print(text());
   }
   const failing = reports.some(
     (r) => r.report.steps.some((step) => args.options.failOn.includes(step.verdict))

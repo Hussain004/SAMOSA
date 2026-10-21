@@ -6,7 +6,7 @@ branding:
   color: 'gold'
 inputs:
   path:
-    description: 'The files to check, as a glob.'
+    description: 'The files to check, as a glob. The glob is expanded by the command, so ** works.'
     required: false
     default: '**/*.tex'
   fail-on:
@@ -25,10 +25,24 @@ runs:
   using: 'composite'
   steps:
     - name: 'Check the derivation'
-      run: node $GITHUB_ACTION_PATH/pkg/dist/cli.mjs check ${{ inputs.path }} --format ${{ inputs.format }} --fail-on ${{ inputs.fail-on }} --seed ${{ inputs.seed }}
+      # The pattern is quoted, so the command expands it and the shell does
+      # not eat the stars. The SARIF goes in a file, because that is what the
+      # upload step reads; the other formats are printed, because that is
+      # what the annotations are made of.
+      run: |
+        if [ "${{ inputs.format }}" = "sarif" ]; then
+          node $GITHUB_ACTION_PATH/pkg/dist/cli.mjs check "${{ inputs.path }}" \
+            --format sarif --fail-on "${{ inputs.fail-on }}" --seed "${{ inputs.seed }}" \
+            --output samosa.sarif
+        else
+          node $GITHUB_ACTION_PATH/pkg/dist/cli.mjs check "${{ inputs.path }}" \
+            --format "${{ inputs.format }}" --fail-on "${{ inputs.fail-on }}" --seed "${{ inputs.seed }}"
+        fi
       shell: bash
     - name: 'Upload the results'
-      if: ${{ inputs.format == 'sarif' }}
+      # the upload runs even when the check fails, or the report of the
+      # failure would be lost
+      if: always() && inputs.format == 'sarif'
       uses: github/codeql-action/upload-sarif@v3
       with:
         sarif_file: samosa.sarif

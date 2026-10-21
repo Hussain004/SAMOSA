@@ -1,8 +1,9 @@
 #!/usr/bin/env node
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { basename, extname } from 'node:path';
 import { check, explainAll, type CheckOptions, type Report } from '../src/core/index.ts';
 import { extractDocument } from './extract.ts';
+import { expandGlob } from './glob.ts';
 import { formatGithub, formatPretty, formatSarif } from './format.ts';
 
 /**
@@ -23,6 +24,8 @@ interface Args {
     failOn: string[];
     /** the fixes and the counterexamples are not computed */
     noExplain: boolean;
+    /** the report goes in this file, and not on the standard output */
+    output?: string;
   };
 }
 
@@ -61,6 +64,9 @@ function parseArgs(argv: string[]): Args {
         break;
       case '--no-explain':
         args.options.noExplain = true;
+        break;
+      case '--output':
+        args.options.output = next();
         break;
       case '--seed':
         args.options.seed = Number(next());
@@ -111,6 +117,7 @@ Options:
   --trials <number>           the trials per size
   --layout <denominator|numerator>
   --no-explain                do not look for the fixes and the counterexamples
+  --output <file>             write the report in a file, not on the output
   --version
 `;
 }
@@ -141,8 +148,16 @@ function main(): void {
     fail('no file to check\n\n' + usage());
   }
 
+  // The file arguments are glob patterns, so "**/*.tex" finds the files in
+  // the folders as well. The shell does not do this on its own inside a
+  // GitHub Action.
+  const files = args.files.flatMap((pattern) => expandGlob(pattern));
+  if (!files.length) {
+    fail(`no file matches ${args.files.join(', ')}\n\n` + usage());
+  }
+
   const reports: FileReport[] = [];
-  for (const file of args.files) {
+  for (const file of files) {
     const source = file === '-' ? readFileSync(0, 'utf8') : readFileSync(file, 'utf8');
     const isTex = file === '-' ? true : extname(file) === '.tex';
     const extraction = extractDocument(source, isTex);
@@ -170,28 +185,31 @@ function main(): void {
     reports.push({ file: file === '-' ? 'stdin' : file, report, line: 0, column: 0 });
   }
 
-  switch (args.options.format) {
-    case 'json':
-      print(
-        JSON.stringify(
+  const text = (): string => {
+    switch (args.options.format) {
+      case 'json':
+        return JSON.stringify(
           reports.length === 1
             ? reports[0].report
             : reports.map((r) => ({ file: r.file, ...r.report })),
           null,
           2,
-        ),
-      );
-      break;
-    case 'sarif':
-      print(formatSarif(reports.map((r) => ({ file: r.file, report: r.report }))));
-      break;
-    case 'github':
-      print(formatGithub(reports.map((r) => ({ file: r.file, report: r.report }))));
-      break;
-    default:
-      for (const r of reports) {
-        print(formatPretty(r.report, { file: r.file }));
-      }
+        );
+      case 'sarif':
+        return formatSarif(reports.map((r) => ({ file: r.file, report: r.report })));
+      case 'github':
+        return formatGithub(reports.map((r) => ({ file: r.file, report: r.report })));
+      default:
+        return reports.map((r) => formatPretty(r.report, { file: r.file })).join('\n');
+    }
+  };
+
+  // the report goes in a file when the caller asks for it, which is what the
+  // GitHub Action does with the SARIF
+  if (args.options.output) {
+    writeFileSync(args.options.output, `${text()}\n`);
+  } else {
+    print(text());
   }
 
   const failing = reports.some((r) =>

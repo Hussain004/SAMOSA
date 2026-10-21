@@ -1,0 +1,68 @@
+name: The Action
+
+# The action is checked on its own: a paper with a wrong step must fail the
+# job, and the SARIF must be there for the upload.
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'action.yml'
+      - 'pkg/**'
+      - 'cli/**'
+      - 'tests/e2e/action/**'
+      - '.github/workflows/action.yml'
+  pull_request:
+    paths:
+      - 'action.yml'
+      - 'pkg/**'
+      - 'cli/**'
+      - 'tests/e2e/action/**'
+      - '.github/workflows/action.yml'
+  workflow_dispatch:
+
+jobs:
+  the-action:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # a derivation that holds
+      - name: 'Check a derivation that holds'
+        uses: ./
+        with:
+          path: 'tests/e2e/action/holds.tex'
+          format: pretty
+
+      # a derivation with a wrong step: the job must fail
+      - name: 'Check a derivation that is wrong'
+        id: wrong
+        continue-on-error: true
+        uses: ./
+        with:
+          path: 'tests/e2e/action/wrong.tex'
+          format: pretty
+
+      - name: 'The wrong derivation must fail the job'
+        if: steps.wrong.outcome == 'success'
+        run: |
+          echo "the action passed a derivation with a wrong step"
+          exit 1
+
+      # the SARIF must be written, so the upload has something to read
+      - name: 'Check a derivation and write the SARIF'
+        continue-on-error: true
+        uses: ./
+        with:
+          path: 'tests/e2e/action/wrong.tex'
+          format: sarif
+
+      - name: 'The SARIF must be there'
+        run: |
+          test -f samosa.sarif || (echo "no SARIF was written" && exit 1)
+          head -c 40 samosa.sarif
+          echo
