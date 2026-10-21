@@ -302,9 +302,12 @@ export function App() {
             report={report}
             explanation={selectedStep ? explanations[selectedStep] : undefined}
             onApplyFix={(fix) => {
-              if (!fix.edit) return;
-              const from = fix.edit.span.from;
-              const to = fix.edit.span.to;
+              if (!fix.edit || !step) return;
+              // the spans of a fix are offsets into its own row, so the row
+              // offset is added before the edit is applied
+              const offset = step.span.from;
+              const from = Math.max(0, Math.min(source.length, fix.edit.span.from + offset));
+              const to = Math.max(from, Math.min(source.length, fix.edit.span.to + offset));
               setSource(source.slice(0, from) + fix.edit.insert + source.slice(to));
             }}
             onCopy={copy}

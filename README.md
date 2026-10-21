@@ -191,15 +191,9 @@ Issues and pull requests are welcome. The best ones come with a derivation
 that SAMOSA gets wrong: a notation it cannot read, a step it should catch
 and does not, or a false checkmark. Those are the bugs that matter.
 
-## License
-
-MIT, see [LICENSE](LICENSE).
-
 ---
 
 <div align="center">
-
-**Built with love for the people who check their derivations twice**
 
 *If SAMOSA saves you a wrong step, consider giving it a ⭐ on [GitHub](https://github.com/Hussain004/SAMOSA)!*
 
