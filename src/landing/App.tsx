@@ -59,7 +59,7 @@ function Header() {
 
   return (
     <header className="sticky top-0 z-30 border-b border-[var(--color-line)] bg-[#0b0a08cc] backdrop-blur-md">
-      <div className="mx-auto flex max-w-[1180px] items-center gap-6 px-6 py-4">
+      <div className="mx-auto flex max-w-[1180px] items-center gap-4 overflow-x-auto px-6 py-4 sm:gap-6">
         <a href="/" className="flex items-center gap-2 text-[var(--color-gold)]">
           <span className="text-lg leading-none">∇</span>
           <span className="text-sm tracking-[0.2em]">SAMOSA</span>
@@ -68,22 +68,28 @@ function Header() {
           step auditor for matrix math
         </span>
         <nav className="ml-auto flex items-center gap-5 text-[13px] text-[var(--color-muted)]">
-          <a href="#how" className="hover:text-[var(--color-text)]">
+          <a href="#how" className="hidden hover:text-[var(--color-text)] sm:inline">
             How it works
           </a>
-          <a href="#menu" className="hover:text-[var(--color-text)]">
+          <a href="#menu" className="hidden hover:text-[var(--color-text)] sm:inline">
             Menu
           </a>
-          <a href="#install" className="hover:text-[var(--color-text)]">
+          <a href="#install" className="hidden hover:text-[var(--color-text)] sm:inline">
             Install
+          </a>
+          <a href="/docs/HOW_IT_WORKS.md" className="hidden hover:text-[var(--color-text)] md:inline">
+            Docs
+          </a>
+          <a href="/docs/CHANGELOG.md" className="hidden hover:text-[var(--color-text)] md:inline">
+            Changelog
           </a>
           <a
             href="https://github.com/Hussain004/SAMOSA"
             target="_blank"
             rel="noreferrer"
-            className="hover:text-[var(--color-text)]"
+            className="whitespace-nowrap hover:text-[var(--color-text)]"
           >
-            ★ GitHub{stars ? ` ${stars}` : ''}
+            ★ GitHub{stars && stars >= 50 ? ` ${stars}` : ''}
           </a>
           <a
             href="/app"
@@ -109,7 +115,7 @@ function Hero() {
   return (
     <section className="dotted relative">
       <div className="mx-auto grid max-w-[1180px] items-center gap-10 px-6 py-16 md:grid-cols-[1fr_1.15fr] md:py-24">
-        <div>
+        <div className="order-2 md:order-1">
           <h1 className="font-display text-[clamp(34px,4.6vw,70px)] leading-[1.02]">
             <span className="whitespace-nowrap">Derive more.</span>
             <br />
@@ -126,7 +132,9 @@ function Hero() {
             <CopyChip text="npx samosa-math check paper.tex" />
           </div>
         </div>
-        <AsciiSamosa />
+        <div className="order-1 md:order-2">
+          <AsciiSamosa />
+        </div>
       </div>
     </section>
   );
@@ -168,7 +176,7 @@ function CopyChip({ text }: { text: string }) {
       }}
       className="rounded border border-[var(--color-line)] bg-[var(--color-panel)] px-4 py-3 text-[13px] text-[var(--color-text)] transition-colors hover:border-[var(--color-gold)]"
     >
-      {copied ? '✓ copied' : `$ ${text}`}
+      {copied ? '✓ copied' : text}
     </button>
   );
 }
@@ -235,17 +243,44 @@ function Tour() {
           title="The line nobody checks"
           body="The moment every derivation has: after some algebraic manipulation, we may obtain. SAMOSA reads that line, evaluates it over a finite field, and brings a counterexample you can read."
         />
-        <video
-          className="mt-8 w-full rounded-lg border border-[var(--color-line)]"
-          src="/brag.mp4"
-          poster="/brag.jpg"
-          autoPlay
-          muted
-          loop
-          playsInline
-        />
+        <TourVideo />
       </div>
     </section>
+  );
+}
+
+/**
+ * The tour.
+ *
+ * The video is only fetched when it scrolls into the screen, so the page does
+ * not pay for it before it is needed.
+ */
+function TourVideo() {
+  const ref = useRef<HTMLVideoElement | null>(null);
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) void node.play().catch(() => {});
+        else node.pause();
+      },
+      { threshold: 0.25 },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+  return (
+    <video
+      ref={ref}
+      className="mt-8 w-full rounded-lg border border-[var(--color-line)]"
+      src="/brag.mp4"
+      poster="/brag.jpg"
+      muted
+      loop
+      playsInline
+      preload="none"
+    />
   );
 }
 
@@ -288,14 +323,14 @@ function Features() {
       <div className="mx-auto max-w-[1180px] px-6 py-20">
         <SectionHead
           eyebrow="what it does"
-          title="Six things, all of them useful"
+          title={`${FEATURES.length} things, all of them useful`}
           body="SAMOSA never guesses. When it does not know, it says so, and tells you what to declare."
         />
         <div className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map((feature) => (
             <div
               key={feature.title}
-              className="group rounded border border-[var(--color-line)] bg-[var(--color-ink)] p-5 transition-colors hover:border-[var(--color-gold)]/50"
+              className="group min-w-0 rounded border border-[var(--color-line)] bg-[var(--color-ink)] p-5 transition-colors hover:border-[var(--color-gold)]/50"
             >
               <h3 className="text-[15px] font-medium">{feature.title}</h3>
               <p className="mt-2 text-[13px] leading-relaxed text-[var(--color-muted)]">{feature.body}</p>
@@ -314,7 +349,7 @@ function CounterexampleMock() {
       <MockLine tone="bad">
         ✗ row {MOCKS.counterexample.row} · the two sides are not equal
       </MockLine>
-      <pre className="mt-2 text-[11px] leading-relaxed text-[var(--color-muted)]">
+      <pre className="mt-2 overflow-x-auto text-[11px] leading-relaxed text-[var(--color-muted)]">
         {formatValues(MOCKS.counterexample.values, MOCKS.counterexample.derived)}
       </pre>
     </Mock>
@@ -347,7 +382,7 @@ function FixMock() {
   return (
     <Mock>
       <MockLine tone="plain">{MOCKS.fix.title}</MockLine>
-      <pre className="mt-2 text-[11px] leading-relaxed text-[var(--color-muted)]">
+      <pre className="mt-2 overflow-x-auto text-[11px] leading-relaxed text-[var(--color-muted)]">
         {MOCKS.fix.edit}
       </pre>
     </Mock>
@@ -360,7 +395,7 @@ function ShapeMock() {
       <MockLine tone="bad">
         ⊘ row {MOCKS.shape.row} · {MOCKS.shape.message}
       </MockLine>
-      <pre className="mt-2 text-[11px] leading-relaxed text-[var(--color-muted)]">
+      <pre className="mt-2 overflow-x-auto text-[11px] leading-relaxed text-[var(--color-muted)]">
         {`C_t is m by n
 the inner sizes do not match
 
@@ -374,7 +409,7 @@ function GradientMock() {
   return (
     <Mock>
       <MockLine tone="bad">✗ row {MOCKS.layout.row} · the numerator layout</MockLine>
-      <pre className="mt-2 text-[11px] leading-relaxed text-[var(--color-muted)]">
+      <pre className="mt-2 overflow-x-auto text-[11px] leading-relaxed text-[var(--color-muted)]">
         {`the gradient has the shape
 of the variable it is taken with
 respect to. Transpose it.`}
@@ -387,7 +422,7 @@ function GuaranteeMock() {
   return (
     <Mock>
       <MockLine tone="ok">✓ row 11 · holds at every size tested</MockLine>
-      <pre className="mt-2 text-[11px] leading-relaxed text-[var(--color-muted)]">
+      <pre className="mt-2 overflow-x-auto text-[11px] leading-relaxed text-[var(--color-muted)]">
         {`sizes (3,2) (2,3) (4,3)
 6 trials each · 2 primes
 d ≤ 43 · false-✓ ≤ 1e-46`}
@@ -530,7 +565,7 @@ function DeepDives() {
       <div className="mx-auto max-w-[1180px] px-6 py-20">
         <SectionHead
           eyebrow="how it works"
-          title="Five ideas, no magic"
+          title={`${DEEP_DIVES.length} ideas, no magic`}
           body="There is no model in the loop. There is arithmetic, a finite field and a probability bound."
         />
         <div className="mt-12 space-y-10">
@@ -566,7 +601,7 @@ function MenuSection() {
       <div className="mx-auto max-w-[1180px] px-6 py-20">
         <SectionHead
           eyebrow="the menu"
-          title="Fifteen derivations to try"
+          title={`${MENU.length} derivations to try`}
           body="Woodbury, the Kalman update, backprop, Gaussian expectations. Each one has a planted bug, and a spot the bug game."
         />
         <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -574,11 +609,11 @@ function MenuSection() {
             <a
               key={item.id}
               href={`/app#menu=${item.id}`}
-              className="rounded border border-[var(--color-line)] bg-[var(--color-ink)] p-4 transition-colors hover:border-[var(--color-gold)]/60"
+              className="block min-w-0 max-w-full overflow-hidden rounded border border-[var(--color-line)] bg-[var(--color-ink)] p-4 transition-colors hover:border-[var(--color-gold)]/60"
             >
               <h3 className="text-[14px] font-medium">{item.title}</h3>
               <p className="mt-1 text-[12px] leading-relaxed text-[var(--color-faint)]">{item.blurb}</p>
-              <div className="mt-3 overflow-x-auto text-[14px]" dangerouslySetInnerHTML={{ __html: RENDERED.menu[item.id] ?? '' }} />
+              <div className="mt-3 max-w-full overflow-x-auto text-[14px]" dangerouslySetInnerHTML={{ __html: RENDERED.menu[item.id] ?? '' }} />
               <p className="mt-2 text-[11px] text-[var(--color-faint)]">spot the bug →</p>
             </a>
           ))}
@@ -594,33 +629,46 @@ const TABS = [
     id: 'web',
     label: 'Web',
     body: 'Open the app, paste a derivation, read the verdicts. Everything runs in your browser, and the share link keeps it in the URL fragment.',
+    snippet: 'https://samosa-math.vercel.app/app',
   },
   {
     id: 'cli',
     label: 'CLI',
-    body: 'npx samosa-math check paper.tex\nnpx samosa-math check notes.md --format sarif --fail-on wrong,shape',
+    body: 'The CLI reads a paper, a note or the standard input, and prints the verdicts in the format you ask for.',
+    snippet: 'npx samosa-math check paper.tex --format sarif',
   },
   {
     id: 'claude',
     label: 'Claude Code',
-    body: 'claude mcp add samosa -- npx -y -p samosa-math samosa-mcp',
+    body: 'The MCP server gives an agent the same engine, with the counterexamples and the fixes.',
+    snippet: 'claude mcp add samosa -- npx -y -p samosa-math samosa-mcp',
   },
   {
     id: 'codex',
     label: 'Codex',
-    body: '[mcp_servers.samosa]\ncommand = "npx"\nargs = ["-y", "-p", "samosa-math", "samosa-mcp"]',
+    body: 'The same server, in the config file Codex reads.',
+    snippet: '[mcp_servers.samosa]\ncommand = "npx"\nargs = ["-y", "-p", "samosa-math", "samosa-mcp"]',
   },
   {
     id: 'cursor',
     label: 'Cursor',
-    body: '{ "mcpServers": { "samosa": { "command": "npx", "args": ["-y", "-p", "samosa-math", "samosa-mcp"] } } }',
+    body: 'The same server, in the config file Cursor reads.',
+    snippet: '{ "mcpServers": { "samosa": { "command": "npx", "args": ["-y", "-p", "samosa-math", "samosa-mcp"] } } }',
+  },
+  {
+    id: 'skill',
+    label: 'Skill',
+    body: 'The Agent Skill lives in the repository, and it teaches an agent how to write a derivation SAMOSA can check.',
+    snippet: 'npx skills add Hussain004/SAMOSA',
   },
   {
     id: 'action',
     label: 'GitHub Action',
-    body: '- uses: Hussain004/SAMOSA@v1\n  with:\n    path: "paper/**/*.tex"\n    fail-on: "wrong,shape"',
+    body: 'The action checks every paper in a pull request, and a wrong step fails the build.',
+    snippet: '- uses: Hussain004/SAMOSA@v1\n  with:\n    path: "paper/**/*.tex"\n    fail-on: "wrong,shape"',
   },
 ];
+
 
 function Install() {
   const [tab, setTab] = useState(0);
@@ -682,7 +730,12 @@ function Install() {
             </button>
           ))}
         </div>
-        <CopyChip text={TABS[tab].body} />
+        <p className="mt-4 max-w-[640px] text-[13px] leading-relaxed text-[var(--color-muted)]">
+          {TABS[tab].body}
+        </p>
+        <div className="mt-3">
+          <CopyChip text={TABS[tab].snippet} />
+        </div>
       </div>
     </section>
   );
