@@ -182,7 +182,8 @@ pnpm build:pkg      # the npm package
 
 The engine lives in `src/core` and imports nothing from the DOM or from
 Node, so the same code runs in the browser, in the CLI and in the MCP
-server. The rules it lives by are in [AGENTS.md](AGENTS.md).
+server. The rules it lives by: no model in the verdict path, never a
+checkmark without a guarantee, and nothing that leaves the machine.
 
 ## Contributing
 
@@ -190,17 +191,18 @@ Issues and pull requests are welcome. The best ones come with a derivation
 that SAMOSA gets wrong: a notation it cannot read, a step it should catch
 and does not, or a false checkmark. Those are the bugs that matter.
 
-## Cite
-
-```bibtex
-@software{samosa2026,
-  author = {Hussain},
-  title  = {SAMOSA: a step auditor for matrix derivations},
-  year   = {2026},
-  url    = {https://github.com/Hussain004/SAMOSA}
-}
-```
-
 ## License
 
 MIT, see [LICENSE](LICENSE).
+
+---
+
+<div align="center">
+
+**Built with love for the people who check their derivations twice**
+
+*If SAMOSA saves you a wrong step, consider giving it a ⭐ on [GitHub](https://github.com/Hussain004/SAMOSA)!*
+
+*Want to support development directly? [Donate here](https://donatr.ee/hussain/)*
+
+</div>

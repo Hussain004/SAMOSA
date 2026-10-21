@@ -63,6 +63,8 @@ export function repairs(
 
   out.push(...residualRepairs(sh));
 
+  // the smallest edit first, then the order the rules were tried in
+  out.sort((a, b) => editSize(a) - editSize(b));
   return out.slice(0, 3);
 }
 
@@ -121,6 +123,21 @@ const MUTATIONS: Mutation[] = [
     apply: (node) => {
       if (node.k !== 'op' || node.op !== 'T') return null;
       return node.args[0];
+    },
+  },
+  {
+    id: 'A4',
+    title: 'an inverse where there should be none, or the other way round',
+    apply: (node) => {
+      if (node.k === 'op' && node.op === 'inv') return node.args[0];
+      if (node.k === 'op' && (node.op === 'mul' || node.op === 'add' || node.op === 'sub')) {
+        for (const arg of node.args) {
+          if (arg.k === 'op' && arg.op === 'inv' && !isInvertedTwice(arg)) {
+            return { ...node, args: node.args.map((a) => (a === arg ? a.args[0] : a)) };
+          }
+        }
+      }
+      return null;
     },
   },
   {
@@ -204,6 +221,17 @@ const MUTATIONS: Mutation[] = [
     },
   },
 ];
+
+/** How big is the edit a fix proposes? */
+function editSize(fix: Fix): number {
+  if (!fix.edit) return 0;
+  return fix.edit.insert.length;
+}
+
+/** Is this inverse already inside an inverse? Then unwrapping it changes nothing. */
+function isInvertedTwice(node: Extract<Node, { k: 'op' }>): boolean {
+  return node.args[0]?.k === 'op' && node.args[0].op === 'inv';
+}
 
 /** Every node of a tree, with its path. */
 function walk(node: Node, path: number[] = []): Array<{ node: Node; path: number[] }> {

@@ -240,18 +240,21 @@ export class Parser {
   private applyScripts(base: Node, accents: string[], baseLatex: string): Node {
     let sub: string | null = null;
     let labelSup: string | null = null;
+    let spanEnd = base.span.to;
     const scripts: Array<{ kind: 'transpose' | 'inverse' | 'inverseT' | 'power'; text?: string; to: number }> = [];
 
     if (this.kind() === 'sub') {
       this.pos++;
       const s = this.readSubscript();
       sub = s.text;
+      spanEnd = s.span.to;
     }
 
     while (this.kind() === 'sup') {
       this.pos++;
       const sup = this.readSuperscript();
       const classified = classifySuperscript(sup.text);
+      spanEnd = sup.span.to;
       if (classified.kind === 'label') {
         labelSup = sup.text;
         continue;
@@ -262,7 +265,10 @@ export class Parser {
     // the symbol keeps its subscript and its label, whatever happens to the scripts
     let node: Node = base;
     if (node.k === 'sym') {
-      node = this.makeSym(accents, baseLatex, sub, labelSup, node.span);
+      node = this.makeSym(accents, baseLatex, sub, labelSup, {
+        from: node.span.from,
+        to: spanEnd,
+      });
     }
 
     for (const script of scripts) {
@@ -702,8 +708,9 @@ export class Parser {
     }
 
     if (ACCENTS.has(name)) {
+      const accentSpan = { from: t.from, to: t.to };
       this.pos++;
-      const base = this.parseAccentBase(name);
+      const base = this.parseAccentBase(name, accentSpan);
       if (base.k === 'sym' && this.kind() === 'lparen') {
         const density = base.name.match(/^\\mathcal([NU])$/);
         if (density) {
@@ -729,19 +736,20 @@ export class Parser {
   }
 
   /** Reads the base of an accent: a letter, a single symbol, or a one item group. */
-  private parseAccentBase(accent: string): Node {
-    const startTok = this.cur;
+  private parseAccentBase(accent: string, accentSpan: Span): Node {
     let baseLatex: string;
-    let span: Span = { from: startTok.from, to: startTok.to };
+    // the span starts at the accent, so the whole symbol is covered
+    let span: Span = { from: accentSpan.from, to: accentSpan.to };
     let accents: string[] = [];
 
     if (this.kind() === 'ident') {
       const t = this.cur;
       this.pos++;
       baseLatex = t.value;
-      span = { from: t.from, to: t.to };
+      span = { from: accentSpan.from, to: t.to };
     } else if (this.kind() === 'lbrace') {
       const g = this.rawGroupText();
+      span = { from: accentSpan.from, to: g.span.to };
       const inner = new Parser(tokenize(g.text), g.text, this.opts);
       const node = inner.parsePrimary();
       if (node.k === 'sym') {
@@ -757,7 +765,7 @@ export class Parser {
         const t = this.cur;
         this.pos++;
         baseLatex = `\\${t.value}`;
-        span = { from: t.from, to: t.to };
+        span = { from: accentSpan.from, to: t.to };
       } else {
         const sub = this.parseCommand();
         if (sub.k === 'sym') {
@@ -771,7 +779,7 @@ export class Parser {
       const t = this.cur;
       this.pos++;
       baseLatex = t.value;
-      span = { from: t.from, to: t.to };
+      span = { from: accentSpan.from, to: t.to };
     }
 
     // stacking accents, such as \bar{\hat{x}}

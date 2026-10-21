@@ -210,17 +210,22 @@ function describe<T>(
   const dims: Record<string, number> = {};
   for (const [k, v] of sizes) dims[k] = v;
 
+  // the field elements are shown as the small signed integers they are
+  const signed = (x: number): number => {
+    const p = 2147483647;
+    return x > p / 2 ? x - p : x;
+  };
   const plain: Record<string, number[] | number> = {};
   for (const [name, val] of values) {
-    plain[name] = val.k === 's' ? field.toNumber(val.v) : val.m.d.map((x) => field.toNumber(x));
+    plain[name] = val.k === 's' ? signed(field.toNumber(val.v)) : val.m.d.map((x) => signed(field.toNumber(x)));
   }
-  const lhsPlain = lhs.k === 's' ? field.toNumber(lhs.v) : lhs.m.d.map((x) => field.toNumber(x));
-  const rhsPlain = rhs.k === 's' ? field.toNumber(rhs.v) : rhs.m.d.map((x) => field.toNumber(x));
+  const lhsPlain = lhs.k === 's' ? signed(field.toNumber(lhs.v)) : lhs.m.d.map((x) => signed(field.toNumber(x)));
+  const rhsPlain = rhs.k === 's' ? signed(field.toNumber(rhs.v)) : rhs.m.d.map((x) => signed(field.toNumber(x)));
   const diffPlain =
     lhs.k === 's' && rhs.k === 's'
-      ? field.toNumber(lhs.v) - field.toNumber(rhs.v)
+      ? signed(field.toNumber(lhs.v) - field.toNumber(rhs.v))
       : lhs.k === 'm' && rhs.k === 'm'
-        ? lhs.m.d.map((x, i) => field.toNumber(x) - field.toNumber(rhs.m.d[i]))
+        ? lhs.m.d.map((x, i) => signed(field.toNumber(x) - field.toNumber(rhs.m.d[i])))
         : 0;
 
   return {
@@ -284,6 +289,7 @@ export function numpySnippet(
   lines.push('');
   lines.push(`# ${lhsText} - ${rhsText} is not zero with these values`);
   lines.push(`# sizes: ${Object.entries(dims).map(([k, v]) => `${k}=${v}`).join(', ')}`);
+  lines.push('# the values above are the ones SAMOSA found; the two sides differ with them');
   void map;
   return lines.join('\n');
 }

@@ -67,8 +67,8 @@ function renderSymbol(name: string): string {
     sup = name.slice(supIndex);
   }
   let out = base;
-  if (sub) out += `_{${sub}}`;
-  if (sup) out += `^{${sup}}`;
+  if (sub) out += sub.length === 1 ? `_${sub}` : `_{${sub}}`;
+  if (sup) out += sup.length === 1 ? `^${sup}` : `^{${sup}}`;
   return out;
 }
 
@@ -92,7 +92,7 @@ function renderOp(node: Extract<Node, { k: 'op' }>): string {
     case 'invT':
       return `{${a[0]}}^{-\\top}`;
     case 'T':
-      return `{${a[0]}}^{\\top}`;
+      return `{${a[0]}}^\\top`;
     case 'tr':
       return `\\operatorname{tr}\\left(${a[0]}\\right)`;
     case 'det':

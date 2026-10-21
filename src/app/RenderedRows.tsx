@@ -152,19 +152,19 @@ function escapeHtml(text: string): string {
 /**
  * The LaTeX of a step, with the wrong part wrapped in a highlight.
  *
- * The spans are offsets into the whole source, so the source is what gets
- * sliced. The row text is only used when there is no source to slice.
+ * The spans of a step are offsets into its own row, so the row text is what
+ * gets sliced.
  */
-function stepLaTeX(step: StepResult, source: string): string {
-  const text = source || step.text || '';
+function stepLaTeX(step: StepResult, _source: string): string {
+  const text = step.text ?? '';
   if (!text) return '';
   if (step.verdict === 'wrong' && step.lhsSpan && step.rhsSpan) {
     const lhs = text.slice(step.lhsSpan.from, step.lhsSpan.to);
     const relation = text.slice(step.lhsSpan.to, step.rhsSpan.from).replace(/&/g, '');
-    const rhs = text.slice(step.rhsSpan.to);
+    const rhs = text.slice(step.rhsSpan.from);
     return `${tex(lhs)}${tex(relation)}\\htmlClass{samosa-hl}{${tex(rhs)}}`;
   }
-  return tex(step.text ?? text);
+  return tex(text);
 }
 
 /** The LaTeX of a piece of a row, with the alignment markers removed. */
