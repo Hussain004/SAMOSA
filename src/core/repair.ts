@@ -101,8 +101,14 @@ interface Mutation {
   apply: (node: Node) => Node | null;
 }
 
-/** The mistake catalog of Appendix B, in the shapes the IR can express. */
-const MUTATIONS: Mutation[] = [
+/**
+ * The mistake catalog of Appendix B, in the shapes the IR can express.
+ *
+ * It is exported so that the corpus can generate its mutants from the same
+ * list the repairs use: a mutant and a repair are the same thing seen from
+ * the two sides.
+ */
+export const MUTATIONS: Mutation[] = [
   {
     id: 'T1',
     title: 'the transpose of a product keeps the order',
@@ -259,7 +265,7 @@ function isInvertedTwice(node: Extract<Node, { k: 'op' }>): boolean {
 }
 
 /** Every node of a tree, with its path. */
-function walk(node: Node, path: number[] = []): Array<{ node: Node; path: number[] }> {
+export function walk(node: Node, path: number[] = []): Array<{ node: Node; path: number[] }> {
   const out = [{ node, path }];
   const children: Node[] =
     node.k === 'op' || node.k === 'call'
@@ -278,7 +284,7 @@ function walk(node: Node, path: number[] = []): Array<{ node: Node; path: number
 }
 
 /** Replaces one node of a tree with another. */
-function replaceAt(node: Node, path: number[], replacement: Node): Node {
+export function replaceAt(node: Node, path: number[], replacement: Node): Node {
   if (path.length === 0) return replacement;
   const [head, ...rest] = path;
   if (node.k === 'op' || node.k === 'call') {

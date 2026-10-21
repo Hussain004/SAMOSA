@@ -93,21 +93,43 @@ async function record(name, script) {
   await context.close();
   const raw = await video.path();
 
-  // The GIF keeps every pixel of the recording, so the text stays legible.
-  // The idle seconds at the start are trimmed, and the palette is built from
-  // the parts that change.
+  // The video: the same recording, in colour and at full resolution. It is
+  // the one to watch, and the GIF is the one that plays in the readme.
   execFileSync('ffmpeg', [
     '-y',
     '-i',
     raw,
     '-vf',
-    'trim=start=1.2,setpts=PTS-STARTPTS,fps=10,scale=1080:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=128:stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=3',
+    'trim=start=1.2,setpts=PTS-STARTPTS,fps=20,scale=1080:-1:flags=lanczos',
+    '-c:v',
+    'libx264',
+    '-pix_fmt',
+    'yuv420p',
+    '-preset',
+    'slow',
+    '-crf',
+    '20',
+    '-movflags',
+    '+faststart',
+    resolve(OUT, `${name}.mp4`),
+  ]);
+
+  // The GIF keeps every pixel of the recording, so the text stays legible.
+  // The idle seconds at the start are trimmed, the palette has every colour
+  // the screen uses, and there is no dithering: the noise of the dither is
+  // what makes a recorded text look rough.
+  execFileSync('ffmpeg', [
+    '-y',
+    '-i',
+    raw,
+    '-vf',
+    'trim=start=1.2,setpts=PTS-STARTPTS,fps=10,scale=1080:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=256:stats_mode=diff[p];[s1][p]paletteuse=dither=none:diff_mode=rectangle',
     '-loop',
     '0',
     resolve(OUT, `${name}.gif`),
   ]);
   rmSync(dir, { recursive: true, force: true });
-  console.log(`  ${name}.gif`);
+  console.log(`  ${name}.gif and ${name}.mp4`);
 }
 
 /** Scrolls the inspector down to the counterexample. */

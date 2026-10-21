@@ -84,15 +84,21 @@ takes one keystroke.
 
 ![A transposed product is flagged, the counterexample is small, and the fix applies](public/gifs/transpose.gif)
 
+[watch it in colour](public/gifs/transpose.mp4)
+
 **The Kalman update, with the missing noise term.** The row everybody writes
 from memory, and the term that is not there.
 
 ![The Kalman measurement update, with the row that is wrong](public/gifs/kalman.gif)
 
+[watch it in colour](public/gifs/kalman.mp4)
+
 **A gradient in the wrong layout.** The numerator layout is a transpose away
 from the right answer, and SAMOSA says so.
 
 ![A gradient in the numerator layout, with the hint](public/gifs/gradient.gif)
+
+[watch it in colour](public/gifs/gradient.mp4)
 
 ## Quick start
 
