@@ -31,9 +31,6 @@
   "homepage": "https://samosa-math.vercel.app",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.1",
-    "@unified-latex/unified-latex-util-parse": "^1.8.4",
-    "@unified-latex/unified-latex-util-split": "^1.8.4",
-    "@unified-latex/unified-latex-util-environments": "^1.8.4",
     "decimal.js": "^10.6.0",
     "zod": "^4.6.7"
   },

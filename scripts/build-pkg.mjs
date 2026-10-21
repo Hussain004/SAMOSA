@@ -28,7 +28,8 @@ await build({
   ...shared,
   entryPoints: [resolve(root, 'cli/bin.ts')],
   outfile: resolve(out, 'cli.mjs'),
-  external: ['@unified-latex/unified-latex-util-parse', '@unified-latex/unified-latex-util-split', '@unified-latex/unified-latex-util-environments'],
+  // The CLI is one file with no dependencies, so the Action can run it from
+  // a checkout with nothing installed.
 });
 
 await build({
@@ -62,10 +63,8 @@ writeFileSync(
       repository: { type: 'git', url: 'git+https://github.com/Hussain004/SAMOSA.git' },
       homepage: 'https://samosa-math.vercel.app',
       dependencies: {
+        // the MCP server needs these; the CLI has everything inside it
         '@modelcontextprotocol/sdk': '^1.32.1',
-        '@unified-latex/unified-latex-util-parse': '^1.8.4',
-        '@unified-latex/unified-latex-util-split': '^1.8.4',
-        '@unified-latex/unified-latex-util-environments': '^1.8.4',
         'decimal.js': '^10.6.0',
         'zod': '^4.6.7',
       },
