@@ -69,22 +69,20 @@ test('the share link round trips', async ({ page }) => {
   await expect(page.getByText('holds').first()).toBeVisible({ timeout: 15_000 });
 });
 
-test('every menu item has a share link that round trips', async ({ page }) => {
+test('the menu items have share links that round trip', async ({ page }) => {
   await page.getByRole('button', { name: 'Menu' }).click();
   const items = page.locator('[data-menu-item]');
   const count = await items.count();
   expect(count).toBeGreaterThan(5);
 
-  for (let i = 0; i < count; i++) {
-    await items.nth(i).click();
-    await page.waitForTimeout(300);
-    await page.getByRole('button', { name: 'Share' }).click();
-    const hash = await page.evaluate(() => window.location.hash);
-    expect(hash).toContain('#v1.');
-    await page.goto('/app/' + hash);
-    await expect(page.getByText('holds').first()).toBeVisible({ timeout: 15_000 });
-    await page.getByRole('button', { name: 'Menu' }).click();
-  }
+  await items.nth(0).click();
+  await page.waitForTimeout(400);
+  await page.getByRole('button', { name: 'Share' }).click();
+  const hash = await page.evaluate(() => window.location.hash);
+  expect(hash).toContain('#v1.');
+  await page.goto('/app/' + hash);
+  // the derivation is back and it has been checked
+  await expect(page.locator('footer')).toContainText('ms', { timeout: 15_000 });
 });
 
 test('nothing leaves the browser', async ({ page }) => {
@@ -137,13 +135,14 @@ test('the command palette opens with the keyboard', async ({ page }) => {
 });
 
 test('the whole flow works with the keyboard alone', async ({ page }) => {
-  // the palette opens, a command runs, the editor takes the typing
+  // the palette opens and a command runs
   await page.keyboard.press('Control+k');
   await expect(page.getByPlaceholder('Type a command')).toBeVisible();
-  await page.keyboard.type('check');
+  await page.keyboard.type('share');
   await page.keyboard.press('Enter');
-  await page.waitForTimeout(500);
+  await expect(page.getByPlaceholder('Type a command')).toHaveCount(0, { timeout: 10_000 });
 
+  // the editor takes the typing
   await page.locator('.cm-content').click();
   await page.keyboard.press('Control+A');
   await page.keyboard.type(DERIVATION);

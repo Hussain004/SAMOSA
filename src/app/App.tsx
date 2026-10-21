@@ -114,7 +114,7 @@ export function App() {
 
   return (
     <div className="flex h-full flex-col bg-[var(--color-ink)] text-[var(--color-text)]">
-      <header className="flex shrink-0 items-center gap-3 border-b border-[var(--color-line)] px-4 py-2.5">
+      <header className="flex shrink-0 items-center gap-3 overflow-x-auto border-b border-[var(--color-line)] px-4 py-2.5 whitespace-nowrap">
         <a href="/" className="flex items-center gap-2 text-sm text-[var(--color-gold)]">
           <span className="text-lg leading-none">∇</span>
           <span className="tracking-[0.18em]">SAMOSA</span>
@@ -249,7 +249,7 @@ export function App() {
         </div>
       )}
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-2">
+      <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(140px,2fr)_minmax(160px,3fr)] md:grid-rows-1 md:grid-cols-2">
         <section className="flex min-h-0 flex-col border-b border-[var(--color-line)] md:border-b-0 md:border-r">
           <div className="flex items-center justify-between px-3 py-1.5">
             <span className="pane-title">source</span>
@@ -317,10 +317,10 @@ export function App() {
         </div>
       </section>
 
-      <footer className="flex shrink-0 items-center gap-4 border-t border-[var(--color-line)] px-4 py-1.5 text-[11px] text-[var(--color-muted)]">
+      <footer className="flex shrink-0 items-center gap-4 overflow-x-auto border-t border-[var(--color-line)] px-4 py-1.5 text-[11px] whitespace-nowrap text-[var(--color-muted)]">
         <span className="text-[var(--color-chutney)]">●</span>
-        <span>all checks local, nothing uploaded</span>
-        <span className="text-[var(--color-faint)]">·</span>
+        <span className="hidden sm:inline">all checks local, nothing uploaded</span>
+        <span className="hidden text-[var(--color-faint)] sm:inline">·</span>
         <span>seed 0x{settings.seed.toString(16).toUpperCase()}</span>
         <span className="text-[var(--color-faint)]">·</span>
         {spotTheBug && !revealed ? (
