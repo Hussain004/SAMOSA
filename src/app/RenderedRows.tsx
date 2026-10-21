@@ -115,7 +115,7 @@ function Row({
       <span className="mt-1 w-6 shrink-0 text-right text-[10px] tabular-nums text-[var(--color-faint)]">
         {step.row}
       </span>
-      <div className="min-w-0 flex-1 overflow-x-auto">
+      <div className="min-w-0 flex-1 overflow-x-auto overflow-y-hidden py-0.5">
         <div className="text-[15px] leading-8" dangerouslySetInnerHTML={{ __html: html }} />
         {step.annotation && (
           <p className="mt-0.5 text-xs text-[var(--color-faint)]">{step.annotation}</p>

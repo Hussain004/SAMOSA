@@ -72,6 +72,11 @@ const DEFAULT_SETTINGS: Settings = {
 
 let worker: Worker | null = null;
 let pending = 0;
+/** the timer of the request that is running, and when it started */
+let watchdog: number | undefined;
+
+/** A check that takes longer than this is a check that will not end. */
+const TIMEOUT_MS = 3000;
 
 function getWorker(): Worker {
   if (!worker) {
@@ -79,6 +84,7 @@ function getWorker(): Worker {
     worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
       const response = event.data;
       if (response.gen < pending) return;
+      stopWatchdog();
       const state = useApp.getState();
       if (response.type === 'report') {
         useApp.setState({ report: response.report, busy: false, error: null });
@@ -92,6 +98,34 @@ function getWorker(): Worker {
     };
   }
   return worker;
+}
+
+/**
+ * The watchdog.
+ *
+ * A pathological derivation can keep the worker busy for ever, because the
+ * budget is checked between the steps and not inside them. So a request
+ * that takes too long gets the worker killed, a new one is started, and the
+ * row is said to be not checked.
+ */
+function startWatchdog(gen: number): void {
+  stopWatchdog();
+  watchdog = window.setTimeout(() => {
+    worker?.terminate();
+    worker = null;
+    if (gen < pending) return;
+    useApp.setState({
+      busy: false,
+      error: 'the check took too long, so the row was not checked',
+    });
+  }, TIMEOUT_MS);
+}
+
+function stopWatchdog(): void {
+  if (watchdog !== undefined) {
+    window.clearTimeout(watchdog);
+    watchdog = undefined;
+  }
 }
 
 export function runCheck(source: string, settings: Settings): void {
@@ -110,6 +144,7 @@ export function runCheck(source: string, settings: Settings): void {
     },
   };
   getWorker().postMessage(request);
+  startWatchdog(gen);
 }
 
 export function runExplain(source: string, stepId: string, settings: Settings): void {

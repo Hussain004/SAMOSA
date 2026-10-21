@@ -60,14 +60,20 @@ export function Inspector({ step, report, explanation, onApplyFix, onCopy, onClo
         <Field label="mode" value={step.mode ?? VERDICT_LABEL[step.verdict]} />
         <Field label="seed" value={`0x${card.seed.toString(16).toUpperCase()}`} />
         <Field label="trials per size" value={String(card.trialsPerSize)} />
-        <Field label="sizes tested" value={card.sizes.map((s) => Object.entries(s).map(([k, v]) => `${k}=${v}`).join(' ')).join(' · ')} />
-        {card.primes && <Field label="primes" value={card.primes.map((p) => p.toString()).join(', ')} />}
-        {card.degree !== undefined && <Field label="degree bound" value={String(card.degree)} />}
-        {card.bound !== undefined && (
-          <Field label="false checkmark" value={`≤ ${formatBound(card.bound)}`} />
-        )}
-        {card.maxDelta !== undefined && (
-          <Field label="max difference" value={card.maxDelta.toExponential(2)} />
+        {/* A step that is wrong has no guarantee to show, so the fields of
+            the guarantee are only there when the step holds. */}
+        {step.verdict === 'ok' && (
+          <>
+            <Field label="sizes tested" value={card.sizes.map((s) => Object.entries(s).map(([k, v]) => `${k}=${v}`).join(' ')).join(' · ')} />
+            {card.primes && <Field label="primes" value={card.primes.map((p) => p.toString()).join(', ')} />}
+            {card.degree !== undefined && <Field label="degree bound" value={String(card.degree)} />}
+            {card.bound !== undefined && (
+              <Field label="false checkmark" value={`≤ ${formatBound(card.bound)}`} />
+            )}
+            {card.maxDelta !== undefined && (
+              <Field label="max difference" value={card.maxDelta.toExponential(2)} />
+            )}
+          </>
         )}
       </div>
 
@@ -125,12 +131,17 @@ export function Inspector({ step, report, explanation, onApplyFix, onCopy, onClo
         <div className="mt-4">
           <h3 className="pane-title">assumptions SAMOSA made</h3>
           <ul className="mt-1 space-y-0.5 text-xs text-[var(--color-muted)]">
-            {report.chips.slice(0, 6).map((chip) => (
-              <li key={chip.id + chip.message} className="flex gap-2">
-                <span className="text-[var(--color-faint)]">·</span>
-                <span>{chip.message}</span>
-              </li>
-            ))}
+            {/* the assumptions of the card are already listed above, so the
+                chips that say the same thing are not said twice */}
+            {report.chips
+              .filter((chip) => !card.assumptions.includes(chip.message))
+              .slice(0, 6)
+              .map((chip) => (
+                <li key={chip.id + chip.message} className="flex gap-2">
+                  <span className="text-[var(--color-faint)]">·</span>
+                  <span>{chip.message}</span>
+                </li>
+              ))}
           </ul>
         </div>
       )}
