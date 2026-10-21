@@ -1,0 +1,36 @@
+name: SAMOSA cannot parse this
+description: A piece of notation SAMOSA does not read.
+labels: notation
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This is the issue that decides what SAMOSA learns next. A row that
+        SAMOSA cannot read comes back with a question mark, and the reason
+        says which construct stopped it.
+
+  - type: textarea
+    id: row
+    attributes:
+      label: The row
+      description: The piece of notation SAMOSA cannot read, on its own.
+      placeholder: \langle c_1\rangle
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Where it appears
+      description: A few lines of the derivation around it, so the meaning is clear.
+
+  - type: dropdown
+    id: reason
+    attributes:
+      label: What does SAMOSA say
+      description: The reason from the report, if there is one.
+      options:
+        - The unknown construct
+        - A parse error
+        - The shapes do not fit
+        - I do not know

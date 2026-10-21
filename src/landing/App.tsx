@@ -678,10 +678,23 @@ function Install() {
   );
 }
 
+/** The same entries as CHANGELOG.md. */
 const CHANGELOG = [
-  { date: '2026-10-21', title: 'The first release', body: 'The engine, the app, the CLI, the MCP server and fifteen derivations.' },
-  { date: '2026-10-18', title: 'The Joseph form', body: 'The Kalman update of Lecture 8, with its two planted bugs.' },
-  { date: '2026-10-14', title: 'Dual numbers', body: 'Gradients and Hessians, checked exactly over a finite field.' },
+  {
+    date: '2026-10-21',
+    title: 'The first release',
+    body: 'The engine, the app, the CLI, the MCP server and fifteen derivations.',
+  },
+  {
+    date: '2026-10-21',
+    title: 'The Joseph form',
+    body: 'The Kalman update of Lecture 8, with its two planted bugs.',
+  },
+  {
+    date: '2026-10-21',
+    title: 'Dual numbers',
+    body: 'Gradients and Hessians, checked exactly over a finite field.',
+  },
 ];
 
 function Changelog() {

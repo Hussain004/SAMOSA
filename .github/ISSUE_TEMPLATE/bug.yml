@@ -1,0 +1,56 @@
+name: Bug report
+description: SAMOSA got a derivation wrong, or failed to read one.
+labels: bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you. The most useful bug report is one with a derivation that
+        SAMOSA gets wrong, because that is the kind that matters.
+
+  - type: textarea
+    id: derivation
+    attributes:
+      label: The derivation
+      description: The LaTeX, the way you would paste it into the app.
+      placeholder: |
+        \begin{align*}
+        K_t &= \bar\Sigma_t C_t^\top \left(C_t \bar\Sigma_t C_t^\top + Q_t\right)^{-1}
+        \end{align*}
+    validations:
+      required: true
+
+  - type: textarea
+    id: declarations
+    attributes:
+      label: The declarations
+      description: What SAMOSA needs to know about the symbols.
+      placeholder: C_t: m×n; Q_t: spd m; \bar\Sigma_t: spd n
+    validations:
+      required: true
+
+  - type: dropdown
+    id: verdict
+    attributes:
+      label: What did SAMOSA say
+      options:
+        - It said the step holds, and the step is wrong
+        - It said the step is wrong, and the step is right
+        - It said the shapes do not fit
+        - It did not check the step
+        - Something else
+    validations:
+      required: true
+
+  - type: input
+    id: seed
+    attributes:
+      label: The seed
+      description: The seed from the report, so the run is reproducible.
+      placeholder: '5910618'
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else
+      description: What you expected, and what you got.
