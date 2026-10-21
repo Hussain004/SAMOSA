@@ -8,3 +8,9 @@ playwright-report
 test-results
 coverage
 .samosa-cache
+
+# private working files, they are not part of the public repository
+IMPLEMENTATION_PLAN.md
+AGENTS.md
+spikes/
+prototypes/

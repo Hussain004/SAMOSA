@@ -394,14 +394,20 @@ export function directionalDerivative<T>(
   fnNode: Node,
   env: EvalEnv<T>,
   wrtName: string,
-  baseValue: Mat<T>,
-  direction: Mat<T>,
+  baseValue: Val<T>,
+  direction: Val<T>,
 ): Val<T> {
   const dual = new DualField(base);
   const dEnv = dualEnv(env, dual);
-  const dMat = toDual(base, baseValue);
-  for (let i = 0; i < dMat.d.length; i++) dMat.d[i] = { v: dMat.d[i].v, t: direction.d[i] };
-  dEnv.values.set(wrtName, { k: 'm', m: dMat });
+  if (isScalarVal(baseValue) && isScalarVal(direction)) {
+    dEnv.values.set(wrtName, scalar({ v: baseValue.v, t: direction.v }));
+  } else {
+    const bm = isMatrixVal(baseValue) ? baseValue.m : { r: 1, c: 1, d: [baseValue.v] };
+    const dm = isMatrixVal(direction) ? direction.m : { r: 1, c: 1, d: [direction.v] };
+    const dMat = toDual(base, bm);
+    for (let i = 0; i < dMat.d.length; i++) dMat.d[i] = { v: dMat.d[i].v, t: dm.d[i] };
+    dEnv.values.set(wrtName, { k: 'm', m: dMat });
+  }
   const result = evalNode(dual, fnNode, dEnv);
   if (isScalarVal(result)) return scalar(result.v.t);
   return { k: 'm', m: { r: result.m.r, c: result.m.c, d: result.m.d.map((x) => x.t) } };
@@ -418,17 +424,27 @@ export function mixedSecondDerivative<T>(
   fnNode: Node,
   env: EvalEnv<T>,
   wrtName: string,
-  baseValue: Mat<T>,
-  v: Mat<T>,
-  w: Mat<T>,
+  baseValue: Val<T>,
+  v: Val<T>,
+  w: Val<T>,
 ): Val<T> {
   const hyper = new HyperDualField(base);
   const hEnv = hyperEnv(env, hyper);
-  const hMat = toHyperDual(base, baseValue);
-  for (let i = 0; i < hMat.d.length; i++) {
-    hMat.d[i] = { v: hMat.d[i].v, e1: v.d[i], e2: w.d[i], e12: base.zero };
+  if (isScalarVal(baseValue) && isScalarVal(v) && isScalarVal(w)) {
+    hEnv.values.set(
+      wrtName,
+      scalar({ v: baseValue.v, e1: v.v, e2: w.v, e12: base.zero }),
+    );
+  } else {
+    const bm = isMatrixVal(baseValue) ? baseValue.m : { r: 1, c: 1, d: [baseValue.v] };
+    const vm = isMatrixVal(v) ? v.m : { r: 1, c: 1, d: [v.v] };
+    const wm = isMatrixVal(w) ? w.m : { r: 1, c: 1, d: [w.v] };
+    const hMat = toHyperDual(base, bm);
+    for (let i = 0; i < hMat.d.length; i++) {
+      hMat.d[i] = { v: hMat.d[i].v, e1: vm.d[i], e2: wm.d[i], e12: base.zero };
+    }
+    hEnv.values.set(wrtName, { k: 'm', m: hMat });
   }
-  hEnv.values.set(wrtName, { k: 'm', m: hMat });
   const result = evalNode(hyper, fnNode, hEnv);
   if (isScalarVal(result)) return scalar(result.v.e12);
   return { k: 'm', m: { r: result.m.r, c: result.m.c, d: result.m.d.map((x) => x.e12) } };

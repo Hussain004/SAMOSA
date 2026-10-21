@@ -669,6 +669,7 @@ function evaluateSides<T>(
     if (error instanceof DomainError) {
       return { kind: 'unknown', message: error.message, domain: true };
     }
+    console.log('EVALFAIL', (error as Error).message, (error as Error).stack?.split('\n').slice(0,5).join(' | '));
     return { kind: 'unknown', message: String(error) };
   }
 }
@@ -684,7 +685,7 @@ function compareDerivative<T>(
   if (!wrt || wrt.k !== 'sym') return { kind: 'unknown', message: 'SAMOSA does not know what to differentiate with respect to' };
   const pivotName = wrt.name;
   const pivot = env.values.get(pivotName);
-  if (!pivot || pivot.k !== 'm') {
+  if (!pivot) {
     return { kind: 'unknown', message: `no value for ${pivotName}` };
   }
   const fnNode = deriv.f;
@@ -696,16 +697,29 @@ function compareDerivative<T>(
     return { kind: 'unknown', message: `${fnNode.name} is not defined, so its derivative cannot be computed` };
   }
 
-  const n = pivot.m.r;
-  const c = pivot.m.c;
-  const direction = sampler.sampleGeneral(n, c);
+  const isScalarPivot = isScalarVal(pivot);
+  const n = isScalarPivot ? 1 : pivot.m.r;
+  const c = isScalarPivot ? 1 : pivot.m.c;
+  const direction: Val<T> = isScalarPivot
+    ? scalar(sampler.sampleScalar())
+    : { k: 'm', m: sampler.sampleGeneral(n, c) };
 
   if (deriv.order === 2) {
-    const w = sampler.sampleGeneral(n, c);
-    const mixed = mixedSecondDerivative(field, def, env, pivotName, pivot.m, direction, w);
+    const w: Val<T> = isScalarPivot
+      ? scalar(sampler.sampleScalar())
+      : { k: 'm', m: sampler.sampleGeneral(n, c) };
+    const mixed = mixedSecondDerivative(field, def, env, pivotName, pivot, direction, w);
     const claimedVal = evalNode(field, claimed, env);
     if (isMatrixVal(claimedVal)) {
-      const value = quadraticForm(field, direction, claimedVal.m, w);
+      const value = isScalarPivot
+        ? field.mul(
+            field.mul(
+              (direction as { k: 's'; v: T }).v,
+              claimedVal.m.d[0],
+            ),
+            (w as { k: 's'; v: T }).v,
+          )
+        : quadraticForm(field, direction.m, claimedVal.m, w.m);
       const mixedScalar = asScalar(field, mixed);
       if (mixedScalar !== null && field.eq(value, mixedScalar)) return { kind: 'equal' };
       return {
@@ -718,12 +732,12 @@ function compareDerivative<T>(
     return { kind: 'unknown', message: 'the right hand side of a Hessian claim has to be a matrix' };
   }
 
-  const tangent = directionalDerivative(field, def, env, pivotName, pivot.m, direction);
+  const tangent = directionalDerivative(field, def, env, pivotName, pivot, direction);
   const claimedVal = evalNode(field, claimed, env);
   const tangentScalar = asScalar(field, tangent);
 
-  if (tangentScalar !== null && isMatrixVal(claimedVal)) {
-    const inner = innerProduct(field, claimedVal.m, direction);
+  if (tangentScalar !== null && isMatrixVal(claimedVal) && !isScalarPivot) {
+    const inner = innerProduct(field, claimedVal.m, direction.m);
     if (fieldClose(field, inner, tangentScalar)) return { kind: 'equal' };
     // the layout diagnosis: the claimed gradient has the transposed shape
     if (claimedVal.m.r === direction.c && claimedVal.m.c === direction.r) {
@@ -746,12 +760,22 @@ function compareDerivative<T>(
     };
   }
 
+  if (tangentScalar !== null && isScalarVal(claimedVal)) {
+    if (fieldClose(field, tangentScalar, claimedVal.v)) return { kind: 'equal' };
+    return {
+      kind: 'different',
+      lhs: tangent,
+      rhs: claimedVal,
+      message: 'the claimed derivative is not the derivative of that function',
+    };
+  }
+
   if (isMatrixVal(tangent) && isMatrixVal(claimedVal)) {
-    const product = matMul(field, claimedVal.m, direction);
+    const product = matMul(field, claimedVal.m, direction.m);
     if (product.r === tangent.m.r && product.c === tangent.m.c) {
       let same = true;
       for (let i = 0; i < product.d.length; i++) {
-        if (!field.eq(product.d[i], tangent.m.d[i])) {
+        if (!fieldClose(field, product.d[i], tangent.m.d[i])) {
           same = false;
           break;
         }
@@ -968,10 +992,12 @@ function checkNumeric(
       }
       maxDelta = Math.max(maxDelta, delta);
       if (delta > 1e-6) {
+        console.log('BIGDELTA', delta);
         let confirmed = false;
         for (let k = 0; k < 3 && !confirmed; k++) {
           const rng2 = rngFor(opts.seed, step.id, settingKey(setting), trial, 'dec', k);
           const d2 = numericDelta(ctx, defs, step, setting, rng2, dec);
+          console.log('DECDELTA', d2);
           if (d2 !== null && d2 > 1e-20) confirmed = true;
         }
         const message = confirmed
@@ -1062,7 +1088,7 @@ function numericDelta<T>(
   for (const [name, value] of sampled.entries()) env.values.set(name, value);
 
   const sides = evaluateSides(field, step, env, sampler);
-  if (sides.kind === 'unknown') return null;
+  if (sides.kind === 'unknown') { console.log('UNK', sides.message); return null; }
   if (sides.kind === 'equal') return 0;
   return relativeDelta(field, sides.lhs, sides.rhs);
 }
@@ -1438,7 +1464,7 @@ function gradientAt<T>(
   for (let i = 0; i < n; i++) {
     const e: Mat<T> = { r: n, c: 1, d: new Array<T>(n).fill(field.zero) };
     e.d[i] = field.one;
-    const tangent = directionalDerivative(field, def, env, pivotName, baseValue, e);
+    const tangent = directionalDerivative(field, def, env, pivotName, { k: 'm', m: baseValue }, { k: 'm', m: e });
     const value = asScalar(field, tangent);
     if (value === null) return null;
     g.d[i] = value;
