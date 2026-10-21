@@ -29,9 +29,14 @@ why the three of them never disagree.
 
 ```bash
 pnpm install
+pnpm setup      # once: it installs the pre-commit hook
 pnpm test
 pnpm lint
 ```
+
+The CLI that the GitHub Action runs is committed to the repository, so it has
+to be rebuilt when the engine changes. The pre-commit hook does that for
+you, and the CI checks that the committed one is the one that was built.
 
 The golden suite is the Menu: every derivation in `corpus/menu.ts`, with its
 correct version and its planted bug. If you add an operator, a

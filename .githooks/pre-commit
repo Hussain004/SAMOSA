@@ -1,0 +1,8 @@
+#!/bin/sh
+# The CLI that the GitHub Action runs is committed to the repository, so it
+# has to be rebuilt whenever the engine changes. The CI checks that the
+# committed one is the one that was built, and this hook makes sure it is.
+set -e
+node scripts/build-pkg.mjs > /dev/null
+# the build output is tracked, so it is added even though "dist" is ignored
+git add -f pkg/dist pkg/README.md

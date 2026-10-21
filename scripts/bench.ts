@@ -5,7 +5,12 @@
  * in the mode people use. The numbers are stored in `bench/baseline.json`,
  * and a regression of more than a fifth fails the build.
  *
- *   pnpm bench:check
+ * The absolute time depends on the machine, so the baseline stores the time
+ * of the engine together with the time of a calibration loop, and the gate
+ * compares the two ratios. A shared runner and a laptop then give the same
+ * answer.
+ *
+ *   pnpm bench
  */
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
@@ -50,6 +55,24 @@ const CASES: Array<{ name: string; run: () => void }> = [
   },
 ];
 
+/**
+ * The calibration.
+ *
+ * A loop of arithmetic that the machine does at a speed of its own, so the
+ * engine's time can be read as a ratio and not as a number of milliseconds.
+ */
+function calibration(): number {
+  let x = 0.123456789;
+  const started = performance.now();
+  for (let i = 0; i < 3_000_000; i++) {
+    x = (x * 1.0000001 + 0.0000001) % 1;
+  }
+  const elapsed = performance.now() - started;
+  // the loop is not optimised away
+  if (x < 0) throw new Error('the calibration went wrong');
+  return elapsed;
+}
+
 /** The best of three rounds, in milliseconds per run. */
 function measure(run: () => void, rounds = 3): number {
   let best = Infinity;
@@ -63,10 +86,25 @@ function measure(run: () => void, rounds = 3): number {
   return Math.round(best * 1000) / 1000;
 }
 
-const measured: Record<string, number> = {};
+interface Measurement {
+  /** the milliseconds per run */
+  engine: number;
+  /** the milliseconds of the calibration loop */
+  calibration: number;
+  /** the engine's time per millisecond of calibration */
+  ratio: number;
+}
+
+const reference = Math.min(calibration(), calibration(), calibration());
+const measured: Record<string, Measurement> = {};
 for (const item of CASES) {
-  measured[item.name] = measure(item.run);
-  console.log(`  ${item.name}: ${measured[item.name]} ms`);
+  const engine = measure(item.run);
+  measured[item.name] = {
+    engine,
+    calibration: Math.round(reference * 1000) / 1000,
+    ratio: Math.round((engine / reference) * 1e6) / 1e6,
+  };
+  console.log(`  ${item.name}: ${engine} ms (${measured[item.name].ratio} per calibration ms)`);
 }
 
 const write = process.argv.includes('--write');
@@ -76,18 +114,17 @@ if (write) {
   writeFileSync(baselineFile, `${JSON.stringify(measured, null, 2)}\n`);
   console.log(`the baseline is written in ${baselineFile}`);
 } else if (check_ && existsSync(baselineFile)) {
-  const baseline = JSON.parse(readFileSync(baselineFile, 'utf8')) as Record<string, number>;
-  // The numbers are absolute, so the tolerance depends on the machine: a
-  // shared runner is slower than a laptop, and the gate is there to catch a
-  // real regression, not the difference between two machines.
+  const baseline = JSON.parse(readFileSync(baselineFile, 'utf8')) as Record<string, Measurement>;
   const tolerance = Number(process.env.BENCH_TOLERANCE ?? '1.2');
   let failed = false;
   for (const [name, before] of Object.entries(baseline)) {
     const now = measured[name];
-    if (now === undefined) continue;
-    if (now > before * tolerance) {
+    if (!now || !before.ratio) continue;
+    if (now.ratio > before.ratio * tolerance) {
       failed = true;
-      console.error(`  ${name}: ${now} ms, the baseline is ${before} ms, so it got slower`);
+      console.error(
+        `  ${name}: ${now.ratio} per calibration millisecond, the baseline is ${before.ratio}, so it got more than a fifth slower`,
+      );
     }
   }
   if (failed) {

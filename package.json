@@ -32,6 +32,7 @@
     "gen:demo": "vite-node scripts/gen-demo.ts --write",
     "gen:tex": "vite-node scripts/gen-tex.ts --write",
     "publish:pkg": "npm run build:pkg && npm publish --access public --prefix pkg",
+    "setup": "git config core.hooksPath .githooks",
     "test": "vitest run",
     "test:watch": "vitest",
     "bench": "vite-node scripts/bench.ts --check",
