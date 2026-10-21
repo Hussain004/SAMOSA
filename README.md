@@ -76,7 +76,7 @@ checks it, exactly, and it also finds the two ways you can get it wrong.
 **Nineteen seconds.** The line everybody writes and nobody checks, and what
 happens when a machine reads it.
 
-![The nineteen second tour: the derivation types in, the wrong row gets its badge, the counterexample arrives](public/brag.mp4)
+![The nineteen second tour: the derivation types in, the wrong row gets its badge, the counterexample arrives](public/brag.webp)
 
 **A transposed product.** The squiggle, the counterexample, and the fix that
 takes one keystroke.
