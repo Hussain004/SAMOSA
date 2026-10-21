@@ -1,6 +1,6 @@
 import type { Dim, Dist, Prop, SymbolDecl } from './decl.ts';
 import type { Node, Span } from './ir.ts';
-import { GREEK, toDisplay } from './notation.ts';
+import { canonicalizeSymbol, GREEK, toDisplay } from './notation.ts';
 
 /**
  * Types, shapes and degree bounds.
@@ -126,6 +126,19 @@ export function createContext(
 ): TypeContext {
   const map = new Map<string, SymbolDecl>();
   for (const d of decls) map.set(d.name, d);
+  // a random variable takes the shape of its mean
+  for (const d of decls) {
+    if (d.kind !== 'random' || d.rows) continue;
+    const dist = d.dist;
+    if (!dist) continue;
+    const meanName = dist.kind === 'normal' ? dist.mu : dist.kind === 'uniform' ? dist.a : null;
+    if (!meanName) continue;
+    const mean = map.get(canonicalizeSymbol(meanName));
+    if (mean && mean.rows) {
+      d.rows = mean.rows;
+      d.cols = mean.cols;
+    }
+  }
   const dimVars: string[] = [];
   for (const d of decls) {
     for (const dim of [d.rows, d.cols, d.cod, ...(d.dom ?? [])]) {
@@ -433,7 +446,11 @@ function guessType(ctx: TypeContext, name: string, base: string): Guess {
 }
 
 function opType(ctx: TypeContext, node: Extract<Node, { k: 'op' }>): Ty {
-  const args = node.args.map((a) => inferType(ctx, a));
+  // a random variable behaves like the matrix it is drawn from
+  const args = node.args.map((a) => {
+    const t = inferType(ctx, a);
+    return t.t === 'rv' ? t.of : t;
+  });
   switch (node.op) {
     case 'add':
     case 'sub': {
@@ -574,7 +591,14 @@ function callType(ctx: TypeContext, fn: string, args: Node[], span: Span): Ty {
     case 'trace':
     case 'norm':
     case 'logdet':
+    case 'var':
       return { t: 'scalar' };
+    case 'cov': {
+      const a = types[0];
+      const b = types[1];
+      if (a && b && isMatrix(a) && isMatrix(b)) return { t: 'mat', r: a.r, c: b.r };
+      return { t: 'scalar' };
+    }
     case 'exp':
     case 'log':
     case 'ln':
@@ -585,8 +609,8 @@ function callType(ctx: TypeContext, fn: string, args: Node[], span: Span): Ty {
     case 'tanh':
     case 'sigmoid':
     case 'relu':
-      return { t: 'scalar' };
     case 'softmax':
+      // these act element wise, so they keep the shape of their argument
       return types[0] ?? { t: 'scalar' };
     case 'normalDensity':
     case 'uniformDensity':

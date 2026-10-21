@@ -21,7 +21,7 @@ export interface ParseOptions {
   knownFns?: Set<string>;
 }
 
-const DEFAULT_FUNCTIONS = new Set([
+export const DEFAULT_FUNCTIONS = new Set([
   'exp',
   'log',
   'ln',
@@ -41,6 +41,8 @@ const DEFAULT_FUNCTIONS = new Set([
   'abs',
   'sech',
   'sqrt',
+  'var',
+  'cov',
 ]);
 
 /** Commands that name a symbol rather than an operation. */
@@ -669,6 +671,17 @@ export class Parser {
         if (this.kind() === 'lbrace') {
           const arg = this.parseGroupAsExpression();
           return { k: 'call', fn: name === 'sigma' ? 'sigmoid' : name, args: [arg], span: { from: t.from, to: arg.span.to } };
+        }
+        // \log x and \log\sigma(z): the argument is the next operand
+        const nextKind = this.kind();
+        if (nextKind === 'ident' || (nextKind === 'cmd' && !NON_OPERAND_COMMANDS.has(this.cur.value))) {
+          const arg = this.parsePrimary();
+          return {
+            k: 'call',
+            fn: name === 'sigma' ? 'sigmoid' : name,
+            args: [arg],
+            span: { from: t.from, to: arg.span.to },
+          };
         }
         const sym = this.makeSym([], name, null, null, { from: t.from, to: t.to });
         return this.applyScripts(sym, [], name);

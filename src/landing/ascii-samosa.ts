@@ -13,7 +13,7 @@ const STEAM = ['∂', '∂', '~', '~', '·', '·', '.'];
 
 // The tetrahedron: A and B are the top corners, C the bottom apex (the front
 // view reads as a nabla), D the back.
-const V = {
+const V: Record<'A' | 'B' | 'C' | 'D', Vec> = {
   A: [-1.05, 0.55, 0.32],
   B: [1.05, 0.55, 0.32],
   C: [0, -1.0, 0.12],

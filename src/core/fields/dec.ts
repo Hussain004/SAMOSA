@@ -38,7 +38,7 @@ export class DecField implements Field<Decimal> {
     return a.negated();
   }
   inv(a: Decimal): Decimal {
-    return a.isZero() ? new Decimal(Infinity) : a.div(1);
+    return a.isZero() ? new Decimal(Infinity) : new Decimal(1).div(a);
   }
   fromRational(n: number, d: number): Decimal {
     return new Decimal(n).div(d);

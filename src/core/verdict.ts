@@ -2,7 +2,7 @@ import type { Field } from './fields/types.ts';
 import { F64Field } from './fields/f64.ts';
 import { DecField } from './fields/dec.ts';
 import { GFpField, P1, P2 } from './fields/gfp.ts';
-import { DomainError, matInv, matMul, matSub, type Mat } from './linalg.ts';
+import { DomainError, matAdd, matInv, matMul, matSub, transpose, type Mat } from './linalg.ts';
 import {
   evalNode,
   makeEnv,
@@ -12,7 +12,7 @@ import {
 } from './evaluate.ts';
 import { Sampler } from './sample.ts';
 import { rngFor, type Rng } from './prng.ts';
-import { parseRow } from './parse.ts';
+import { DEFAULT_FUNCTIONS, parseRow } from './parse.ts';
 import { splitRows } from './steps.ts';
 import { parseDeclarations, type SymbolDecl } from './decl.ts';
 import { presetDecls } from './presets.ts';
@@ -28,6 +28,7 @@ import {
 } from './types.ts';
 import { isMatrixVal, isScalarVal, scalar, type Val } from './value.ts';
 import { collectDimVarsFor } from './dims.ts';
+import { GAUSS7, type QuadVar } from './quadrature.ts';
 import type { Assertion, Node, Relation, Span } from './ir.ts';
 import type { Dim } from './decl.ts';
 
@@ -224,7 +225,7 @@ export function check(src: string, opts: CheckOptions = {}): Report {
       collectSymbols(lhs, symbols);
       collectSymbols(rhs, symbols);
 
-      const bareLhs = defNameOf(lhs);
+      const bareLhs = defNameOf(lhs, ctx);
       // an equation whose left hand side is a bare symbol that has not been
       // defined yet is a definition, not a claim
       const isDefinition =
@@ -473,11 +474,12 @@ function isRational(node: Node, ctx: TypeContext, defs: Map<string, Node>, seen:
     case 'op':
       return node.args.every((a) => isRational(a, ctx, defs, seen));
     case 'call':
-      return node.fn === 'det' || node.fn === 'tr' || node.fn === 'trace';
+      return node.fn === 'det' || node.fn === 'tr' || node.fn === 'trace' || node.fn === 'var' || node.fn === 'cov';
     case 'deriv':
       return isRational(node.f, ctx, defs, seen);
     case 'expect':
-      return false;
+      // the quadrature is exact, so an expectation does not force numeric mode
+      return true;
     case 'bigop':
       return (
         (!node.lo || isRational(node.lo, ctx, defs, seen)) &&
@@ -591,7 +593,7 @@ function checkExact(
     rhsSpan: step.rhs?.span,
     relation: step.relation,
     verdict: 'ok',
-    mode: 'exact',
+    mode: hasExpectation(step) ? 'quadrature' : 'exact',
     card: { ...card, sizes, primes, degree: worstDegree, bound: worstBound, assumptions },
     message: 'holds at every size tested',
     annotation: step.annotation,
@@ -621,7 +623,8 @@ function runExactTrial(
   if (sampled === 'unknown') {
     return { kind: 'unknown', message: 'SAMOSA could not sample an instance of these objects' };
   }
-  for (const [name, value] of sampled.entries()) env.values.set(name, value);
+  for (const [name, value] of sampled.values.entries()) env.values.set(name, value);
+  for (const [name, quadVar] of sampled.quad.entries()) env.quad.set(name, quadVar);
 
   const sides = evaluateSides(field, step, env, sampler);
   if (sides.kind === 'unknown') return { kind: 'unknown', message: sides.message, domain: sides.domain };
@@ -631,7 +634,7 @@ function runExactTrial(
     kind: 'wrong',
     message: sides.message,
     layoutHint: sides.layoutHint,
-    counterexample: buildCounterexample(ctx, step, setting, sampled, sides.lhs, sides.rhs, field),
+    counterexample: buildCounterexample(ctx, step, setting, sampled.values, sides.lhs, sides.rhs, field),
   };
 }
 
@@ -669,7 +672,6 @@ function evaluateSides<T>(
     if (error instanceof DomainError) {
       return { kind: 'unknown', message: error.message, domain: true };
     }
-    console.log('EVALFAIL', (error as Error).message, (error as Error).stack?.split('\n').slice(0,5).join(' | '));
     return { kind: 'unknown', message: String(error) };
   }
 }
@@ -719,7 +721,7 @@ function compareDerivative<T>(
             ),
             (w as { k: 's'; v: T }).v,
           )
-        : quadraticForm(field, direction.m, claimedVal.m, w.m);
+        : quadraticForm(field, (direction as { k: 'm'; m: Mat<T> }).m, claimedVal.m, (w as { k: 'm'; m: Mat<T> }).m);
       const mixedScalar = asScalar(field, mixed);
       if (mixedScalar !== null && field.eq(value, mixedScalar)) return { kind: 'equal' };
       return {
@@ -737,11 +739,12 @@ function compareDerivative<T>(
   const tangentScalar = asScalar(field, tangent);
 
   if (tangentScalar !== null && isMatrixVal(claimedVal) && !isScalarPivot) {
-    const inner = innerProduct(field, claimedVal.m, direction.m);
+    const inner = innerProduct(field, claimedVal.m, (direction as { k: 'm'; m: Mat<T> }).m);
     if (fieldClose(field, inner, tangentScalar)) return { kind: 'equal' };
     // the layout diagnosis: the claimed gradient has the transposed shape
-    if (claimedVal.m.r === direction.c && claimedVal.m.c === direction.r) {
-      const flipped = innerProduct(field, transposeMat(claimedVal.m), direction);
+    const dirMat = (direction as { k: 'm'; m: Mat<T> }).m;
+    if (claimedVal.m.r === dirMat.c && claimedVal.m.c === dirMat.r) {
+      const flipped = innerProduct(field, transposeMat(claimedVal.m), dirMat);
       if (field.eq(flipped, tangentScalar)) {
         return {
           kind: 'different',
@@ -760,8 +763,9 @@ function compareDerivative<T>(
     };
   }
 
-  if (tangentScalar !== null && isScalarVal(claimedVal)) {
-    if (fieldClose(field, tangentScalar, claimedVal.v)) return { kind: 'equal' };
+  if (tangentScalar !== null && isScalarVal(claimedVal) && isScalarPivot) {
+    const expected = field.mul(claimedVal.v, (direction as { k: 's'; v: T }).v);
+    if (fieldClose(field, tangentScalar, expected)) return { kind: 'equal' };
     return {
       kind: 'different',
       lhs: tangent,
@@ -771,7 +775,7 @@ function compareDerivative<T>(
   }
 
   if (isMatrixVal(tangent) && isMatrixVal(claimedVal)) {
-    const product = matMul(field, claimedVal.m, direction.m);
+    const product = matMul(field, claimedVal.m, (direction as { k: 'm'; m: Mat<T> }).m);
     if (product.r === tangent.m.r && product.c === tangent.m.c) {
       let same = true;
       for (let i = 0; i < product.d.length; i++) {
@@ -850,6 +854,20 @@ function fieldClose<T>(field: Field<T>, a: T, b: T): boolean {
   return Math.abs(x - y) <= 1e-12 * scale;
 }
 
+/** Does the step contain an expectation? Those are checked by quadrature. */
+function hasExpectation(step: Step): boolean {
+  const check = (node: Node | undefined): boolean => {
+    if (!node) return false;
+    if (node.k === 'expect') return true;
+    if (node.k === 'op' || node.k === 'call') return node.args.some(check);
+    if (node.k === 'deriv') return check(node.f);
+    if (node.k === 'bigop') return check(node.body);
+    if (node.k === 'block') return node.rows.flat().some(check);
+    return false;
+  };
+  return stepNodes(step).some(check);
+}
+
 /** The variables a derivative is taken with respect to: they stay free. */
 function freeVariables(step: Step): Set<string> {
   const out = new Set<string>();
@@ -872,10 +890,16 @@ function freeVariables(step: Step): Set<string> {
 }
 
 /** The name a definition binds, whether it is a symbol or a function. */
-function defNameOf(lhs: Node | undefined): string | undefined {
+function defNameOf(lhs: Node | undefined, ctx: TypeContext): string | undefined {
   if (!lhs) return undefined;
   if (lhs.k === 'sym') return lhs.name;
-  if (lhs.k === 'call') return lhs.fn;
+  if (lhs.k === 'call') {
+    const decl = ctx.decls.get(lhs.fn);
+    if (decl && decl.kind === 'function') return lhs.fn;
+    // tr, det and the rest are functions, not variables
+    if (DEFAULT_FUNCTIONS.has(lhs.fn)) return undefined;
+    return lhs.fn;
+  }
   return undefined;
 }
 
@@ -899,8 +923,9 @@ function sampleFor<T>(
   setting: Map<string, number>,
   sampler: Sampler<T>,
   free: Set<string> = new Set(),
-): Map<string, Val<T>> | 'unknown' {
+): { values: Map<string, Val<T>>; quad: Map<string, QuadVar> } | 'unknown' {
   const values = new Map<string, Val<T>>();
+  const quad = new Map<string, QuadVar<any>>();
   const names = new Set<string>();
   for (const node of stepNodes(step)) collectSymbols(node, names);
   // a definition brings in the symbols it is written with
@@ -914,6 +939,35 @@ function sampleFor<T>(
     if (values.has(name)) continue;
     const info = ctx.symbols.get(name);
     if (!info) continue;
+    if (info.ty.t === 'rv') {
+      // a random variable: sample the root of its covariance, so that the
+      // covariance symbol and the variable agree
+      const dist = info.ty.dist;
+      const size = info.ty.of.t === 'mat' ? dimSizeOf(ctx, info.ty.of.r, setting) : 1;
+      let mean: Val<T>;
+      if (dist.kind === 'normal' && dist.mu !== '0') {
+        const existing = values.get(dist.mu);
+        if (existing) {
+          mean = existing;
+        } else {
+          mean = { k: 'm', m: sampler.sampleGeneral(size, 1) };
+          values.set(dist.mu, mean);
+        }
+      } else {
+        mean = { k: 'm', m: sampler.sampleGeneral(size, 1) };
+      }
+      const root = sampler.sampleGeneral(size, size);
+      const f = sampler.field;
+      if (dist.kind === 'normal' && dist.sigma !== 'I') {
+        values.set(dist.sigma, { k: 'm', m: matMul(f, root, transpose(root)) });
+      }
+      const z = sampler.sampleGeneral(size, 1);
+      const meanMat = isMatrixVal(mean) ? mean.m : { r: size, c: 1, d: new Array<T>(size).fill(f.zero) };
+      values.set(name, { k: 'm', m: matAdd(f, meanMat, matMul(f, root, z)) });
+      values.set(`__mean_${name}`, mean);
+      quad.set(name, { name, mean, root, dim: size, rule: GAUSS7 });
+      continue;
+    }
     if (info.ty.t === 'scalar') {
       values.set(name, scalar(sampler.sampleScalar()));
       continue;
@@ -932,7 +986,7 @@ function sampleFor<T>(
     }
     if (!placed) return 'unknown';
   }
-  return values;
+  return { values, quad };
 }
 
 function isSingular<T>(field: Field<T>, m: Mat<T>): boolean {
@@ -947,6 +1001,9 @@ function isSingular<T>(field: Field<T>, m: Mat<T>): boolean {
 
 function valuesEqual<T>(field: Field<T>, a: Val<T>, b: Val<T>): boolean {
   if (a.k === 's' && b.k === 's') return field.eq(a.v, b.v);
+  // a 1 by 1 matrix and a scalar are the same thing
+  if (a.k === 'm' && b.k === 's' && a.m.r === 1 && a.m.c === 1) return field.eq(a.m.d[0], b.v);
+  if (a.k === 's' && b.k === 'm' && b.m.r === 1 && b.m.c === 1) return field.eq(a.v, b.m.d[0]);
   if (a.k === 'm' && b.k === 'm') {
     if (a.m.r !== b.m.r || a.m.c !== b.m.c) return false;
     for (let i = 0; i < a.m.d.length; i++) if (!field.eq(a.m.d[i], b.m.d[i])) return false;
@@ -992,12 +1049,10 @@ function checkNumeric(
       }
       maxDelta = Math.max(maxDelta, delta);
       if (delta > 1e-6) {
-        console.log('BIGDELTA', delta);
         let confirmed = false;
         for (let k = 0; k < 3 && !confirmed; k++) {
           const rng2 = rngFor(opts.seed, step.id, settingKey(setting), trial, 'dec', k);
           const d2 = numericDelta(ctx, defs, step, setting, rng2, dec);
-          console.log('DECDELTA', d2);
           if (d2 !== null && d2 > 1e-20) confirmed = true;
         }
         const message = confirmed
@@ -1085,10 +1140,11 @@ function numericDelta<T>(
   const free = freeVariables(step);
   const sampled = sampleFor(ctx, step, defs, setting, sampler, free);
   if (sampled === 'unknown') return null;
-  for (const [name, value] of sampled.entries()) env.values.set(name, value);
+  for (const [name, value] of sampled.values.entries()) env.values.set(name, value);
+  for (const [name, quadVar] of sampled.quad.entries()) env.quad.set(name, quadVar);
 
   const sides = evaluateSides(field, step, env, sampler);
-  if (sides.kind === 'unknown') { console.log('UNK', sides.message); return null; }
+  if (sides.kind === 'unknown') return null;
   if (sides.kind === 'equal') return 0;
   return relativeDelta(field, sides.lhs, sides.rhs);
 }
@@ -1276,7 +1332,6 @@ function checkImplication(
         if (outcome.kind === 'unknown') {
           if (outcome.domain) {
             // this size cannot work (a singular matrix, say), so it is skipped
-            domainSkips++;
             continue;
           }
           return {
@@ -1328,7 +1383,7 @@ function checkImplication(
 type ImpOutcome =
   | { kind: 'ok' }
   | { kind: 'wrong'; message: string; counterexample: Counterexample }
-  | { kind: 'unknown'; message: string };
+  | { kind: 'unknown'; message: string; domain?: boolean };
 
 /**
  * Checks "premise => conclusion" with constraint completion.
@@ -1354,7 +1409,8 @@ function runImplicationTrial(
 
   const sampled = sampleFor(ctx, step, defs, setting, sampler);
   if (sampled === 'unknown') return { kind: 'unknown', message: 'could not sample an instance' };
-  for (const [name, value] of sampled.entries()) env.values.set(name, value);
+  for (const [name, value] of sampled.values.entries()) env.values.set(name, value);
+  for (const [name, quadVar] of sampled.quad.entries()) env.quad.set(name, quadVar);
 
   const conclusionLhs = conclusion.lhs;
   const pivot = conclusionLhs && conclusionLhs.k === 'sym' ? conclusionLhs.name : undefined;
@@ -1438,7 +1494,7 @@ function runImplicationTrial(
   return {
     kind: 'wrong',
     message: 'the implication does not follow',
-    counterexample: buildCounterexample(ctx, step, setting, sampled, cl, cr, field),
+    counterexample: buildCounterexample(ctx, step, setting, sampled.values, cl, cr, field),
   };
 }
 

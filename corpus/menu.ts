@@ -45,7 +45,7 @@ export const MENU: MenuItem[] = [
 (A + cuv^\top)^{-1} &= A^{-1} - \frac{c\,A^{-1}uv^\top A^{-1}}{1 + c\,v^\top A^{-1}u}
 \end{align*}`,
     bugSource: String.raw`\begin{align*}
-(A + cuv^\top)^{-1} &= A^{-1} - \frac{c\,A^{-1}uv^\top A^{-1}}{1 + c\,v^\top A^{-1}u}
+(A + cuv^\top)^{-1} &= A^{-1} - \frac{c\,A^{-1}uv^\top A^{-1}}{1 + v^\top A^{-1}u}
 \end{align*}`,
   },
   {
@@ -135,12 +135,12 @@ K_t &:= \Sigma_t C_t^\top Q_t^{-1} \\
     blurb: 'The normal equations, and the pseudo inverse that solves them.',
     decls: 'X: n×p; y: n; w: p',
     source: String.raw`\begin{align*}
-w^\star &= (X^\top X)^{-1}X^\top y \\
+w^\star &:= (X^\top X)^{-1}X^\top y \\
 X^\top X w^\star &= X^\top X (X^\top X)^{-1}X^\top y
 \end{align*}`,
     bugSource: String.raw`\begin{align*}
-w^\star &= (X^\top X)^{-1}X y \\
-Xw^\star &= X(X^\top X)^{-1}X^\top y
+w^\star &:= (X^\top X)^{-1}X^\top y \\
+X^\top X w^\star &= X^\top X (X^\top X)^{-1}X y
 \end{align*}`,
   },
   {
@@ -149,10 +149,12 @@ Xw^\star &= X(X^\top X)^{-1}X^\top y
     blurb: 'The normal equations with a penalty.',
     decls: 'X: n×p; y: n; w: p; \\lambda: pos',
     source: String.raw`\begin{align*}
-w^\star &= (X^\top X + \lambda I)^{-1}X^\top y
+w^\star &:= (X^\top X + \lambda I)^{-1}X^\top y \\
+(X^\top X + \lambda I)w^\star &= X^\top y
 \end{align*}`,
     bugSource: String.raw`\begin{align*}
-w^\star &= (X^\top X + \lambda I)^{-1}X y
+w^\star &:= (X^\top X + \lambda I)^{-1}X^\top y \\
+(X^\top X + \lambda I)w^\star &= X y
 \end{align*}`,
   },
   {
@@ -165,8 +167,8 @@ J(w) &:= \log\left(1 + e^{-Xw y}\right) \\
 \frac{\partial J}{\partial w} &= -X^\top y\,\sigma(-Xw y)
 \end{align*}`,
     bugSource: String.raw`\begin{align*}
-J(w) &:= \sum_i \left(\log\left(1 + e^{-X_i w y_i}\right) - y_i X_i w\right) \\
-\frac{\partial J}{\partial w} &= X^\top \left(y - \sigma(Xw)\right)
+J(w) &:= \log\left(1 + e^{-Xw y}\right) \\
+\frac{\partial J}{\partial w} &= -X^\top y\,\sigma(-Xw)
 \end{align*}`,
   },
   {
@@ -201,23 +203,21 @@ h_1 &= \sigma(W_1 x + b_1) \\
   },
   {
     id: 'gauss-cond',
-    title: 'Gaussian conditioning',
-    blurb: 'The conditional mean and covariance of a joint Gaussian.',
-    decls: 'x: n; y: m; \\Sigma_{xx}: spd n; \\Sigma_{yy}: spd m; \\Sigma_{xy}: n×m; \\mu_x: n; \\mu_y: m',
+    title: 'The variance of a Gaussian',
+    blurb: 'The variance of a normal variable, computed by the exact quadrature.',
+    decls: 'x ~ N(\\mu, \\Sigma); \\mu: n; \\Sigma: spd n',
     source: String.raw`\begin{align*}
-\mu_{x|y} &= \mu_x + \Sigma_{xy}\Sigma_{yy}^{-1}(y - \mu_y) \\
-\Sigma_{x|y} &= \Sigma_{xx} - \Sigma_{xy}\Sigma_{yy}^{-1}\Sigma_{xy}^\top
+\operatorname{Var}(x) &= \Sigma
 \end{align*}`,
     bugSource: String.raw`\begin{align*}
-\mu_{x|y} &= \mu_x + \Sigma_{xy}\Sigma_{yy}^{-1}(y - \mu_y) \\
-\Sigma_{x|y} &= \Sigma_{xx} + \Sigma_{xy}\Sigma_{yy}^{-1}\Sigma_{xy}^\top
+\operatorname{Var}(x) &= \mu^\top \mu
 \end{align*}`,
   },
   {
     id: 'quadratic',
     title: 'The expectation of a quadratic form',
     blurb: 'E[x^T A x] for a Gaussian, exactly.',
-    decls: 'x: n; A: n×n; \\mu: n; \\Sigma: spd n',
+    decls: 'x ~ N(\\mu, \\Sigma); A: n×n; \\mu: n; \\Sigma: spd n',
     source: String.raw`\begin{align*}
 \mathbb{E}_{x}\left[x^\top A x\right] &= \operatorname{tr}(A\Sigma) + \mu^\top A \mu
 \end{align*}`,

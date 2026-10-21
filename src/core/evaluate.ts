@@ -23,6 +23,7 @@ import {
   type Mat,
 } from './linalg.ts';
 import type { Node } from './ir.ts';
+import { degreeInVar, evaluateExpectation, type QuadVar } from './quadrature.ts';
 import { isMatrixVal, isScalarVal, scalar, type Val } from './value.ts';
 import type { Rng } from './prng.ts';
 
@@ -52,11 +53,13 @@ export interface EvalEnv<T> {
   defs: Map<string, Node>;
   /** the memoized definitions, per instance */
   memo: Map<string, Val<T>>;
+  /** the random variables, with the roots of their covariances */
+  quad: Map<string, QuadVar<any>>;
   random: Rng;
 }
 
 export function makeEnv<T>(field: Field<T>, random: Rng): EvalEnv<T> {
-  return { field, values: new Map(), defs: new Map(), memo: new Map(), random };
+  return { field, values: new Map(), defs: new Map(), memo: new Map(), quad: new Map(), random };
 }
 
 function requireMatrix<T>(val: Val<T>, what: string): Mat<T> {
@@ -89,12 +92,18 @@ export function evalNode<T>(f: Field<T>, node: Node, env: EvalEnv<T>): Val<T> {
     }
     case 'op':
       return evalOp(f, node.op, node.args.map((a) => evalNode(f, a, env)), env);
-    case 'call':
+    case 'call': {
+      if (node.fn === 'var' || node.fn === 'cov') {
+        // the variance and the covariance are expectations
+        const over = node.args[0]?.k === 'sym' ? [node.args[0].name] : [];
+        return evalExpect(f, { k: 'expect', op: node.fn === 'var' ? 'Var' : 'Cov', args: node.args, over, span: node.span }, env);
+      }
       return evalCall(f, node.fn, node.args.map((a) => evalNode(f, a, env)), env);
+    }
     case 'deriv':
       throw new EvalError('a derivative is checked by the verdict engine, not evaluated directly');
     case 'expect':
-      throw new EvalError('an expectation is evaluated by the quadrature engine');
+      return evalExpect(f, node, env);
     case 'bigop': {
       const lo = node.lo ? Math.round(f.toNumber(requireScalar(evalNode(f, node.lo, env), 'a sum bound'))) : 1;
       const hi = node.hi ? Math.round(f.toNumber(requireScalar(evalNode(f, node.hi, env), 'a sum bound'))) : lo;
@@ -127,6 +136,83 @@ function scalarOf<T>(val: Val<T>): T | null {
   if (isScalarVal(val)) return val.v;
   if (val.m.r === 1 && val.m.c === 1) return val.m.d[0];
   return null;
+}
+
+/**
+ * The expectation of an expression, by the rational quadrature.
+ *
+ * The body has to be a polynomial in the random variable, and the rule has
+ * to be exact for that degree. Otherwise the answer would be an
+ * approximation, and SAMOSA does not hand out approximations.
+ */
+function evalExpect<T>(f: Field<T>, node: Extract<Node, { k: 'expect' }>, env: EvalEnv<T>): Val<T> {
+  const names = node.over.length ? node.over : [...env.quad.keys()];
+  const vars: QuadVar<T>[] = [];
+  for (const name of names) {
+    const v = env.quad.get(name);
+    if (!v) throw new EvalError(`the distribution of ${name} is not known`);
+    vars.push(v);
+  }
+  if (!vars.length) throw new EvalError('an expectation needs a random variable');
+
+  const body = expectationBody(node, env);
+  for (const v of vars) {
+    const degree = degreeInVar(body, v.name);
+    if (!Number.isFinite(degree) || degree > v.rule.degree) {
+      throw new EvalError(
+        `the expectation of ${v.name} is not a polynomial of degree at most ${v.rule.degree}`,
+      );
+    }
+  }
+
+  return evaluateExpectation(f, body, vars, (n, values) => {
+    const merged = new Map(env.values);
+    for (const [name, value] of values) merged.set(name, value);
+    return evalNode(f, n, { ...env, values: merged, memo: new Map() });
+  });
+}
+
+/** The expression an expectation really averages over. */
+function expectationBody(node: Extract<Node, { k: 'expect' }>, env: EvalEnv<any>): Node {
+  const arg = node.args[0];
+  if (!arg) throw new EvalError('an expectation needs something to average');
+  if (node.op === 'E') return arg;
+  if (node.op === 'Var') {
+    // Var[x] = E[(x - E x)^T (x - E x)] for a scalar
+    // and E[(x - E x)(x - E x)^T] for a vector
+    const value = arg.k === 'sym' ? env.values.get(arg.name) : undefined;
+    const vector = value?.k === 'm';
+    const centred = centredCopy(arg);
+    if (!vector) {
+      return { k: 'op', op: 'inner', args: [centred, centredCopy(arg)], span: arg.span };
+    }
+    return {
+      k: 'op',
+      op: 'mul',
+      args: [centred, { k: 'op', op: 'T', args: [centredCopy(arg)], span: arg.span }],
+      span: arg.span,
+    };
+  }
+  // Cov[x, y] = E[(x - E x)(y - E y)^T]
+  const second = node.args[1];
+  if (!second) throw new EvalError('a covariance needs two variables');
+  return {
+    k: 'op',
+    op: 'mul',
+    args: [centredCopy(arg), { k: 'op', op: 'T', args: [centredCopy(second)], span: second.span }],
+    span: arg.span,
+  };
+}
+
+/** A copy of a symbol, centred on its mean. */
+function centredCopy(node: Node): Node {
+  if (node.k !== 'sym') return node;
+  return {
+    k: 'op',
+    op: 'sub',
+    args: [node, { k: 'sym', name: `__mean_${node.name}`, display: node.display, span: node.span }],
+    span: node.span,
+  };
 }
 
 function evalOp<T>(f: Field<T>, op: string, args: Val<T>[], _env: EvalEnv<T>): Val<T> {
@@ -368,7 +454,7 @@ function dualEnv<T>(env: EvalEnv<T>, dual: DualField<Field<T>>): EvalEnv<DualVal
     if (isScalarVal(val)) values.set(name, scalar({ v: val.v, t: dual.base.zero }));
     else values.set(name, { k: 'm', m: toDual(dual.base, val.m) });
   }
-  return { field: dual, values, defs: env.defs, memo: new Map(), random: env.random };
+  return { field: dual, values, defs: env.defs, memo: new Map(), quad: new Map(), random: env.random };
 }
 
 function hyperEnv<T>(env: EvalEnv<T>, hyper: HyperDualField<Field<T>>): EvalEnv<HyperDualValue> {
@@ -380,7 +466,7 @@ function hyperEnv<T>(env: EvalEnv<T>, hyper: HyperDualField<Field<T>>): EvalEnv<
       values.set(name, { k: 'm', m: toHyperDual(hyper.base, val.m) });
     }
   }
-  return { field: hyper, values, defs: env.defs, memo: new Map(), random: env.random };
+  return { field: hyper, values, defs: env.defs, memo: new Map(), quad: new Map(), random: env.random };
 }
 
 /**
