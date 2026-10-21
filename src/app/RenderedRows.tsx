@@ -11,6 +11,11 @@ export interface RenderedProps {
   onSelectStep: (id: string) => void;
   hoverStep: string | null;
   onHoverStep: (id: string | null) => void;
+  /** the spot the bug game: the badges are hidden until the user guesses */
+  spotTheBug: boolean;
+  /** the row the user guessed, and the row that is really wrong */
+  guess: string | null;
+  revealed: string | null;
 }
 
 /**
@@ -20,7 +25,17 @@ export interface RenderedProps {
  * mode. The offending sub-expression is highlighted, so the eye goes
  * straight to the part that is wrong.
  */
-export function RenderedRows({ source, report, selectedStep, onSelectStep, hoverStep, onHoverStep }: RenderedProps) {
+export function RenderedRows({
+  source,
+  report,
+  selectedStep,
+  onSelectStep,
+  hoverStep,
+  onHoverStep,
+  spotTheBug,
+  guess,
+  revealed,
+}: RenderedProps) {
   if (!report || report.steps.length === 0) {
     return (
       <div className="flex h-full items-center justify-center p-8 text-center text-sm text-[var(--color-faint)]">
@@ -41,6 +56,9 @@ export function RenderedRows({ source, report, selectedStep, onSelectStep, hover
           source={source}
           selected={selectedStep === step.id}
           hovered={hoverStep === step.id}
+          spotTheBug={spotTheBug}
+          guess={guess}
+          revealed={revealed}
           onSelect={() => onSelectStep(step.id)}
           onHover={(on) => onHoverStep(on ? step.id : null)}
         />
@@ -54,6 +72,9 @@ function Row({
   source,
   selected,
   hovered,
+  spotTheBug,
+  guess,
+  revealed,
   onSelect,
   onHover,
 }: {
@@ -61,11 +82,17 @@ function Row({
   source: string;
   selected: boolean;
   hovered: boolean;
+  spotTheBug: boolean;
+  guess: string | null;
+  revealed: string | null;
   onSelect: () => void;
   onHover: (on: boolean) => void;
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
-  const html = useMemo(() => renderStep(step, source), [step, source]);
+  const html = useMemo(
+    () => renderStep(step, source, spotTheBug && !revealed),
+    [step, source, spotTheBug, revealed],
+  );
 
   useEffect(() => {
     if (selected) ref.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
@@ -95,12 +122,20 @@ function Row({
         )}
       </div>
       <div className="mt-1 shrink-0">
-        <span className={`badge badge-${badgeClass(step)}`}>
-          <span aria-hidden="true">{VERDICT_ICON[step.verdict]}</span>
-          {VERDICT_LABEL[step.verdict]}
-        </span>
-        {step.mode && (
-          <span className="ml-2 text-[10px] uppercase tracking-wider text-[var(--color-faint)]">{step.mode}</span>
+        {spotTheBug && !revealed ? (
+          <span className="text-[11px] text-[var(--color-faint)]">
+            {guess === step.id ? 'you think this one' : 'click the wrong row'}
+          </span>
+        ) : (
+          <>
+            <span className={`badge badge-${badgeClass(step)}`}>
+              <span aria-hidden="true">{VERDICT_ICON[step.verdict]}</span>
+              {VERDICT_LABEL[step.verdict]}
+            </span>
+            {step.mode && (
+              <span className="ml-2 text-[10px] uppercase tracking-wider text-[var(--color-faint)]">{step.mode}</span>
+            )}
+          </>
         )}
       </div>
     </div>
@@ -125,8 +160,8 @@ function badgeClass(step: StepResult): string {
 }
 
 /** Renders a step with KaTeX, highlighting the part that is wrong. */
-export function renderStep(step: StepResult, source = ''): string {
-  const latex = stepLaTeX(step, source);
+export function renderStep(step: StepResult, source = '', plain = false): string {
+  const latex = stepLaTeX(step, source, plain);
   if (!latex) return '';
   try {
     return katex.renderToString(latex, {
@@ -155,10 +190,10 @@ function escapeHtml(text: string): string {
  * The spans of a step are offsets into its own row, so the row text is what
  * gets sliced.
  */
-function stepLaTeX(step: StepResult, _source: string): string {
+function stepLaTeX(step: StepResult, _source: string, plain = false): string {
   const text = step.text ?? '';
   if (!text) return '';
-  if (step.verdict === 'wrong' && step.lhsSpan && step.rhsSpan) {
+  if (!plain && step.verdict === 'wrong' && step.lhsSpan && step.rhsSpan) {
     const lhs = text.slice(step.lhsSpan.from, step.lhsSpan.to);
     const relation = text.slice(step.lhsSpan.to, step.rhsSpan.from).replace(/&/g, '');
     const rhs = text.slice(step.rhsSpan.from);

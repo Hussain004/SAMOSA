@@ -5,7 +5,7 @@ import { PRESETS } from '../core/index.ts';
 export interface MenuProps {
   onPick: (source: string, decls: string) => void;
   onClose: () => void;
-  onSpotTheBug?: (source: string) => void;
+  onSpotTheBug?: (source: string, decls: string) => void;
 }
 
 /** The Menu: fifteen derivations, with their planted bugs. */
@@ -41,7 +41,7 @@ export function Menu({ onPick, onClose, onSpotTheBug }: MenuProps) {
               </button>
               {item.bugSource && onSpotTheBug && (
                 <button
-                  onClick={() => onSpotTheBug(item.bugSource!)}
+                  onClick={() => onSpotTheBug(item.bugSource!, item.decls)}
                   className="rounded border border-[var(--color-line)] px-2 py-1 text-[10px] hover:border-[var(--color-tamarind)] hover:text-[var(--color-text)]"
                 >
                   spot the bug

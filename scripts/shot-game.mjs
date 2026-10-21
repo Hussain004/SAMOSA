@@ -1,0 +1,14 @@
+import { chromium } from '@playwright/test';
+const browser = await chromium.launch();
+const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+await page.goto('http://localhost:4173/app/#menu=kalman', { waitUntil: 'networkidle' });
+await page.waitForTimeout(2500);
+await page.screenshot({ path: '/tmp/opencode/game1.png' });
+await page.getByRole('button', { name: 'Menu' }).click();
+await page.waitForTimeout(500);
+const card = page.locator('div').filter({ hasText: /^Kalman update/ }).last();
+await card.getByRole('button', { name: 'spot the bug' }).click();
+await page.waitForTimeout(2500);
+await page.screenshot({ path: '/tmp/opencode/game2.png' });
+await browser.close();
+console.log('ok');

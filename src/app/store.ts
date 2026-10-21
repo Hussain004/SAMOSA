@@ -26,6 +26,12 @@ export interface AppState {
   settings: Settings;
   report: Report | null;
   selectedStep: string | null;
+  /** the spot the bug game: the verdicts are hidden until the user guesses */
+  spotTheBug: boolean;
+  /** the row the user thinks is wrong */
+  guess: string | null;
+  /** the row that really is wrong */
+  revealed: string | null;
   explanations: Record<string, Explanation>;
   busy: boolean;
   error: string | null;
@@ -34,6 +40,8 @@ export interface AppState {
   setSource: (source: string) => void;
   setSettings: (patch: Partial<Settings>) => void;
   select: (id: string | null) => void;
+  startSpotTheBug: (source: string, decls: string) => void;
+  makeGuess: (id: string) => void;
   reroll: () => void;
   loadShare: () => void;
   applyShare: (hash: string) => void;
@@ -127,6 +135,9 @@ export const useApp = create<AppState>((set, get) => ({
   settings: DEFAULT_SETTINGS,
   report: null,
   selectedStep: null,
+  spotTheBug: false,
+  guess: null,
+  revealed: null,
   explanations: {},
   busy: false,
   error: null,
@@ -144,7 +155,30 @@ export const useApp = create<AppState>((set, get) => ({
     schedule(get());
   },
 
+  startSpotTheBug: (source, decls) => {
+    set({
+      source,
+      settings: { ...get().settings, decls },
+      spotTheBug: true,
+      guess: null,
+      revealed: null,
+      selectedStep: null,
+    });
+    schedule(get());
+  },
+
+  makeGuess: (id) => {
+    const report = get().report;
+    if (!report) return;
+    const wrong = report.steps.find((s) => s.verdict === 'wrong' || s.verdict === 'shape');
+    set({ guess: id, revealed: wrong?.id ?? null, selectedStep: id });
+  },
+
   select: (id) => {
+    if (get().spotTheBug) {
+      if (id) get().makeGuess(id);
+      return;
+    }
     set({ selectedStep: id });
     const { report, source, settings, explanations } = get();
     if (!id || !report) return;

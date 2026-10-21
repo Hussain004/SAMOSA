@@ -14,6 +14,8 @@ export interface EditorProps {
   report: Report | null;
   selectedStep: string | null;
   onSelectStep: (id: string) => void;
+  /** the spot the bug game: the squiggles would give the answer away */
+  hideDiagnostics?: boolean;
 }
 
 /**
@@ -22,7 +24,14 @@ export interface EditorProps {
  * CodeMirror with the lint gutter, so a wrong step gets a squiggle and a
  * click on the squiggle opens the card of that step.
  */
-export function SourceEditor({ value, onChange, report, selectedStep, onSelectStep }: EditorProps) {
+export function SourceEditor({
+  value,
+  onChange,
+  report,
+  selectedStep,
+  onSelectStep,
+  hideDiagnostics,
+}: EditorProps) {
   const host = useRef<HTMLDivElement | null>(null);
   const view = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
@@ -82,7 +91,7 @@ export function SourceEditor({ value, onChange, report, selectedStep, onSelectSt
     if (!v) return;
     const length = v.state.doc.length;
     const diagnostics: CmDiagnostic[] = [];
-    for (const step of report?.steps ?? []) {
+    for (const step of hideDiagnostics ? [] : (report?.steps ?? [])) {
       if (step.verdict === 'defined') continue;
       const severity =
         step.verdict === 'wrong' || step.verdict === 'shape'
@@ -108,7 +117,7 @@ export function SourceEditor({ value, onChange, report, selectedStep, onSelectSt
       });
     }
     v.dispatch(setDiagnostics(v.state, diagnostics));
-  }, [report, selectedStep]);
+  }, [report, selectedStep, hideDiagnostics]);
 
   return <div className="h-full min-h-0 overflow-hidden" ref={host} />;
 }

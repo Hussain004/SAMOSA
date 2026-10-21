@@ -5,6 +5,7 @@ import { RenderedRows } from './RenderedRows.tsx';
 import { Inspector } from './Inspector.tsx';
 import { CommandPalette, Menu, PresetList, type Command } from './Menu.tsx';
 import { exportJson, exportMarkdown, exportLatex } from './export.ts';
+import { MENU } from '../../corpus/menu.ts';
 
 export function App() {
   const {
@@ -15,11 +16,15 @@ export function App() {
     explanations,
     busy,
     error,
+    spotTheBug,
+    guess,
+    revealed,
     setSource,
     setSettings,
     select,
     reroll,
     loadShare,
+    startSpotTheBug,
   } = useApp();
 
   const [menuOpen, setMenuOpen] = useState(false);
@@ -29,8 +34,18 @@ export function App() {
 
   useEffect(() => {
     loadShare();
+    // a deep link to a menu item, such as /app#menu=kalman
+    const hash = window.location.hash;
+    const menu = hash.match(/menu=([\w-]+)/);
+    if (menu) {
+      const item = MENU.find((m) => m.id === menu[1]);
+      if (item) {
+        setSource(item.source);
+        setSettings({ decls: item.decls });
+      }
+    }
     runCheck(useApp.getState().source, useApp.getState().settings);
-  }, [loadShare]);
+  }, [loadShare, setSource, setSettings]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -109,6 +124,21 @@ export function App() {
         >
           Menu
         </button>
+        {spotTheBug ? (
+          <span className="rounded border border-[var(--color-saffron)]/60 px-2 py-1 text-[11px] text-[var(--color-saffron)]">
+            spot the bug
+          </span>
+        ) : (
+          <button
+            onClick={() => {
+              const item = MENU.find((m) => m.bugSource);
+              if (item?.bugSource) startSpotTheBug(item.bugSource, item.decls);
+            }}
+            className="rounded border border-[var(--color-line)] px-2 py-1 text-[11px] text-[var(--color-muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-text)]"
+          >
+            Spot the bug
+          </button>
+        )}
         <button
           onClick={() => setShowSettings((v) => !v)}
           className="rounded border border-[var(--color-line)] px-2 py-1 text-[11px] text-[var(--color-muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-text)]"
@@ -208,8 +238,8 @@ export function App() {
                 setSettings({ decls });
                 setMenuOpen(false);
               }}
-              onSpotTheBug={(src) => {
-                setSource(src);
+              onSpotTheBug={(src, decls) => {
+                startSpotTheBug(src, decls);
                 setMenuOpen(false);
               }}
               onClose={() => setMenuOpen(false)}
@@ -231,6 +261,7 @@ export function App() {
               report={report}
               selectedStep={selectedStep}
               onSelectStep={select}
+              hideDiagnostics={spotTheBug && !revealed}
             />
           </div>
         </section>
@@ -248,6 +279,9 @@ export function App() {
               onSelectStep={select}
               hoverStep={null}
               onHoverStep={() => {}}
+              spotTheBug={spotTheBug}
+              guess={guess}
+              revealed={revealed}
             />
           </div>
         </section>
@@ -285,10 +319,16 @@ export function App() {
         <span className="text-[var(--color-faint)]">·</span>
         <span>seed 0x{settings.seed.toString(16).toUpperCase()}</span>
         <span className="text-[var(--color-faint)]">·</span>
-        {counts.ok > 0 && <span className="text-[var(--color-chutney)]">✓ {counts.ok}</span>}
-        {counts.wrong > 0 && <span className="text-[var(--color-tamarind)]">✗ {counts.wrong}</span>}
-        {counts.shape > 0 && <span className="text-[var(--color-tamarind)]">⊘ {counts.shape}</span>}
-        {counts.unchecked > 0 && <span className="text-[var(--color-slate)]">? {counts.unchecked}</span>}
+        {spotTheBug && !revealed ? (
+          <span className="text-[var(--color-saffron)]">find the wrong row</span>
+        ) : (
+          <>
+            {counts.ok > 0 && <span className="text-[var(--color-chutney)]">✓ {counts.ok}</span>}
+            {counts.wrong > 0 && <span className="text-[var(--color-tamarind)]">✗ {counts.wrong}</span>}
+            {counts.shape > 0 && <span className="text-[var(--color-tamarind)]">⊘ {counts.shape}</span>}
+            {counts.unchecked > 0 && <span className="text-[var(--color-slate)]">? {counts.unchecked}</span>}
+          </>
+        )}
         {report && (
           <>
             <span className="text-[var(--color-faint)]">·</span>
