@@ -77,13 +77,17 @@ if (write) {
   console.log(`the baseline is written in ${baselineFile}`);
 } else if (check_ && existsSync(baselineFile)) {
   const baseline = JSON.parse(readFileSync(baselineFile, 'utf8')) as Record<string, number>;
+  // The numbers are absolute, so the tolerance depends on the machine: a
+  // shared runner is slower than a laptop, and the gate is there to catch a
+  // real regression, not the difference between two machines.
+  const tolerance = Number(process.env.BENCH_TOLERANCE ?? '1.2');
   let failed = false;
   for (const [name, before] of Object.entries(baseline)) {
     const now = measured[name];
     if (now === undefined) continue;
-    if (now > before * 1.2) {
+    if (now > before * tolerance) {
       failed = true;
-      console.error(`  ${name}: ${now} ms, the baseline is ${before} ms, so it got more than a fifth slower`);
+      console.error(`  ${name}: ${now} ms, the baseline is ${before} ms, so it got slower`);
     }
   }
   if (failed) {

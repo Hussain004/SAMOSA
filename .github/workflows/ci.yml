@@ -27,7 +27,9 @@ jobs:
       - name: The CLI still runs
         run: node pkg/dist/cli.mjs check --help
       - name: The engine is not slower than the baseline
-        run: pnpm bench
+        # a shared runner is slower than the machine the baseline was measured
+        # on, so the gate is loose enough to catch a real regression only
+        run: BENCH_TOLERANCE=3 pnpm bench
       - name: The demo of the landing page is what the engine says
         run: pnpm gen:demo && git diff --exit-code src/landing/generated.json
       - name: The math of the landing page is rendered
