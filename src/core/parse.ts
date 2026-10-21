@@ -104,10 +104,26 @@ const NON_OPERAND_COMMANDS = new Set([
 /** A token used past the end of a slice, so the parser always sees an end. */
 const EOF_TOKEN: Token = { type: 'eof', value: '', from: 0, to: 0 };
 
+/**
+ * The functions whose double bar separates two arguments.
+ *
+ * In the information theory literature the double bar is a divergence, and in
+ * the probability literature the vertical bar is a conditioning. Both are
+ * written with a bar that looks like the one of a norm.
+ */
+const DIVERGENCES = new Set(['d', 'kl', 'd_kl', 'dkl', 'div', 'chi']);
+
+/** The name without its accents: `\mathrm{KL}` is `KL`. */
+function plainName(name: string): string {
+  return name.replace(/^(\\[A-Za-z]+)+/, '').toLowerCase();
+}
+
 export class Parser {
   private pos = 0;
   /** is the next factor the first of its product? */
   private firstFactor = false;
+  /** is the parser inside the arguments of a divergence? */
+  private inDivergence = false;
 
   private readonly tokens: Token[];
   private readonly opts: ParseOptions;
@@ -537,7 +553,10 @@ export class Parser {
           // A lowercase name with parentheses is a function call, even when
           // SAMOSA does not know the function. A capital name is a matrix, so
           // A(B) is a product, the way the notation reads.
+          const wasDivergence = this.inDivergence;
+          this.inDivergence = DIVERGENCES.has(plainName(t.value));
           const args = this.parseArgs();
+          this.inDivergence = wasDivergence;
           return { k: 'call', fn: t.value, args, span: { from: t.from, to: args.at(-1)?.span.to ?? t.to } };
         }
         return scripted;
@@ -630,6 +649,18 @@ export class Parser {
         if (this.kind() === 'comma' || this.kind() === 'semi') {
           this.pos++;
           continue;
+        }
+        // In a divergence the double bar separates the two distributions:
+        // D(P||Q) is a distance, not a norm of P. The same goes for the
+        // conditioning bar of a conditional expectation.
+        if (this.kind() === 'csym' && this.cur.value === '\\|' && this.inDivergence) {
+          this.pos++;
+          args.push(this.parseExpression());
+          if (this.kind() === 'comma' || this.kind() === 'semi') {
+            this.pos++;
+            continue;
+          }
+          break;
         }
         break;
       }

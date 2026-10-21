@@ -14,8 +14,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { Parser } from '../src/core/parse.ts';
-import { tokenize } from '../src/core/lex.ts';
+import { parseRow as engineParseRow } from '../src/core/parse.ts';
 import type { Node } from '../src/core/ir.ts';
 
 const root = resolve(import.meta.dirname, '..');
@@ -156,10 +155,16 @@ function parseRow(text: string): { ok: boolean; readable: boolean; reason: strin
   const trimmed = text.trim();
   if (!trimmed) return { ok: false, readable: false, reason: 'an empty row' };
   try {
-    const parser = new Parser(tokenize(trimmed), trimmed, {});
-    const node = parser.parseExpression();
-    const raw = firstRaw(node);
-    if (raw) return { ok: false, readable: true, reason: `the unknown construct ${raw}` };
+    // The row is parsed the way the engine parses it: by the relation in it.
+    // A row that ends in a comma is a row of a paper, not a broken row.
+    const parsed = engineParseRow(trimmed, trimmed, 0, 0);
+    if (parsed.prose || !parsed.parts.length) {
+      return { ok: false, readable: false, reason: 'a row with no relation in it' };
+    }
+    for (const part of parsed.parts) {
+      const raw = (part.lhs ? firstRaw(part.lhs) : null) ?? (part.rhs ? firstRaw(part.rhs) : null);
+      if (raw) return { ok: false, readable: true, reason: `the unknown construct ${raw}` };
+    }
     return { ok: true, readable: true, reason: '' };
   } catch (error) {
     return { ok: false, readable: false, reason: `a parse error: ${(error as Error).message}` };

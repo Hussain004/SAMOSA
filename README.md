@@ -145,13 +145,13 @@ cs.RO and stat.ML, 1498 rows:
 
 | | |
 | --- | --- |
-| rows SAMOSA can parse | 1173 (**78.3%**) |
-| rows SAMOSA reads with no unknown construct | 818 (**54.6%**) |
+| rows SAMOSA can parse | 1300 (**86.8%**) |
+| rows SAMOSA reads with no unknown construct | 749 (**50.0%**) |
 
 The gap is rows that parse but contain something SAMOSA does not know, such
-as a `\|` used as a double bar instead of a norm, or a macro the authors
-defined in their own preamble. The method and the full list of what stops
-the rest are in [docs/COVERAGE.md](docs/COVERAGE.md).
+as a `\mid` used as a conditional bar, or a macro the authors defined in
+their own preamble. The method and the full list of what stops the rest are
+in [docs/COVERAGE.md](docs/COVERAGE.md).
 
 And the Cookbook: 48 identities in matrix algebra, calculus and stochastics,
 with the mistakes the catalog can make of them.
