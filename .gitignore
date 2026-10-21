@@ -1,6 +1,5 @@
 node_modules
 dist
-pkg/dist
 .DS_Store
 *.local
 .vite
@@ -15,3 +14,4 @@ AGENTS.md
 spikes/
 prototypes/
 public/docs
+.directory
