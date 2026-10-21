@@ -87,6 +87,46 @@ export interface Explanation {
  * wrong step.
  */
 export function explain(src: string, stepId: string, opts: CheckOptions = {}): Explanation {
+  const parsed = parseForExplain(src, opts);
+  const step = parsed.steps.find((s) => s.id === stepId);
+  if (!step || !step.lhs || !step.rhs) return { fixes: [] };
+  return explainStep(parsed, step, opts);
+}
+
+/**
+ * The explanations of every step that is wrong or does not fit.
+ *
+ * The CLI and the MCP server need all of them, and parsing the source once
+ * for all of them is what makes that affordable.
+ */
+export function explainAll(
+  src: string,
+  opts: CheckOptions = {},
+  limit = 8,
+): Map<string, Explanation> {
+  const out = new Map<string, Explanation>();
+  const parsed = parseForExplain(src, opts);
+  const deadline = Date.now() + (opts.budgetMs ?? 4000);
+  let count = 0;
+  for (const step of parsed.steps) {
+    if (count >= limit) break;
+    if (Date.now() > deadline) break;
+    if (!step.lhs || !step.rhs) continue;
+    if (step.relation !== '=' && step.relation !== 'shape') continue;
+    out.set(step.id, explainStep(parsed, step, opts));
+    count++;
+  }
+  return out;
+}
+
+interface ParsedSource {
+  ctx: ReturnType<typeof createContext>;
+  defs: Map<string, Node>;
+  steps: Array<{ id: string; lhs?: Node; rhs?: Node; relation: string; defined: boolean }>;
+}
+
+/** Parses a source into the steps the explanations work on. */
+function parseForExplain(src: string, opts: CheckOptions): ParsedSource {
   const rows = splitRows(src);
   const declared = parseDeclarations(opts.decls ?? '');
   const preset = presetDecls(opts.preset);
@@ -104,7 +144,7 @@ export function explain(src: string, stepId: string, opts: CheckOptions = {}): E
 
   const ctx = createContext(decls, opts.layout ?? 'denominator');
   const defs = new Map<string, Node>();
-  const steps: Array<{ id: string; lhs?: Node; rhs?: Node; relation: string; defined: boolean }> = [];
+  const steps: ParsedSource['steps'] = [];
   let previousRhs: Node | undefined;
 
   rows.forEach((row, rowIndex) => {
@@ -143,8 +183,13 @@ export function explain(src: string, stepId: string, opts: CheckOptions = {}): E
     }
   });
 
-  const step = steps.find((s) => s.id === stepId);
-  if (!step || !step.lhs || !step.rhs) return { fixes: [] };
+  return { ctx, defs, steps };
+}
+
+/** The fixes and the counterexample of one step. */
+function explainStep(parsed: ParsedSource, step: ParsedSource['steps'][number], opts: CheckOptions): Explanation {
+  const { ctx, defs } = parsed;
+  if (!step.lhs || !step.rhs) return { fixes: [] };
 
   inferType(ctx, step.lhs);
   inferType(ctx, step.rhs);

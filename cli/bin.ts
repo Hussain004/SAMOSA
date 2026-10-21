@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { readFileSync } from 'node:fs';
 import { basename, extname } from 'node:path';
-import { check, type CheckOptions, type Report } from '../src/core/index.ts';
+import { check, explainAll, type CheckOptions, type Report } from '../src/core/index.ts';
 import { extractDocument } from './extract.ts';
 import { formatGithub, formatPretty, formatSarif } from './format.ts';
 
@@ -21,6 +21,8 @@ interface Args {
   options: CheckOptions & {
     format: 'pretty' | 'json' | 'sarif' | 'github';
     failOn: string[];
+    /** the fixes and the counterexamples are not computed */
+    noExplain: boolean;
   };
 }
 
@@ -36,6 +38,7 @@ function parseArgs(argv: string[]): Args {
       seed: undefined,
       trials: undefined,
       layout: 'denominator',
+      noExplain: false,
     },
   };
 
@@ -55,6 +58,9 @@ function parseArgs(argv: string[]): Args {
         break;
       case '--fail-on':
         args.options.failOn = (next() ?? 'wrong,shape').split(',').map((s) => s.trim());
+        break;
+      case '--no-explain':
+        args.options.noExplain = true;
         break;
       case '--seed':
         args.options.seed = Number(next());
@@ -104,6 +110,7 @@ Options:
   --seed <number>             the seed of the sampling
   --trials <number>           the trials per size
   --layout <denominator|numerator>
+  --no-explain                do not look for the fixes and the counterexamples
   --version
 `;
 }
@@ -140,15 +147,25 @@ function main(): void {
     const isTex = file === '-' ? true : extname(file) === '.tex';
     const extraction = extractDocument(source, isTex);
     const decls = [args.options.decls, ...extraction.decls].filter(Boolean).join('; ');
-    const report = check(extraction.rows.map((r) => r.text).join('\\\\\n'), {
-      ...args.options,
-      decls,
-    });
+    const rows = extraction.rows.map((r) => r.text).join('\\\\\n');
+    const report = check(rows, { ...args.options, decls });
     // the line of every step, so the output can point at it
     for (const step of report.steps) {
       const row = extraction.rows.find((r) => step.text?.startsWith(r.text));
       step.line = row?.line ?? 0;
       step.column = 1;
+    }
+    // The fixes and the shrunk counterexample, so the CLI says what to do and
+    // not only that the step is wrong. The rows that are wrong are few, so
+    // this is affordable.
+    if (!args.options.noExplain) {
+      const explanations = explainAll(rows, { ...args.options, decls });
+      for (const step of report.steps) {
+        const explanation = explanations.get(step.id);
+        if (!explanation) continue;
+        step.fixes = explanation.fixes;
+        if (explanation.counterexample) step.counterexample = explanation.counterexample;
+      }
     }
     reports.push({ file: file === '-' ? 'stdin' : file, report, line: 0, column: 0 });
   }
