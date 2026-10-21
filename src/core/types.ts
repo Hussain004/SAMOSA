@@ -642,7 +642,9 @@ function derivType(ctx: TypeContext, node: Extract<Node, { k: 'deriv' }>): Ty {
     }
     return { t: 'scalar' };
   }
-  if (f.t === 'scalar') {
+  // a one by one matrix is a scalar that happens to be written as a product
+  const scalarish = f.t === 'scalar' || (f.t === 'mat' && f.r === 1 && f.c === 1);
+  if (scalarish) {
     const w = wrtTypes[0];
     if (w && isMatrix(w)) {
       if (ctx.layout === 'numerator') return { t: 'mat', r: w.c, c: w.r };

@@ -6,6 +6,7 @@ import { Inspector } from './Inspector.tsx';
 import { CommandPalette, Menu, PresetList, type Command } from './Menu.tsx';
 import { exportJson, exportMarkdown, exportLatex } from './export.ts';
 import { MENU } from '../../corpus/menu.ts';
+import { VERDICT_LABEL } from './verdicts.ts';
 
 export function App() {
   const {
@@ -292,7 +293,7 @@ export function App() {
           <span className="pane-title">inspector</span>
           {step && (
             <span className="text-[10px] text-[var(--color-faint)]">
-              row {step.row} · {step.mode ?? 'defined'}
+              row {step.row} · {step.mode ?? VERDICT_LABEL[step.verdict]}
             </span>
           )}
         </div>

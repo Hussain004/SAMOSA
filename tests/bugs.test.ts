@@ -75,3 +75,26 @@ describe('the planted bugs', () => {
     expect(report.steps[9].verdict).toBe('ok');
   });
 });
+
+describe('the layout of a gradient', () => {
+  const GRADIENT = String.raw`\begin{align*}
+J &:= a^\top X b \\
+\frac{\partial J}{\partial X} &= b a^\top
+\end{align*}`;
+  const DECLS_X = 'X: m×n; a: m; b: n';
+
+  it('says the right side is in the numerator layout', () => {
+    const report = check(GRADIENT, { decls: DECLS_X });
+    const step = report.steps[1];
+    expect(step.verdict).toBe('shape');
+    expect(step.message).toContain('numerator layout');
+  });
+
+  it('holds the denominator layout', () => {
+    // the denominator layout of the gradient of a^top X b is a b^top
+    const ok = check(GRADIENT.replace(String.raw`b a^\top`, String.raw`a b^\top`), {
+      decls: DECLS_X,
+    });
+    expect(ok.steps[1].verdict).toBe('ok');
+  });
+});

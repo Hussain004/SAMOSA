@@ -43,6 +43,8 @@ async function main() {
     await page.waitForTimeout(1600);
     await clickBadRow(page);
     await page.waitForTimeout(2200);
+    await scrollInspector(page);
+    await page.waitForTimeout(1200);
     const apply = page.getByRole('button', { name: 'apply' }).first();
     if (await apply.count()) {
       await apply.click();
@@ -57,6 +59,8 @@ async function main() {
     await page.waitForTimeout(1800);
     await clickBadRow(page);
     await page.waitForTimeout(2600);
+    await scrollInspector(page);
+    await page.waitForTimeout(1200);
   });
 
   // 3. the gradient in the wrong layout
@@ -75,9 +79,12 @@ async function main() {
 async function record(name, script) {
   const dir = resolve(WORK, name);
   mkdirSync(dir, { recursive: true });
+  // the recording is at the full size of the window: the text in the app is
+  // 13 pixels, and a GIF that is scaled down is a GIF nobody can read
   const context = await chromium.launchPersistentContext('', {
-    recordVideo: { dir, size: { width: 1100, height: 680 } },
-    viewport: { width: 1100, height: 680 },
+    recordVideo: { dir, size: { width: 1080, height: 660 } },
+    viewport: { width: 1080, height: 660 },
+    deviceScaleFactor: 1,
   });
   const page = await context.newPage();
   await script(page);
@@ -86,19 +93,36 @@ async function record(name, script) {
   await context.close();
   const raw = await video.path();
 
-  // the GIF: a palette, a modest size, and enough frames to be smooth
+  // The GIF keeps every pixel of the recording, so the text stays legible.
+  // The idle seconds at the start are trimmed, and the palette is built from
+  // the parts that change.
   execFileSync('ffmpeg', [
     '-y',
     '-i',
     raw,
     '-vf',
-    'fps=14,scale=760:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=96[p];[s1][p]paletteuse=dither=bayer:bayer_scale=3',
+    'trim=start=1.2,setpts=PTS-STARTPTS,fps=10,scale=1080:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=128:stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=3',
     '-loop',
     '0',
     resolve(OUT, `${name}.gif`),
   ]);
   rmSync(dir, { recursive: true, force: true });
   console.log(`  ${name}.gif`);
+}
+
+/** Scrolls the inspector down to the counterexample. */
+async function scrollInspector(page) {
+  await page.evaluate(() => {
+    const sections = document.querySelectorAll('section');
+    const last = sections[sections.length - 1];
+    if (!last) return;
+    for (const el of last.querySelectorAll('div')) {
+      if (el.scrollHeight > el.clientHeight + 8) {
+        el.scrollTop = el.scrollHeight;
+        return;
+      }
+    }
+  });
 }
 
 /** Clicks the row that SAMOSA flagged. */

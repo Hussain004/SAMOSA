@@ -384,20 +384,22 @@ function checkStep(
   const lhsTy = inferType(ctx, step.lhs);
   const rhsTy = inferType(ctx, step.rhs);
   // the two sides of an equality have to have the same shape
+  // a gradient in the wrong layout shows up as a transposed shape, so the shapes
+  // are compared before they are unified
+  let transposed = false;
+  if (step.lhs?.k === 'deriv' && rhsTy.t === 'mat' && lhsTy.t === 'mat') {
+    const key = (d: Dim): string => (typeof d === 'number' ? String(d) : ctx.dims.find(d.v));
+    transposed =
+      key(rhsTy.r) === key(lhsTy.c) && key(rhsTy.c) === key(lhsTy.r) && key(rhsTy.r) !== key(rhsTy.c);
+  }
   if (lhsTy.t === 'mat' && rhsTy.t === 'mat') {
     unifyShapes(ctx, lhsTy, rhsTy, step.span);
   }
   const shapeErrors = ctx.errors.splice(0, ctx.errors.length);
 
-  // a gradient in the wrong layout shows up as a transposed shape
-  if (shapeErrors.length && step.lhs?.k === 'deriv' && rhsTy.t === 'mat' && lhsTy.t === 'mat') {
-    const transposed =
-      (rhsTy.r === lhsTy.c && rhsTy.c === lhsTy.r && rhsTy.r !== rhsTy.c) ||
-      (rhsTy.r === lhsTy.c && rhsTy.c === lhsTy.r);
-    if (transposed) {
-      shapeErrors[0].message =
-        'this is the numerator layout: SAMOSA uses the denominator layout, where the gradient has the shape of the variable it is taken with respect to';
-    }
+  if (shapeErrors.length && transposed) {
+    shapeErrors[0].message =
+      'this is the numerator layout: SAMOSA uses the denominator layout, where the gradient has the shape of the variable it is taken with respect to';
   }
   if (shapeErrors.length) {
     for (const error of shapeErrors) {
