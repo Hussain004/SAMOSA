@@ -1,12 +1,12 @@
 {
   "the Kalman update, seven rows": {
-    "engine": 7.247,
-    "calibration": 36.997,
-    "ratio": 0.195881
+    "engine": 6.629,
+    "calibration": 164.933,
+    "ratio": 0.040192
   },
   "the Woodbury identity, one row": {
-    "engine": 1.57,
-    "calibration": 36.997,
-    "ratio": 0.042436
+    "engine": 1.417,
+    "calibration": 164.933,
+    "ratio": 0.008591
   }
 }

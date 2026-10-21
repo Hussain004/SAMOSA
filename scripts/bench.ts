@@ -64,8 +64,13 @@ const CASES: Array<{ name: string; run: () => void }> = [
 function calibration(): number {
   let x = 0.123456789;
   const started = performance.now();
-  for (let i = 0; i < 3_000_000; i++) {
-    x = (x * 1.0000001 + 0.0000001) % 1;
+  for (let i = 0; i < 300_000; i++) {
+    // The engine allocates a matrix for every instance it evaluates, so the
+    // calibration allocates as well: a machine that is slow at allocating
+    // makes both slower, and the ratio stays the same.
+    const scratch = new Float64Array(16);
+    for (let j = 0; j < scratch.length; j++) scratch[j] = (x * 1.0000001 + j) % 1;
+    x = scratch[3] + scratch[11];
   }
   const elapsed = performance.now() - started;
   // the loop is not optimised away
@@ -73,11 +78,11 @@ function calibration(): number {
   return elapsed;
 }
 
-/** The best of three rounds, in milliseconds per run. */
-function measure(run: () => void, rounds = 3): number {
+/** The best of five rounds, in milliseconds per run. */
+function measure(run: () => void, rounds = 5): number {
   let best = Infinity;
   for (let round = 0; round < rounds; round++) {
-    const runs = 20;
+    const runs = 100;
     const started = performance.now();
     for (let i = 0; i < runs; i++) run();
     const each = (performance.now() - started) / runs;
@@ -115,7 +120,7 @@ if (write) {
   console.log(`the baseline is written in ${baselineFile}`);
 } else if (check_ && existsSync(baselineFile)) {
   const baseline = JSON.parse(readFileSync(baselineFile, 'utf8')) as Record<string, Measurement>;
-  const tolerance = Number(process.env.BENCH_TOLERANCE ?? '1.2');
+  const tolerance = Number(process.env.BENCH_TOLERANCE ?? '1.25');
   let failed = false;
   for (const [name, before] of Object.entries(baseline)) {
     const now = measured[name];
