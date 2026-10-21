@@ -30,7 +30,7 @@ export const DEMO_SCRIPTS: DemoScript[] = [
   {
     id: 'claude',
     label: 'Claude Code',
-    title: '~/notes · claude',
+    title: '~/notes: claude',
     events: [
       { kind: 'user', text: 'derive the Kalman gain for my notes and check every step' },
       { kind: 'think', text: 'Thinking…' },
@@ -47,7 +47,7 @@ export const DEMO_SCRIPTS: DemoScript[] = [
   {
     id: 'codex',
     label: 'Codex',
-    title: '~/notes · codex',
+    title: '~/notes: codex',
     events: [
       { kind: 'user', text: 'derive the Kalman gain for my notes and check every step' },
       { kind: 'think', text: 'Working…' },
@@ -61,7 +61,7 @@ export const DEMO_SCRIPTS: DemoScript[] = [
   {
     id: 'cli',
     label: 'CLI',
-    title: 'samosa · zsh',
+    title: 'samosa: zsh',
     events: [
       { kind: 'user', text: 'npx samosa-math check paper.tex' },
       { kind: 'result', text: 'paper/appendix.tex', tone: 'plain' },
