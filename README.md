@@ -12,6 +12,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6.svg)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-19-61dafb.svg)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-8-646cff.svg)](https://vite.dev/)
+[![npm](https://img.shields.io/npm/v/samosa-math.svg)](https://www.npmjs.com/package/samosa-math)
 [![Version](https://img.shields.io/badge/version-1.0.0-3b82f6.svg)](https://github.com/Hussain004/SAMOSA/releases)
 
 [**→ Live demo**](https://samosa-math.vercel.app/app) · [Report a bug](https://github.com/Hussain004/SAMOSA/issues) · [Request a feature](https://github.com/Hussain004/SAMOSA/issues)
@@ -176,7 +177,7 @@ Gaussians, the Riccati recursion and the trace identities.
 | | |
 | --- | --- |
 | **Web** | [samosa-math.vercel.app/app](https://samosa-math.vercel.app/app), no install |
-| **CLI** | `npm i -g samosa-math`, or `npx samosa-math` |
+| **CLI** | `npm i -g samosa-math`, then `samosa check paper.tex`, or `npx samosa-math check paper.tex` |
 | **Claude Code** | `claude mcp add samosa -- npx -y -p samosa-math samosa-mcp` |
 | **Codex** | `[mcp_servers.samosa]` in `~/.codex/config.toml` |
 | **Cursor** | the `mcpServers` entry in `.cursor/mcp.json` |
