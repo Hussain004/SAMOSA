@@ -10,7 +10,12 @@ import type { Field } from './types.ts';
  *   a * b = (a * (b >>> 16)) * 65536 + a * (b & 0xffff)
  *
  * Every intermediate stays below 2^53 and is therefore exact. The spike
- * `spikes/gfp_probe.mjs` validates this against BigInt on 10^5 random pairs.
+ * `spikes/gfp_probe.mjs` validates this against BigInt on 10^5 random pairs,
+ * and `tests/field.test.ts` keeps the oracle honest.
+ *
+ * The operands are expected to be reduced already, in `[0, p)`: that is what
+ * the samplers, the matrix operations and `fromRational` produce, and the
+ * arithmetic above relies on it.
  */
 export class GFpField implements Field<number> {
   readonly name = 'GF(p)';
