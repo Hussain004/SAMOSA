@@ -4,7 +4,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['tests/**/*.test.ts'],
-    benchmark: { include: ['bench/**/*.bench.ts'] },
+    benchmark: { include: ['tests/**/*.bench.ts'] },
     testTimeout: 30_000,
   },
 });

@@ -583,7 +583,7 @@ function residualRepairs(sh: RepairCtx): Fix[] {
     out.push({
       kind: 'residual',
       title: `this step is off by exactly ${scaleText(scale)} ${text}`,
-      edit: { span: sh.rhs.span, insert: `${renderNode(sh.rhs)} + ${scaleText(scale)} ${text}` },
+      edit: { span: sh.rhs.span, insert: `${renderNode(sh.rhs)} ${scaleText(scale)} ${text}` },
       verified: false,
       detail: text,
     });

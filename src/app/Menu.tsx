@@ -34,6 +34,7 @@ export function Menu({ onPick, onClose, onSpotTheBug }: MenuProps) {
             <p className="mt-1 text-[11px] leading-relaxed text-[var(--color-muted)]">{item.blurb}</p>
             <div className="mt-2 flex gap-2">
               <button
+                data-menu-item={item.id}
                 onClick={() => onPick(item.source, item.decls)}
                 className="rounded border border-[var(--color-line)] px-2 py-1 text-[10px] hover:border-[var(--color-gold)] hover:text-[var(--color-text)]"
               >

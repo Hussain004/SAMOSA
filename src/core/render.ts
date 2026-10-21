@@ -76,13 +76,13 @@ function renderOp(node: Extract<Node, { k: 'op' }>): string {
   const a = node.args.map(renderNode);
   switch (node.op) {
     case 'add':
-      return `${a[0]} + ${a[1]}`;
+      return `${operand(node.args[0])} + ${operand(node.args[1])}`;
     case 'sub':
-      return `${a[0]} - ${a[1]}`;
+      return `${operand(node.args[0])} - ${operand(node.args[1])}`;
     case 'neg':
-      return `-${a[0]}`;
+      return `-${operand(node.args[0])}`;
     case 'mul':
-      return `${a[0]} ${a[1]}`;
+      return `${operand(node.args[0])} ${operand(node.args[1])}`;
     case 'div':
       return `\\frac{${a[0]}}{${a[1]}}`;
     case 'pow':
@@ -118,6 +118,22 @@ function renderOp(node: Extract<Node, { k: 'op' }>): string {
     case 'sqrtm':
       return `\\sqrt{${a[0]}}`;
   }
+}
+
+/**
+ * An operand of a sum, a difference or a product.
+ *
+ * A compound operand is written in braces, because a sum inside a product
+ * without them means something else: `I - K C \bar\Sigma` is not
+ * `(I - K C) \bar\Sigma`.
+ */
+function operand(node: Node | undefined): string {
+  if (!node) return '';
+  const text = renderNode(node);
+  if (node.k === 'op' && (node.op === 'add' || node.op === 'sub' || node.op === 'mul' || node.op === 'neg')) {
+    return `{${text}}`;
+  }
+  return text;
 }
 
 /** A short, human readable name of a symbol. */

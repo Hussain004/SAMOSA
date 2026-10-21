@@ -34,7 +34,8 @@
     "publish:pkg": "npm run build:pkg && npm publish --access public --prefix pkg",
     "test": "vitest run",
     "test:watch": "vitest",
-    "bench": "vitest bench --run",
+    "bench": "vite-node scripts/bench.ts --check",
+    "bench:write": "vite-node scripts/bench.ts --write",
     "test:e2e": "playwright test",
     "check:corpus": "node scripts/check-corpus.mjs"
   },

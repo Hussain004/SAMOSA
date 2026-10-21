@@ -26,6 +26,8 @@ jobs:
       - run: pnpm build:pkg
       - name: The CLI still runs
         run: node pkg/dist/cli.mjs check --help
+      - name: The engine is not slower than the baseline
+        run: pnpm bench
       - name: The demo of the landing page is what the engine says
         run: pnpm gen:demo && git diff --exit-code src/landing/generated.json
       - name: The math of the landing page is rendered
