@@ -2,7 +2,7 @@ import type { Field } from './fields/types.ts';
 import { F64Field } from './fields/f64.ts';
 import { DecField } from './fields/dec.ts';
 import { GFpField, P1, P2 } from './fields/gfp.ts';
-import { matInv, matMul, matSub, type Mat } from './linalg.ts';
+import { DomainError, matInv, matMul, matSub, type Mat } from './linalg.ts';
 import {
   evalNode,
   makeEnv,
@@ -21,12 +21,15 @@ import {
   degreeOf,
   dimSizeOf,
   inferType,
+  unifyDim,
   type Chip,
   type SymbolInfo,
   type TypeContext,
 } from './types.ts';
 import { isMatrixVal, isScalarVal, scalar, type Val } from './value.ts';
+import { collectDimVarsFor } from './dims.ts';
 import type { Assertion, Node, Relation, Span } from './ir.ts';
+import type { Dim } from './decl.ts';
 
 /**
  * The verdict engine.
@@ -153,8 +156,8 @@ function collectSymbols(node: Node | undefined, into: Set<string>): void {
       for (const a of node.args) collectSymbols(a, into);
       return;
     case 'bigop':
-      collectSymbols(node.lo, into);
-      collectSymbols(node.hi, into);
+      collectSymbols(node.lo ?? undefined, into);
+      collectSymbols(node.hi ?? undefined, into);
       collectSymbols(node.body, into);
       return;
     case 'block':
@@ -181,12 +184,13 @@ export function check(src: string, opts: CheckOptions = {}): Report {
   const diagnostics: Diagnostic[] = [];
   const definedNames = new Set<string>();
 
+  const knownFns = new Set<string>(decls.filter((d) => d.kind === 'function').map((d) => d.name));
   const steps: Step[] = [];
   let previousRhs: Node | undefined;
   let rowIndex = 0;
 
   for (const row of rows) {
-    const parsed = parseRow(src, row.text, row.from, rowIndex);
+    const parsed = parseRow(src, row.text, row.from, rowIndex, knownFns);
     rowIndex++;
     if (parsed.prose || !parsed.parts.length) continue;
 
@@ -212,18 +216,20 @@ export function check(src: string, opts: CheckOptions = {}): Report {
         continue;
       }
 
-      let lhs = part.lhs;
-      const rhs = part.rhs;
+      let lhs = (part.lhs ?? null) ?? undefined;
+      const rhs = (part.rhs ?? null) ?? undefined;
       if (!lhs && previousRhs) lhs = previousRhs;
 
       const symbols = new Set<string>();
       collectSymbols(lhs, symbols);
       collectSymbols(rhs, symbols);
 
-      const bareLhs = lhs?.k === 'sym' ? lhs.name : undefined;
+      const bareLhs = defNameOf(lhs);
+      // an equation whose left hand side is a bare symbol that has not been
+      // defined yet is a definition, not a claim
       const isDefinition =
         part.relation === ':=' ||
-        (bareLhs !== undefined && !ctx.decls.has(bareLhs) && !definedNames.has(bareLhs));
+        (bareLhs !== undefined && !definedNames.has(bareLhs) && !isFunctionName(ctx, bareLhs));
 
       steps.push({
         id: `s${steps.length}`,
@@ -283,7 +289,7 @@ function mergeDecls(preset: SymbolDecl[], declared: SymbolDecl[]): SymbolDecl[] 
 }
 
 function now(): number {
-  return typeof performance !== 'undefined' ? performance.now() : Date.now();
+  return Date.now();
 }
 
 // ---------------------------------------------------------------- one step
@@ -358,8 +364,12 @@ function checkStep(
     };
   }
 
-  inferType(ctx, step.lhs);
-  inferType(ctx, step.rhs);
+  const lhsTy = inferType(ctx, step.lhs);
+  const rhsTy = inferType(ctx, step.rhs);
+  // the two sides of an equality have to have the same shape
+  if (lhsTy.t === 'mat' && rhsTy.t === 'mat') {
+    unifyShapes(ctx, lhsTy, rhsTy, step.span);
+  }
   const shapeErrors = ctx.errors.splice(0, ctx.errors.length);
   if (shapeErrors.length) {
     for (const error of shapeErrors) {
@@ -402,7 +412,20 @@ function checkStep(
   return checkNumeric(step, ctx, defs, opts, base);
 }
 
-function unsupportedRelation(relation: Relation): string {
+/** Unifies the shapes of the two sides of an equality. */
+function unifyShapes(
+  ctx: TypeContext,
+  a: { r: Dim; c: Dim },
+  b: { r: Dim; c: Dim },
+  span: Span,
+): void {
+  const r = unifyDim(ctx, a.r, b.r, 'in this equality', span);
+  const c = unifyDim(ctx, a.c, b.c, 'in this equality', span);
+  void r;
+  void c;
+}
+
+function unsupportedRelation(relation: Relation | 'defined'): string {
   switch (relation) {
     case 'le':
     case 'ge':
@@ -483,24 +506,25 @@ function checkExact(
 
   let worstBound = 0;
   let worstDegree = 0;
+  const working: Map<string, number>[] = [];
   const sizes: Record<string, number>[] = [];
   const assumptions = collectAssumptions(ctx, step);
 
   for (const setting of settings) {
-    sizes.push({ ...setting });
-    const dl = degreeOf(ctx, step.lhs!, setting, defs);
-    const dr = degreeOf(ctx, step.rhs!, setting, defs);
-    const d = Math.max(dl.n + dr.d, dr.n + dl.d);
-    worstDegree = Math.max(worstDegree, d);
-    const bound = Math.pow(d / P1, opts.trials) * Math.pow(d / P2, opts.trials);
-    worstBound = Math.max(worstBound, bound);
-
+    let usable = false;
     for (let trial = 0; trial < opts.trials; trial++) {
       for (const p of primes) {
         const rng = rngFor(opts.seed, step.id, settingKey(setting), trial, p);
         const outcome = runExactTrial(step, ctx, defs, setting, p, rng);
-        if (outcome.kind === 'ok') continue;
+        if (outcome.kind === 'ok') {
+          usable = true;
+          continue;
+        }
         if (outcome.kind === 'unknown') {
+          if (outcome.domain) {
+            // this size cannot work (a singular matrix, say), so it is skipped
+            continue;
+          }
           return {
             id: step.id,
             row: step.row,
@@ -531,6 +555,32 @@ function checkExact(
         };
       }
     }
+    if (usable) working.push(setting);
+  }
+
+  if (!working.length) {
+    const message = 'this step could not be evaluated at any size';
+    return {
+      id: step.id,
+      row: step.row,
+      span: step.span,
+      relation: step.relation,
+      verdict: 'unchecked',
+      card: { ...card, sizes, primes, assumptions },
+      message,
+      reason: message,
+      annotation: step.annotation,
+    };
+  }
+
+  for (const setting of working) {
+    sizes.push(Object.fromEntries(setting) as Record<string, number>);
+    const dl = degreeOf(ctx, step.lhs!, setting, defs);
+    const dr = degreeOf(ctx, step.rhs!, setting, defs);
+    const d = Math.max(dl.n + dr.d, dr.n + dl.d);
+    worstDegree = Math.max(worstDegree, d);
+    const bound = Math.pow(d / P1, opts.trials) * Math.pow(d / P2, opts.trials);
+    worstBound = Math.max(worstBound, bound);
   }
 
   return {
@@ -551,7 +601,7 @@ function checkExact(
 type TrialOutcome =
   | { kind: 'ok' }
   | { kind: 'wrong'; message: string; counterexample: Counterexample; layoutHint?: string }
-  | { kind: 'unknown'; message: string };
+  | { kind: 'unknown'; message: string; domain?: boolean };
 
 function runExactTrial(
   step: Step,
@@ -566,28 +616,29 @@ function runExactTrial(
   const env = makeEnv(field, rng);
   env.defs = defs;
 
-  const sampled = sampleFor(ctx, step, defs, setting, sampler);
+  const free = freeVariables(step);
+  const sampled = sampleFor(ctx, step, defs, setting, sampler, free);
   if (sampled === 'unknown') {
     return { kind: 'unknown', message: 'SAMOSA could not sample an instance of these objects' };
   }
   for (const [name, value] of sampled.entries()) env.values.set(name, value);
 
   const sides = evaluateSides(field, step, env, sampler);
-  if (sides.kind === 'unknown') return { kind: 'unknown', message: sides.message };
+  if (sides.kind === 'unknown') return { kind: 'unknown', message: sides.message, domain: sides.domain };
   if (sides.kind === 'equal') return { kind: 'ok' };
 
   return {
     kind: 'wrong',
     message: sides.message,
     layoutHint: sides.layoutHint,
-    counterexample: buildCounterexample(ctx, step, setting, sampled, sides.lhs, sides.rhs, p),
+    counterexample: buildCounterexample(ctx, step, setting, sampled, sides.lhs, sides.rhs, field),
   };
 }
 
 type Sides<T> =
   | { kind: 'equal' }
   | { kind: 'different'; lhs: Val<T>; rhs: Val<T>; message: string; layoutHint?: string }
-  | { kind: 'unknown'; message: string };
+  | { kind: 'unknown'; message: string; domain?: boolean };
 
 /**
  * Evaluates both sides of a step and compares them.
@@ -611,8 +662,14 @@ function evaluateSides<T>(
     if (valuesEqual(field, lhs, rhs)) return { kind: 'equal' };
     return { kind: 'different', lhs, rhs, message: 'the two sides are not equal' };
   } catch (error) {
-    if (error instanceof EvalError) return { kind: 'unknown', message: error.message };
-    return { kind: 'unknown', message: String(error) + ' STACK ' + ((error as Error).stack ?? '') };
+    if (error instanceof EvalError) {
+      const domain = /singular|non square|domain/i.test(error.message);
+      return { kind: 'unknown', message: error.message, domain };
+    }
+    if (error instanceof DomainError) {
+      return { kind: 'unknown', message: error.message, domain: true };
+    }
+    return { kind: 'unknown', message: String(error) };
   }
 }
 
@@ -667,7 +724,7 @@ function compareDerivative<T>(
 
   if (tangentScalar !== null && isMatrixVal(claimedVal)) {
     const inner = innerProduct(field, claimedVal.m, direction);
-    if (field.eq(inner, tangentScalar)) return { kind: 'equal' };
+    if (fieldClose(field, inner, tangentScalar)) return { kind: 'equal' };
     // the layout diagnosis: the claimed gradient has the transposed shape
     if (claimedVal.m.r === direction.c && claimedVal.m.c === direction.r) {
       const flipped = innerProduct(field, transposeMat(claimedVal.m), direction);
@@ -713,7 +770,7 @@ function compareDerivative<T>(
 }
 
 /** A 1 by 1 matrix is a scalar in disguise. */
-function asScalar<T>(field: Field<T>, val: Val<T>): T | null {
+function asScalar<T>(_field: Field<T>, val: Val<T>): T | null {
   if (isScalarVal(val)) return val.v;
   if (val.m.r === 1 && val.m.c === 1) return val.m.d[0];
   return null;
@@ -749,6 +806,55 @@ function transposeMat<T>(m: Mat<T>): Mat<T> {
   return { r: m.c, c: m.r, d };
 }
 
+/** Is this name a declared function? Those are never defined by an equation. */
+function isFunctionName(ctx: TypeContext, name: string): boolean {
+  const decl = ctx.decls.get(name);
+  return decl?.kind === 'function';
+}
+
+/**
+ * Are two values the same?
+ *
+ * Over a finite field that is exact equality. Over the reals it is a
+ * relative comparison, because the last bits of a float are noise.
+ */
+function fieldClose<T>(field: Field<T>, a: T, b: T): boolean {
+  if (field instanceof GFpField) return field.eq(a, b);
+  const x = field.toNumber(a);
+  const y = field.toNumber(b);
+  const scale = Math.max(1, Math.abs(x), Math.abs(y));
+  return Math.abs(x - y) <= 1e-12 * scale;
+}
+
+/** The variables a derivative is taken with respect to: they stay free. */
+function freeVariables(step: Step): Set<string> {
+  const out = new Set<string>();
+  const add = (node: Node | undefined) => {
+    if (node && node.k === 'deriv') {
+      for (const w of node.wrt) if (w.k === 'sym') out.add(w.name);
+    }
+  };
+  add(step.lhs);
+  add(step.rhs);
+  if (step.premise) {
+    add(step.premise.lhs);
+    add(step.premise.rhs);
+  }
+  if (step.conclusion) {
+    add(step.conclusion.lhs);
+    add(step.conclusion.rhs);
+  }
+  return out;
+}
+
+/** The name a definition binds, whether it is a symbol or a function. */
+function defNameOf(lhs: Node | undefined): string | undefined {
+  if (!lhs) return undefined;
+  if (lhs.k === 'sym') return lhs.name;
+  if (lhs.k === 'call') return lhs.fn;
+  return undefined;
+}
+
 /** Every node a step mentions, including the premise and the conclusion. */
 function stepNodes(step: Step): Node[] {
   const out: Node[] = [];
@@ -768,6 +874,7 @@ function sampleFor<T>(
   defs: Map<string, Node>,
   setting: Map<string, number>,
   sampler: Sampler<T>,
+  free: Set<string> = new Set(),
 ): Map<string, Val<T>> | 'unknown' {
   const values = new Map<string, Val<T>>();
   const names = new Set<string>();
@@ -779,7 +886,7 @@ function sampleFor<T>(
   }
 
   for (const name of names) {
-    if (defs.has(name)) continue;
+    if (defs.has(name) && !free.has(name)) continue;
     if (values.has(name)) continue;
     const info = ctx.symbols.get(name);
     if (!info) continue;
@@ -841,7 +948,7 @@ function checkNumeric(
   const dec = new DecField(50);
 
   for (const setting of settings) {
-    sizes.push({ ...setting });
+    sizes.push(Object.fromEntries(setting) as Record<string, number>);
     for (let trial = 0; trial < 3; trial++) {
       const rng = rngFor(opts.seed, step.id, settingKey(setting), trial, 'f64');
       const delta = numericDelta(ctx, defs, step, setting, rng, new F64Field());
@@ -949,7 +1056,8 @@ function numericDelta<T>(
   const sampler = new Sampler(field, rng);
   const env = makeEnv(field, rng);
   env.defs = defs;
-  const sampled = sampleFor(ctx, step, defs, setting, sampler);
+  const free = freeVariables(step);
+  const sampled = sampleFor(ctx, step, defs, setting, sampler, free);
   if (sampled === 'unknown') return null;
   for (const [name, value] of sampled.entries()) env.values.set(name, value);
 
@@ -977,33 +1085,12 @@ function relativeDelta<T>(field: Field<T>, a: Val<T>, b: Val<T>): number {
 // ---------------------------------------------------------- the dimensions
 
 function collectDimVars(ctx: TypeContext, step: Step, defs: Map<string, Node>): string[] {
-  const names = new Set<string>();
-  for (const node of stepNodes(step)) collectSymbols(node, names);
-  for (const name of [...names]) {
-    const def = defs.get(name);
-    if (def) collectSymbols(def, names);
+  const lhs = step.lhs;
+  const rhs = step.rhs;
+  if (step.premise?.lhs || step.conclusion?.lhs) {
+    return collectDimVarsFor(ctx, step.conclusion?.lhs ?? lhs, step.conclusion?.rhs ?? rhs, defs);
   }
-  const roots = new Set<string>();
-  for (const name of names) {
-    const def = defs.get(name);
-    if (def) continue;
-    const info = ctx.symbols.get(name);
-    if (!info) continue;
-    if (info.ty.t === 'mat') {
-      for (const d of [info.ty.r, info.ty.c]) {
-        if (typeof d !== 'number') roots.add(ctx.dims.find(d.v));
-      }
-    }
-  }
-  const out: string[] = [];
-  for (const declared of ctx.dimVars) {
-    const root = ctx.dims.find(declared);
-    if (roots.has(root) && !out.includes(root)) out.push(root);
-  }
-  for (const root of roots) {
-    if (!out.includes(root) && !root.startsWith('#')) out.push(root);
-  }
-  return out;
+  return collectDimVarsFor(ctx, lhs, rhs, defs);
 }
 
 /** The size settings of a step: three of them, with the sizes the plan pins down. */
@@ -1079,13 +1166,13 @@ const PROP_WORDS: Record<string, string> = {
 // ------------------------------------------------------------- counterexample
 
 function buildCounterexample<T>(
-  ctx: TypeContext,
-  step: Step,
+  _ctx: TypeContext,
+  _step: Step,
   setting: Map<string, number>,
   sampled: Map<string, Val<T>>,
   lhs: Val<T>,
   rhs: Val<T>,
-  _p: number,
+  field: Field<T>,
 ): Counterexample {
   const dims: Record<string, number> = {};
   for (const [k, v] of setting) dims[k] = v;
@@ -1097,12 +1184,10 @@ function buildCounterexample<T>(
   const rhsVal = rhs.k === 's' ? rhs.v : rhs.m.d;
   const diff =
     lhs.k === 's' && rhs.k === 's'
-      ? lhs.v - rhs.v
+      ? field.sub(lhs.v, rhs.v)
       : lhs.k === 'm' && rhs.k === 'm'
-        ? lhs.m.d.map((x, i) => x - rhs.m.d[i])
+        ? lhs.m.d.map((x, i) => field.sub(x, rhs.m.d[i]))
         : null;
-  void ctx;
-  void step;
   return { dims, values, lhs: lhsVal, rhs: rhsVal, diff, numpy: '' };
 }
 
@@ -1132,7 +1217,8 @@ function checkImplication(
     };
   }
 
-  const pivot = conclusion.lhs.k === 'sym' ? conclusion.lhs.name : undefined;
+  const conclusionLhs = conclusion.lhs;
+  const pivot = conclusionLhs && conclusionLhs.k === 'sym' ? conclusionLhs.name : undefined;
   if (!pivot) {
     const message = 'the conclusion of this implication is not a single variable';
     return {
@@ -1155,13 +1241,18 @@ function checkImplication(
   const assumptions = collectAssumptions(ctx, step);
 
   for (const setting of settings) {
-    sizes.push({ ...setting });
+    sizes.push(Object.fromEntries(setting) as Record<string, number>);
     for (let trial = 0; trial < opts.trials; trial++) {
       for (const p of primes) {
         const rng = rngFor(opts.seed, step.id, settingKey(setting), trial, p);
         const outcome = runImplicationTrial(step, ctx, defs, setting, p, rng);
         if (outcome.kind === 'ok') continue;
         if (outcome.kind === 'unknown') {
+          if (outcome.domain) {
+            // this size cannot work (a singular matrix, say), so it is skipped
+            domainSkips++;
+            continue;
+          }
           return {
             id: step.id,
             row: step.row,
@@ -1197,8 +1288,8 @@ function checkImplication(
     id: step.id,
     row: step.row,
     span: step.span,
-    lhsSpan: conclusion.lhs.span,
-    rhsSpan: conclusion.rhs.span,
+    lhsSpan: conclusion.lhs!.span,
+    rhsSpan: conclusion.rhs!.span,
     relation: step.relation,
     verdict: 'ok',
     mode: 'exact',
@@ -1239,7 +1330,8 @@ function runImplicationTrial(
   if (sampled === 'unknown') return { kind: 'unknown', message: 'could not sample an instance' };
   for (const [name, value] of sampled.entries()) env.values.set(name, value);
 
-  const pivot = conclusion.lhs.k === 'sym' ? conclusion.lhs.name : undefined;
+  const conclusionLhs = conclusion.lhs;
+  const pivot = conclusionLhs && conclusionLhs.k === 'sym' ? conclusionLhs.name : undefined;
   if (!pivot) return { kind: 'unknown', message: 'the conclusion is not about a single variable' };
   const pivotValue = env.values.get(pivot);
   if (!pivotValue || pivotValue.k !== 'm') return { kind: 'unknown', message: `no value for ${pivot}` };
@@ -1310,8 +1402,8 @@ function runImplicationTrial(
   let cl: Val<number>;
   let cr: Val<number>;
   try {
-    cl = evalNode(field, conclusion.lhs, solvedEnv);
-    cr = evalNode(field, conclusion.rhs, solvedEnv);
+    cl = evalNode(field, conclusion.lhs!, solvedEnv);
+    cr = evalNode(field, conclusion.rhs!, solvedEnv);
   } catch {
     return { kind: 'unknown', message: 'could not evaluate the conclusion' };
   }
@@ -1320,7 +1412,7 @@ function runImplicationTrial(
   return {
     kind: 'wrong',
     message: 'the implication does not follow',
-    counterexample: buildCounterexample(ctx, step, setting, sampled, cl, cr, p),
+    counterexample: buildCounterexample(ctx, step, setting, sampled, cl, cr, field),
   };
 }
 

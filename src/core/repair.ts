@@ -1,0 +1,573 @@
+import { GFpField } from './fields/gfp.ts';
+import { evalNode, makeEnv } from './evaluate.ts';
+import { Sampler } from './sample.ts';
+import { rngFor } from './prng.ts';
+import { renderNode } from './render.ts';
+import { sizeSettings } from './verdict.ts';
+import { dimSizeOf, type TypeContext } from './types.ts';
+import type { Node, Span } from './ir.ts';
+import type { Fix } from './verdict.ts';
+import { canonicalizeSymbol } from './notation.ts';
+import type { Prop } from './decl.ts';
+
+/**
+ * Repairs: the "did you mean" suggestions.
+ *
+ * They run lazily, when a wrong or a shape error card is opened, and they
+ * are never applied automatically. Every suggestion is a quick fix that the
+ * user can take or leave.
+ *
+ * Four kinds:
+ *
+ *   a. a mutation from the mistake catalog, applied to one node
+ *   b. the residual fingerprint, which names the term that is missing
+ *   c. the missing assumption, which names the property that is needed
+ *   d. the shape repair, which suggests a transpose
+ */
+
+const CANDIDATE_LIMIT = 300;
+const BUDGET_MS = 150;
+
+interface RepairCtx {
+  ctx: TypeContext;
+  lhs: Node;
+  rhs: Node;
+  defs: Map<string, Node>;
+  seed: number;
+  dimVars: string[];
+}
+
+/** The repairs for one step. */
+export function repairs(
+  ctx: TypeContext,
+  lhs: Node,
+  rhs: Node,
+  defs: Map<string, Node>,
+  seed: number,
+  dimVars: string[],
+  kind: 'wrong' | 'shape',
+): Fix[] {
+  const started = Date.now();
+  const sh: RepairCtx = { ctx, lhs, rhs, defs, seed, dimVars };
+  const out: Fix[] = [];
+
+  const shape = kind === 'shape' ? shapeRepairs(sh) : [];
+  out.push(...shape);
+  if (Date.now() - started > BUDGET_MS) return out;
+
+  out.push(...mutationRepairs(sh));
+  if (Date.now() - started > BUDGET_MS) return out;
+
+  out.push(...assumptionRepairs(sh));
+  if (Date.now() - started > BUDGET_MS) return out;
+
+  out.push(...residualRepairs(sh));
+
+  return out.slice(0, 3);
+}
+
+// ------------------------------------------------------------- mutations
+
+interface Mutation {
+  id: string;
+  title: string;
+  apply: (node: Node) => Node | null;
+}
+
+/** The mistake catalog of Appendix B, in the shapes the IR can express. */
+const MUTATIONS: Mutation[] = [
+  {
+    id: 'T1',
+    title: 'the transpose of a product keeps the order',
+    apply: (node) => {
+      if (node.k !== 'op' || node.op !== 'T') return null;
+      const arg = node.args[0];
+      if (arg.k !== 'op' || arg.op !== 'mul') return null;
+      return { ...node, args: [{ ...arg, args: [arg.args[1], arg.args[0]] }] };
+    },
+  },
+  {
+    id: 'T2',
+    title: 'the inverse of a product keeps the order',
+    apply: (node) => {
+      if (node.k !== 'op' || node.op !== 'inv') return null;
+      const arg = node.args[0];
+      if (arg.k !== 'op' || arg.op !== 'mul') return null;
+      return {
+        ...node,
+        args: [
+          {
+            ...arg,
+            args: [
+              { k: 'op', op: 'inv', args: [arg.args[1]], span: arg.args[1].span },
+              { k: 'op', op: 'inv', args: [arg.args[0]], span: arg.args[0].span },
+            ],
+          },
+        ],
+      };
+    },
+  },
+  {
+    id: 'T3',
+    title: 'a transpose is missing',
+    apply: (node) => {
+      if (node.k !== 'sym') return null;
+      return { k: 'op', op: 'T', args: [node], span: node.span };
+    },
+  },
+  {
+    id: 'T3r',
+    title: 'a transpose is not needed',
+    apply: (node) => {
+      if (node.k !== 'op' || node.op !== 'T') return null;
+      return node.args[0];
+    },
+  },
+  {
+    id: 'A1',
+    title: 'a sign is flipped',
+    apply: (node) => {
+      if (node.k !== 'op' || node.op !== 'add') return null;
+      const second = node.args[1];
+      if (second.k !== 'op' || second.op !== 'neg') return null;
+      return { ...node, op: 'sub', args: [node.args[0], second.args[0]] };
+    },
+  },
+  {
+    id: 'A2',
+    title: 'a factor of two',
+    apply: (node) => {
+      if (node.k !== 'op' || node.op !== 'mul') return null;
+      const a = node.args[0];
+      const b = node.args[1];
+      if (a.k === 'num' && a.value.n === 2) return { ...node, args: [a, b] };
+      if (b.k === 'num' && b.value.n === 2) return { ...node, args: [a, b] };
+      if (a.k === 'num' && a.value.n === 1) {
+        return {
+          ...node,
+          args: [
+            { k: 'num', value: { n: 2, d: 1 }, span: a.span },
+            b,
+          ],
+        };
+      }
+      return null;
+    },
+  },
+  {
+    id: 'C1',
+    title: 'two factors are swapped',
+    apply: (node) => {
+      if (node.k !== 'op' || node.op !== 'mul') return null;
+      return { ...node, args: [node.args[1], node.args[0]] };
+    },
+  },
+  {
+    id: 'S1',
+    title: 'the inverse of a sum is split',
+    apply: (node) => {
+      if (node.k !== 'op' || node.op !== 'inv') return null;
+      const arg = node.args[0];
+      if (arg.k !== 'op' || arg.op !== 'add') return null;
+      return {
+        ...node,
+        args: [
+          {
+            k: 'op',
+            op: 'add',
+            args: [
+              { k: 'op', op: 'inv', args: [arg.args[0]], span: arg.args[0].span },
+              { k: 'op', op: 'inv', args: [arg.args[1]], span: arg.args[1].span },
+            ],
+            span: arg.span,
+          },
+        ],
+      };
+    },
+  },
+  {
+    id: 'N2',
+    title: 'the Frobenius norm uses the wrong trace',
+    apply: (node) => {
+      if (node.k !== 'op' || node.op !== 'frob') return null;
+      const arg = node.args[0];
+      if (arg.k !== 'op' || arg.op !== 'T') return null;
+      return { ...node, op: 'norm2', args: [arg.args[0]] };
+    },
+  },
+  {
+    id: 'G1',
+    title: 'the gradient of a quadratic form assumes symmetry',
+    apply: (node) => {
+      if (node.k !== 'op' || node.op !== 'mul') return null;
+      return null;
+    },
+  },
+];
+
+/** Every node of a tree, with its path. */
+function walk(node: Node, path: number[] = []): Array<{ node: Node; path: number[] }> {
+  const out = [{ node, path }];
+  const children: Node[] =
+    node.k === 'op' || node.k === 'call'
+      ? node.args
+      : node.k === 'deriv'
+        ? [node.f, ...node.wrt]
+        : node.k === 'expect'
+          ? node.args
+          : node.k === 'bigop'
+            ? [node.body]
+            : node.k === 'block'
+              ? node.rows.flat()
+              : [];
+  children.forEach((child, i) => out.push(...walk(child, [...path, i])));
+  return out;
+}
+
+/** Replaces one node of a tree with another. */
+function replaceAt(node: Node, path: number[], replacement: Node): Node {
+  if (path.length === 0) return replacement;
+  const [head, ...rest] = path;
+  if (node.k === 'op' || node.k === 'call') {
+    const args = node.args.slice();
+    args[head] = replaceAt(args[head], rest, replacement);
+    return { ...node, args };
+  }
+  if (node.k === 'block') {
+    const rows = node.rows.map((r) => r.slice());
+    const flat = rows.flat();
+    flat[head] = replaceAt(flat[head], rest, replacement);
+    const out: Node[][] = [];
+    let i = 0;
+    for (const row of rows) {
+      out.push(flat.slice(i, i + row.length));
+      i += row.length;
+    }
+    return { ...node, rows: out };
+  }
+  return node;
+}
+
+function mutationRepairs(sh: RepairCtx): Fix[] {
+  const out: Fix[] = [];
+  const candidates = walk(sh.rhs);
+  let count = 0;
+  for (const { node, path } of candidates) {
+    if (count > CANDIDATE_LIMIT) break;
+    for (const mutation of MUTATIONS) {
+      if (count > CANDIDATE_LIMIT) break;
+      const mutated = mutation.apply(node);
+      if (!mutated) continue;
+      count++;
+      const candidate = replaceAt(sh.rhs, path, mutated);
+      if (renderNode(candidate) === renderNode(sh.rhs)) continue;
+      if (!holdsWith(sh, candidate)) continue;
+      out.push({
+        kind: 'mutation',
+        title: mutation.title,
+        edit: { span: sh.rhs.span, insert: renderNode(candidate) },
+        verified: true,
+        detail: renderNode(candidate),
+      });
+    }
+  }
+  return out;
+}
+
+/** Does the step hold with this right hand side? */
+function holdsWith(sh: RepairCtx, rhs: Node): boolean {
+  const settings = sizeSettings(sh.dimVars);
+  const field = new GFpField(2147483647);
+  for (const setting of settings.slice(0, 2)) {
+    const rng = rngFor(sh.seed, 'repair', 'mutation');
+    const sampler = new Sampler(field, rng);
+    const env = makeEnv(field, rng);
+    env.defs = sh.defs;
+    const values = sampleSymbols(sh.ctx, sh, setting, sampler);
+    if (!values) return false;
+    for (const [name, value] of values.entries()) if (value) env.values.set(name, value);
+    try {
+      const l = evalNode(field, sh.lhs, env);
+      const r = evalNode(field, rhs, env);
+      if (!same(field, l, r)) return false;
+    } catch {
+      return false;
+    }
+  }
+  return true;
+}
+
+function sampleSymbols(
+  ctx: TypeContext,
+  sh: RepairCtx,
+  setting: Map<string, number>,
+  sampler: Sampler<number>,
+): Map<string, ReturnType<Sampler<number>['sample']> extends infer T ? T : never> | null {
+  const values = new Map<string, any>();
+  const names = new Set<string>();
+  const collect = (node: Node) => {
+    if (node.k === 'sym') names.add(node.name);
+    else if (node.k === 'op' || node.k === 'call') node.args.forEach(collect);
+    else if (node.k === 'deriv') {
+      collect(node.f);
+      node.wrt.forEach(collect);
+    } else if (node.k === 'expect') node.args.forEach(collect);
+    else if (node.k === 'bigop') collect(node.body);
+    else if (node.k === 'block') node.rows.flat().forEach(collect);
+  };
+  collect(sh.lhs);
+  collect(sh.rhs);
+  for (const name of names) {
+    if (sh.defs.has(name)) continue;
+    const info = ctx.symbols.get(name);
+    if (!info) continue;
+    if (info.ty.t === 'scalar') {
+      values.set(name, { k: 's', v: sampler.sampleScalar() });
+      continue;
+    }
+    if (info.ty.t !== 'mat') continue;
+    const r = dimSizeOf(ctx, info.ty.r, setting);
+    const c = dimSizeOf(ctx, info.ty.c, setting);
+    const val = sampler.sample({ name, r, c, props: info.props });
+    if (!val) return null;
+    values.set(name, val);
+  }
+  return values;
+}
+
+function same<T>(field: { eq: (a: T, b: T) => boolean }, a: any, b: any): boolean {
+  if (a.k === 's' && b.k === 's') return field.eq(a.v, b.v);
+  if (a.k === 'm' && b.k === 'm') {
+    if (a.m.r !== b.m.r || a.m.c !== b.m.c) return false;
+    for (let i = 0; i < a.m.d.length; i++) if (!field.eq(a.m.d[i], b.m.d[i])) return false;
+    return true;
+  }
+  return false;
+}
+
+// ------------------------------------------------------------ assumptions
+
+const ASSUMPTION_TRIES: Array<{ props: Prop[]; text: string }> = [
+  { props: ['sym'], text: 'symmetric' },
+  { props: ['orth'], text: 'orthogonal' },
+  { props: ['diag'], text: 'diagonal' },
+];
+
+/**
+ * The missing assumption.
+ *
+ * If a step only holds once a matrix is known to be symmetric, that is the
+ * repair to offer, because a hidden assumption is what turns a checkmark
+ * into a lie.
+ */
+function assumptionRepairs(sh: RepairCtx): Fix[] {
+  const out: Fix[] = [];
+  const candidates = [...sh.ctx.symbols.values()].filter(
+    (s) => s.ty.t === 'mat' && s.props.length === 0 && s.source !== 'preset',
+  );
+  for (const symbol of candidates) {
+    for (const attempt of ASSUMPTION_TRIES) {
+      if (holdsWithProps(sh, symbol.name, attempt.props)) {
+        out.push({
+          kind: 'assumption',
+          title: `holds if ${symbol.name} is ${attempt.text}`,
+          addDecl: `${symbol.name}: ${attempt.props[0]} ${dimText(sh.ctx, symbol.name)}`,
+          verified: true,
+        });
+        return out;
+      }
+    }
+  }
+  return out;
+}
+
+function dimText(ctx: TypeContext, name: string): string {
+  const info = ctx.symbols.get(name);
+  if (!info || info.ty.t !== 'mat') return '';
+  const r = info.ty.r;
+  const c = info.ty.c;
+  if (typeof r === 'number') return String(r);
+  if (typeof c === 'number' || (c as { v: string }).v !== (r as { v: string }).v) {
+    return `${(r as { v: string }).v}×${typeof c === 'number' ? c : (c as { v: string }).v}`;
+  }
+  return (r as { v: string }).v;
+}
+
+function holdsWithProps(sh: RepairCtx, name: string, props: Prop[]): boolean {
+  const saved = sh.ctx.symbols.get(name);
+  if (!saved) return false;
+  sh.ctx.symbols.set(name, { ...saved, props });
+  const ok = holdsWith(sh, sh.rhs);
+  sh.ctx.symbols.set(name, saved);
+  return ok;
+}
+
+// -------------------------------------------------------------- shape
+
+/** The shape repair: try a transpose here and there. */
+function shapeRepairs(sh: RepairCtx): Fix[] {
+  const out: Fix[] = [];
+  const candidates = walk(sh.rhs);
+  for (const { node, path } of candidates.slice(0, 40)) {
+    if (node.k === 'sym') {
+      const flipped = { k: 'op' as const, op: 'T' as const, args: [node], span: node.span };
+      const candidate = replaceAt(sh.rhs, path, flipped);
+      if (typeChecks(sh, candidate)) {
+        out.push({
+          kind: 'shape',
+          title: `did you mean ${renderNode(flipped)}?`,
+          edit: { span: sh.rhs.span, insert: renderNode(candidate) },
+          verified: false,
+        });
+        if (out.length >= 3) return out;
+      }
+    }
+  }
+  return out;
+}
+
+function typeChecks(sh: RepairCtx, rhs: Node): boolean {
+  // a cheap check: the candidate must evaluate without a shape error
+  const settings = sizeSettings(sh.dimVars);
+  const field = new GFpField(2147483647);
+  for (const setting of settings.slice(0, 1)) {
+    const rng = rngFor(sh.seed, 'repair', 'shape');
+    const sampler = new Sampler(field, rng);
+    const env = makeEnv(field, rng);
+    env.defs = sh.defs;
+    const values = sampleSymbols(sh.ctx, sh, setting, sampler);
+    if (!values) continue;
+    for (const [n, value] of values.entries()) if (value) env.values.set(n, value);
+    try {
+      evalNode(field, rhs, env);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+
+// ------------------------------------------------------------- residual
+
+/**
+ * The residual fingerprint.
+ *
+ * When the step is off by exactly one term, that term can be found: the
+ * difference between the two sides is a small rational multiple of a term
+ * built from the symbols of the step.
+ */
+function residualRepairs(sh: RepairCtx): Fix[] {
+  const out: Fix[] = [];
+  const settings = sizeSettings(sh.dimVars);
+  const field = new GFpField(2147483647);
+
+  // the difference on a few instances
+  const diffs: number[][] = [];
+  for (const setting of settings.slice(0, 2)) {
+    const rng = rngFor(sh.seed, 'repair', 'residual');
+    const sampler = new Sampler(field, rng);
+    const env = makeEnv(field, rng);
+    env.defs = sh.defs;
+    const values = sampleSymbols(sh.ctx, sh, setting, sampler);
+    if (!values) return out;
+    for (const [name, value] of values.entries()) if (value) env.values.set(name, value);
+    try {
+      const l = evalNode(field, sh.lhs, env);
+      const r = evalNode(field, sh.rhs, env);
+      if (l.k !== 'm' || r.k !== 'm') return out;
+      const d = l.m.d.map((x, i) => field.sub(x, r.m.d[i]));
+      diffs.push(d);
+    } catch {
+      return out;
+    }
+  }
+  if (diffs.length < 2) return out;
+
+  // the candidate terms: the sandwich products of the symbols
+  const terms = new Map<string, Node>();
+  for (const { node } of walk(sh.lhs).concat(walk(sh.rhs))) {
+    if (node.k === 'sym') {
+      const sandwich: Node = {
+        k: 'op',
+        op: 'mul',
+        args: [
+          { k: 'op', op: 'mul', args: [node, { k: 'op', op: 'T', args: [node], span: node.span }], span: node.span },
+        ],
+        span: node.span,
+      };
+      terms.set(renderNode(sandwich), sandwich);
+    }
+  }
+
+  for (const [text, term] of terms) {
+    const scale = matchesScale(field, term, sh, diffs);
+    if (scale === null) continue;
+    out.push({
+      kind: 'residual',
+      title: `this step is off by exactly ${scaleText(scale)} ${text}`,
+      edit: { span: sh.rhs.span, insert: `${renderNode(sh.rhs)} + ${scaleText(scale)} ${text}` },
+      verified: false,
+      detail: text,
+    });
+    if (out.length >= 3) break;
+  }
+  return out;
+}
+
+function matchesScale(
+  field: GFpField,
+  term: Node,
+  sh: RepairCtx,
+  diffs: number[][],
+): number | null {
+  const settings = sizeSettings(sh.dimVars);
+  const rng = rngFor(sh.seed, 'repair', 'residual', 'term');
+  const sampler = new Sampler(field, rng);
+  const env = makeEnv(field, rng);
+  env.defs = sh.defs;
+  const values = sampleSymbols(sh.ctx, sh, settings[0], sampler);
+  if (!values) return null;
+  for (const [name, value] of values.entries()) if (value) env.values.set(name, value);
+  let termValues: number[];
+  try {
+    const t = evalNode(field, term, env);
+    if (t.k !== 'm') return null;
+    termValues = t.m.d;
+  } catch {
+    return null;
+  }
+  if (termValues.length !== diffs[0].length) return null;
+
+  // the scale c with |a|, |b| <= 12, such that diff = c * term
+  for (let a = -12; a <= 12; a++) {
+    for (let b = 1; b <= 12; b++) {
+      let ok = true;
+      for (const diff of diffs) {
+        for (let i = 0; i < diff.length; i++) {
+          if (field.mul(field.fromRational(a, b), termValues[i]) !== diff[i]) {
+            ok = false;
+            break;
+          }
+        }
+        if (!ok) break;
+      }
+      if (ok) return a / b;
+    }
+  }
+  return null;
+}
+
+function scaleText(scale: number): string {
+  if (scale === 1) return '+';
+  if (scale === -1) return '-';
+  if (Number.isInteger(scale)) return scale > 0 ? `+ ${scale}` : `- ${-scale}`;
+  return scale > 0 ? `+ ${scale}` : `- ${-scale}`;
+}
+
+/** The declaration that would add the missing property. */
+export function assumptionDecl(name: string, prop: string, dims: string): string {
+  return `${canonicalizeSymbol(name)}: ${prop} ${dims}`;
+}
+
+export type { Span };

@@ -1,6 +1,6 @@
 import type { Dim, Dist, Prop, SymbolDecl } from './decl.ts';
 import type { Node, Span } from './ir.ts';
-import { canonicalizeSymbol, GREEK, toDisplay } from './notation.ts';
+import { GREEK, toDisplay } from './notation.ts';
 
 /**
  * Types, shapes and degree bounds.
@@ -170,7 +170,7 @@ export function sameDim(a: Dim, b: Dim): boolean {
  * sizes, and a step that needs them to be equal has a shape error. That is
  * what catches the transposes that only work when everything is square.
  */
-function unifyDim(ctx: TypeContext, a: Dim, b: Dim, what: string, span: Span): Dim | null {
+export function unifyDim(ctx: TypeContext, a: Dim, b: Dim, what: string, span: Span): Dim | null {
   if (typeof a === 'number' && typeof b === 'number') {
     if (a !== b) {
       ctx.errors.push({ message: `${what}: the sizes ${a} and ${b} do not match`, span });
@@ -179,20 +179,22 @@ function unifyDim(ctx: TypeContext, a: Dim, b: Dim, what: string, span: Span): D
     return a;
   }
   if (typeof a === 'number') {
-    ctx.dims.union(b.v, `#fixed${a}`);
+    ctx.dims.union((b as { v: string }).v, `#fixed${a}`);
     return a;
   }
   if (typeof b === 'number') {
-    ctx.dims.union(a.v, `#fixed${b}`);
+    ctx.dims.union((a as { v: string }).v, `#fixed${b}`);
     return b;
   }
-  if (a.v !== b.v && !isFreshDim(a.v) && !isFreshDim(b.v)) {
+  const av = (a as { v: string }).v;
+  const bv = (b as { v: string }).v;
+  if (av !== bv && !isFreshDim(av) && !isFreshDim(bv)) {
     ctx.errors.push({
-      message: `${what}: the sizes ${a.v} and ${b.v} do not match`,
+      message: `${what}: the sizes ${av} and ${bv} do not match`,
       span,
     });
   }
-  ctx.dims.union(a.v, b.v);
+  ctx.dims.union(av, bv);
   return a;
 }
 

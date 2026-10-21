@@ -43,12 +43,13 @@ export interface Token {
 }
 
 export class LexError extends Error {
-  constructor(
-    message: string,
-    readonly from: number,
-    readonly to: number,
-  ) {
+  readonly from: number;
+  readonly to: number;
+
+  constructor(message: string, from: number, to: number) {
     super(message);
+    this.from = from;
+    this.to = to;
   }
 }
 

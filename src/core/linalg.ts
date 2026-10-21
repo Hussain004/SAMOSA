@@ -6,6 +6,9 @@ import type { Field } from './fields/types.ts';
  * Sizes are at most 8 by 8, so plain O(n^3) code is fast enough. There is no
  * BLAS and no WebAssembly anywhere in the core.
  */
+/** A failure that comes from the domain, not from the maths being wrong. */
+export class DomainError extends Error {}
+
 export interface Mat<T> {
   r: number;
   c: number;
@@ -82,7 +85,7 @@ export function matTrace<T>(f: Field<T>, a: Mat<T>): T {
 /** Gauss-Jordan inversion. Throws when the matrix is singular. */
 export function matInv<T>(f: Field<T>, a: Mat<T>): Mat<T> {
   const n = a.r;
-  if (n !== a.c) throw new Error('inverse of a non square matrix');
+  if (n !== a.c) throw new DomainError('inverse of a non square matrix');
   const m = mat(n, 2 * n, (i, j) => (j < n ? a.d[i * n + j] : i === j - n ? f.one : f.zero));
   for (let c = 0; c < n; c++) {
     let pivot = -1;
@@ -92,7 +95,7 @@ export function matInv<T>(f: Field<T>, a: Mat<T>): Mat<T> {
         break;
       }
     }
-    if (pivot < 0) throw new Error('singular matrix');
+    if (pivot < 0) throw new DomainError('singular matrix');
     if (pivot !== c) {
       for (let j = 0; j < 2 * n; j++) {
         const tmp = m.d[c * 2 * n + j];
@@ -118,7 +121,7 @@ export function matInv<T>(f: Field<T>, a: Mat<T>): Mat<T> {
 /** Determinant by LU with partial pivoting. */
 export function matDet<T>(f: Field<T>, a: Mat<T>): T {
   const n = a.r;
-  if (n !== a.c) throw new Error('determinant of a non square matrix');
+  if (n !== a.c) throw new DomainError('determinant of a non square matrix');
   const m = a.d.slice();
   let det = f.one;
   for (let c = 0; c < n; c++) {
@@ -156,7 +159,7 @@ export function matSolve<T>(f: Field<T>, a: Mat<T>, b: Mat<T>): Mat<T> {
   return matMul(f, matInv(f, a), b);
 }
 
-export function kron<T>(a: Mat<T>, b: Mat<T>): Mat<T> {
+export function kron<T>(f: Field<T>, a: Mat<T>, b: Mat<T>): Mat<T> {
   const r = a.r * b.r;
   const c = a.c * b.c;
   const d = new Array<T>(r * c);
@@ -164,7 +167,7 @@ export function kron<T>(a: Mat<T>, b: Mat<T>): Mat<T> {
     for (let j = 0; j < a.c; j++) {
       for (let p = 0; p < b.r; p++) {
         for (let q = 0; q < b.c; q++) {
-          d[(i * b.r + p) * c + (j * b.c + q)] = a.d[i * a.c + j] * (b.d[p * b.c + q] as never);
+          d[(i * b.r + p) * c + (j * b.c + q)] = f.mul(a.d[i * a.c + j], b.d[p * b.c + q]);
         }
       }
     }
@@ -244,7 +247,7 @@ export function matPow<T>(f: Field<T>, a: Mat<T>, k: number): Mat<T> {
 /** Adjugate (classical adjoint) of a square matrix. */
 export function matAdj<T>(f: Field<T>, a: Mat<T>): Mat<T> {
   const n = a.r;
-  if (n !== a.c) throw new Error('adjoint of a non square matrix');
+  if (n !== a.c) throw new DomainError('adjoint of a non square matrix');
   if (n === 1) return { r: 1, c: 1, d: [f.one] };
   const cofactors = mat(n, n, (i, j) => {
     const minor = mat(n - 1, n - 1, (r, c) => a.d[(r < i ? r : r + 1) * n + (c < j ? c : c + 1)]);
@@ -258,7 +261,7 @@ export function matAdj<T>(f: Field<T>, a: Mat<T>): Mat<T> {
 export function matSolveCramer<T>(f: Field<T>, a: Mat<T>, b: Mat<T>): Mat<T> {
   const n = a.r;
   const detA = matDet(f, a);
-  if (f.isZero(detA)) throw new Error('singular system');
+  if (f.isZero(detA)) throw new DomainError('singular system');
   const out = mat(n, b.c, (i, j) => {
     const m = mat(n, n, (r, c) => (c === i ? b.d[r * b.c + j] : a.d[r * n + c]));
     return f.div(matDet(f, m), detA);

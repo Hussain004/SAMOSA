@@ -13,7 +13,10 @@ export class DecField implements Field<Decimal> {
   readonly zero: Decimal;
   readonly one: Decimal;
 
-  constructor(readonly precision = 50) {
+  readonly precision: number;
+
+  constructor(precision = 50) {
+    this.precision = precision;
     Decimal.set({ precision, rounding: Decimal.ROUND_HALF_EVEN });
     this.zero = new Decimal(0);
     this.one = new Decimal(1);

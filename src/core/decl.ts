@@ -95,8 +95,6 @@ const PROP_WORDS: Record<string, Prop> = {
   integer: 'int',
 };
 
-const PROP_NAMES = Object.keys(PROP_WORDS);
-
 export function emptyDeclResult(): DeclResult {
   return { decls: [], pinned: {}, errors: [] };
 }
@@ -201,8 +199,8 @@ function parseLatexItem(item: string, result: DeclResult): boolean {
         name,
         display: toDisplay(name),
         kind: 'matrix',
-        rows: inS[2],
-        cols: inS[2],
+        rows: parseDim(inS[2]) ?? undefined,
+        cols: parseDim(inS[2]) ?? undefined,
         props: [inS[3] === '++' ? 'spd' : 'psd', 'sym'],
         source: 'declared',
       });
@@ -219,7 +217,7 @@ function parseLatexItem(item: string, result: DeclResult): boolean {
         name,
         display: toDisplay(name),
         kind: 'vector',
-        rows: inRPlain[2],
+        rows: parseDim(inRPlain[2]) ?? undefined,
         cols: 1,
         props: [],
         source: 'declared',
@@ -372,7 +370,7 @@ function parseLatexItem(item: string, result: DeclResult): boolean {
       display: toDisplay(name),
       kind: 'function',
       dom: parseDims(fn[2]),
-      cod: parseDim(fn[3].trim()),
+      cod: parseDim(fn[3].trim()) ?? undefined,
       props: [],
       source: 'declared',
     });
@@ -474,7 +472,7 @@ function parseType(name: string, type: string): SymbolDecl | null {
       ...base,
       kind: 'function',
       dom: parseDims(fn[1]),
-      cod: parseDim(fn[2]),
+      cod: parseDim(fn[2]) ?? undefined,
       props: [],
     };
   }

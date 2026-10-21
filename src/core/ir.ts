@@ -1,5 +1,4 @@
 import type { Rational } from './rational.ts';
-import { ratFromDecimal } from './rational.ts';
 
 /** A UTF-16 range into the source text. */
 export type Span = { from: number; to: number };
@@ -99,10 +98,10 @@ export interface ParseError {
 }
 
 export class ParseFailure extends Error {
-  constructor(
-    message: string,
-    readonly span: Span,
-  ) {
+  readonly span: Span;
+
+  constructor(message: string, span: Span) {
     super(message);
+    this.span = span;
   }
 }

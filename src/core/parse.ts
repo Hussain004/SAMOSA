@@ -1,7 +1,7 @@
 import { renderTokens, tokenize, type Token } from './lex.ts';
 import { ACCENTS, GREEK, GLYPH_ACCENTS, toDisplay } from './notation.ts';
 import { ratFromDecimal } from './rational.ts';
-import { ParseFailure, type Node, type Op, type Relation, type RowPart, type Span } from './ir.ts';
+import { ParseFailure, type Assertion, type Node, type Op, type ParsedRow, type Relation, type RowPart, type Span } from './ir.ts';
 
 /**
  * The parser: a Pratt parser over the tokens produced by lex.ts.
@@ -33,6 +33,7 @@ const DEFAULT_FUNCTIONS = new Set([
   'tr',
   'trace',
   'sigmoid',
+  'sigma',
   'relu',
   'softmax',
   'logdet',
@@ -104,30 +105,25 @@ const EOF_TOKEN: Token = { type: 'eof', value: '', from: 0, to: 0 };
 export class Parser {
   private pos = 0;
 
-  constructor(
-    private readonly tokens: Token[],
-    private readonly src: string,
-    private readonly opts: ParseOptions = {},
-  ) {}
+  private readonly tokens: Token[];
+  private readonly opts: ParseOptions;
+
+  constructor(tokens: Token[], _src: string, opts: ParseOptions = {}) {
+    this.tokens = tokens;
+    this.opts = opts;
+  }
 
   private get cur(): Token {
     return this.tokens[this.pos] ?? EOF_TOKEN;
   }
 
-  private peek(offset = 1): Token {
-    return this.tokens[Math.min(this.pos + offset, this.tokens.length - 1)];
-  }
-
-  private eat(type: Token['type'], value?: string): Token | null {
-    const t = this.cur;
-    if (t.type !== type) return null;
-    if (value !== undefined && t.value !== value) return null;
-    this.pos++;
-    return t;
+  /** The type of the current token, without narrowing the token itself. */
+  private kind(): Token['type'] {
+    return (this.tokens[this.pos] ?? EOF_TOKEN).type;
   }
 
   private expect(type: Token['type'], what: string): Token {
-    if (this.cur.type !== type) {
+    if (this.kind() !== type) {
       throw new ParseFailure(`expected ${what}`, { from: this.cur.from, to: this.cur.to });
     }
     const t = this.cur;
@@ -180,7 +176,7 @@ export class Parser {
    * digits share one token.
    */
   private readFractionParts(): { num: { text: string; span: Span }; den: { text: string; span: Span } } {
-    if (this.cur.type === 'lbrace') {
+    if (this.kind() === 'lbrace') {
       const num = this.rawGroupText();
       const den = this.readGroupOrToken();
       return { num, den };
@@ -202,7 +198,7 @@ export class Parser {
 
   /** Reads a group, or a single token when the group is omitted (\frac12). */
   private readGroupOrToken(): { text: string; span: Span } {
-    if (this.cur.type === 'lbrace') return this.rawGroupText();
+    if (this.kind() === 'lbrace') return this.rawGroupText();
     const t = this.cur;
     this.pos++;
     return { text: t.type === 'cmd' ? `\\${t.value}` : t.value, span: { from: t.from, to: t.to } };
@@ -210,7 +206,7 @@ export class Parser {
 
   /** Reads a subscript, which may be a group or a single token. */
   private readSubscript(): { text: string; span: Span } {
-    if (this.cur.type === 'lbrace') return this.rawGroupText();
+    if (this.kind() === 'lbrace') return this.rawGroupText();
     const t = this.cur;
     this.pos++;
     return { text: t.value, span: { from: t.from, to: t.to } };
@@ -218,7 +214,7 @@ export class Parser {
 
   /** Reads a superscript, which may be a group or a single token. */
   private readSuperscript(): { text: string; tokens: Token[]; span: Span } {
-    if (this.cur.type === 'lbrace') {
+    if (this.kind() === 'lbrace') {
       const start = this.pos;
       const { text, span } = this.rawGroupText();
       const tokens = this.tokens.slice(start + 1, this.pos - 1);
@@ -244,13 +240,13 @@ export class Parser {
     let labelSup: string | null = null;
     const scripts: Array<{ kind: 'transpose' | 'inverse' | 'inverseT' | 'power'; text?: string; to: number }> = [];
 
-    if (this.cur.type === 'sub') {
+    if (this.kind() === 'sub') {
       this.pos++;
       const s = this.readSubscript();
       sub = s.text;
     }
 
-    while (this.cur.type === 'sup') {
+    while (this.kind() === 'sup') {
       this.pos++;
       const sup = this.readSuperscript();
       const classified = classifySuperscript(sup.text);
@@ -276,7 +272,7 @@ export class Parser {
       } else if (script.kind === 'inverseT') {
         node = { k: 'op', op: 'invT', args: [node], span };
       } else {
-        const exp = { k: 'num', value: ratFromDecimal(script.text ?? '2'), span: { from: node.span.from, to: script.to } };
+        const exp = { k: 'num' as const, value: ratFromDecimal(script.text ?? '2'), span: { from: node.span.from, to: script.to } };
         node = { k: 'op', op: 'pow', args: [node, exp], span };
       }
     }
@@ -322,7 +318,7 @@ export class Parser {
 
   private parseRatio(): Node {
     let left = this.parseProduct();
-    while (this.cur.type === 'op' && this.cur.value === '/') {
+    while (this.kind() === 'op' && this.cur.value === '/') {
       this.pos++;
       const right = this.parseProduct();
       left = { k: 'op', op: 'div', args: [left, right], span: { from: left.span.from, to: right.span.to } };
@@ -411,7 +407,7 @@ export class Parser {
         } else if (classified.kind === 'inverseT') {
           node = { k: 'op', op: 'invT', args: [node], span: { from: node.span.from, to: sup.span.to } };
         } else if (classified.kind === 'power') {
-          const exp = { k: 'num', value: ratFromDecimal(classified.powerText), span: sup.span };
+          const exp = { k: 'num' as const, value: ratFromDecimal(classified.powerText), span: sup.span };
           node = { k: 'op', op: 'pow', args: [node, exp], span: { from: node.span.from, to: sup.span.to } };
         } else {
           node = {
@@ -446,7 +442,7 @@ export class Parser {
       }
       if (t.type === 'op' && t.value === '!') {
         this.pos++;
-        node = { k: 'op', op: 'pow', args: [node, { k: 'num', value: { n: 1, d: 1 }, span: { from: t.from, to: t.to } }], span: { from: node.span.from, to: t.to } };
+        node = { k: 'op', op: 'pow', args: [node, { k: 'num' as const, value: { n: 1, d: 1 }, span: { from: t.from, to: t.to } }], span: { from: node.span.from, to: t.to } };
         continue;
       }
       return node;
@@ -458,15 +454,39 @@ export class Parser {
     switch (t.type) {
       case 'num': {
         this.pos++;
-        return { k: 'num', value: ratFromDecimal(t.value), span: { from: t.from, to: t.to } };
+        return { k: 'num' as const, value: ratFromDecimal(t.value), span: { from: t.from, to: t.to } };
       }
       case 'ident': {
         this.pos++;
+        // a run of letters is a product of single letter symbols, unless it
+        // names a function: "cuv^\top" is c times u times v transpose
+        if (t.value.length > 1 && !this.isFnName(t.value)) {
+          const parts: Node[] = [];
+          for (let i = 0; i < t.value.length; i++) {
+            const ch = t.value[i];
+            const sym = this.makeSym([], ch, null, null, { from: t.from + i, to: t.from + i + 1 });
+            // the scripts belong to the last letter of the run
+            parts.push(i === t.value.length - 1 ? this.applyScripts(sym, [], ch) : sym);
+          }
+          return parts.reduce((a, b) => ({
+            k: 'op' as const,
+            op: 'mul' as const,
+            args: [a, b],
+            span: { from: a.span.from, to: b.span.to },
+          }));
+        }
+        if (t.value === 'e' && this.kind() === 'sup') {
+          // e^x is exp(x)
+          this.pos++;
+          const sup = this.readSuperscript();
+          const inner = new Parser(sup.tokens, '', this.opts).parseExpression();
+          return { k: 'call', fn: 'exp', args: [inner], span: { from: t.from, to: sup.span.to } };
+        }
         const sym = this.makeSym([], t.value, null, null, { from: t.from, to: t.to });
         const scripted = this.applyScripts(sym, [], t.value);
-        if (this.cur.type === 'lparen' && this.isFnName(t.value)) {
+        if (this.kind() === 'lparen' && this.isFnName(t.value)) {
           const args = this.parseArgs();
-          return { k: 'call', fn: t.value, args, span: { from: t.from, to: args.span.to } };
+          return { k: 'call', fn: t.value, args, span: { from: t.from, to: args.at(-1)?.span.to ?? t.to } };
         }
         return scripted;
       }
@@ -515,10 +535,10 @@ export class Parser {
   private parseArgs(): Node[] {
     this.expect('lparen', '(');
     const args: Node[] = [];
-    if (this.cur.type !== 'rparen') {
+    if (this.kind() !== 'rparen') {
       for (;;) {
         args.push(this.parseExpression());
-        if (this.cur.type === 'comma' || this.cur.type === 'semi') {
+        if (this.kind() === 'comma' || this.kind() === 'semi') {
           this.pos++;
           continue;
         }
@@ -544,12 +564,12 @@ export class Parser {
       case 'sqrt': {
         this.pos++;
         // optional index
-        if (this.cur.type === 'lbrack') {
+        if (this.kind() === 'lbrack') {
           this.pos++;
           this.parseExpression();
           this.expect('rbrack', ']');
         }
-        const arg = this.cur.type === 'lbrace' ? this.parseGroupAsExpression() : this.parsePrimary();
+        const arg = this.kind() === 'lbrace' ? this.parseGroupAsExpression() : this.parsePrimary();
         return { k: 'call', fn: 'sqrt', args: [arg], span: { from: t.from, to: arg.span.to } };
       }
       case 'nabla': {
@@ -595,14 +615,14 @@ export class Parser {
             span: { from: t.from, to: arg.span.to },
           };
         }
-        if (this.cur.type === 'lparen') {
+        if (this.kind() === 'lparen') {
           const args = this.parseArgs();
           return { k: 'call', fn: text.toLowerCase(), args, span: { from: t.from, to: args.at(-1)?.span.to ?? t.to } };
         }
         const sym = this.makeSym([name], text, null, null, { from: t.from, to: g.span.to });
         const scripted = this.applyScripts(sym, [name], text);
         if (text.toLowerCase() === 'e' || text.toLowerCase() === 'var' || text.toLowerCase() === 'cov') {
-          if (this.cur.type === 'lbrack') {
+          if (this.kind() === 'lbrack') {
             return this.finishExpectation({ from: t.from, to: g.span.to }, text.toLowerCase());
           }
           return scripted;
@@ -628,16 +648,27 @@ export class Parser {
       case 'tan':
       case 'tanh':
       case 'sigmoid':
+      case 'sigma':
       case 'relu':
       case 'softmax': {
         this.pos++;
-        if (this.cur.type === 'lparen') {
-          const args = this.parseArgs();
-          return { k: 'call', fn: name, args, span: { from: t.from, to: args.at(-1)?.span.to ?? t.to } };
+        if (name === 'sigma' && this.kind() !== 'lparen') {
+          // \sigma on its own is the standard deviation
+          const sym = this.makeSym([], '\\sigma', null, null, { from: t.from, to: t.to });
+          return this.applyScripts(sym, [], '\\sigma');
         }
-        if (this.cur.type === 'lbrace') {
+        if (this.kind() === 'lparen') {
+          const args = this.parseArgs();
+          return {
+            k: 'call',
+            fn: name === 'sigma' ? 'sigmoid' : name,
+            args,
+            span: { from: t.from, to: args.at(-1)?.span.to ?? t.to },
+          };
+        }
+        if (this.kind() === 'lbrace') {
           const arg = this.parseGroupAsExpression();
-          return { k: 'call', fn: name, args: [arg], span: { from: t.from, to: arg.span.to } };
+          return { k: 'call', fn: name === 'sigma' ? 'sigmoid' : name, args: [arg], span: { from: t.from, to: arg.span.to } };
         }
         const sym = this.makeSym([], name, null, null, { from: t.from, to: t.to });
         return this.applyScripts(sym, [], name);
@@ -660,7 +691,7 @@ export class Parser {
     if (ACCENTS.has(name)) {
       this.pos++;
       const base = this.parseAccentBase(name);
-      if (base.k === 'sym' && this.cur.type === 'lparen') {
+      if (base.k === 'sym' && this.kind() === 'lparen') {
         const density = base.name.match(/^\\mathcal([NU])$/);
         if (density) {
           const args = this.parseArgs();
@@ -691,12 +722,12 @@ export class Parser {
     let span: Span = { from: startTok.from, to: startTok.to };
     let accents: string[] = [];
 
-    if (this.cur.type === 'ident') {
+    if (this.kind() === 'ident') {
       const t = this.cur;
       this.pos++;
       baseLatex = t.value;
       span = { from: t.from, to: t.to };
-    } else if (this.cur.type === 'lbrace') {
+    } else if (this.kind() === 'lbrace') {
       const g = this.rawGroupText();
       const inner = new Parser(tokenize(g.text), g.text, this.opts);
       const node = inner.parsePrimary();
@@ -707,7 +738,7 @@ export class Parser {
         // \bar{...} over something that is not a symbol
         return { k: 'raw', text: `\\${accent}{...}`, span };
       }
-    } else if (this.cur.type === 'cmd') {
+    } else if (this.kind() === 'cmd') {
       // \bar\mathbb{R} and \bar\Sigma
       if (GREEK.has(this.cur.value) || SYMBOL_COMMANDS.has(this.cur.value)) {
         const t = this.cur;
@@ -865,13 +896,13 @@ export class Parser {
 
   private parseDerivativeAfterNabla(t: Token): Node {
     let wrt: Node[] = [];
-    if (this.cur.type === 'sub') {
+    if (this.kind() === 'sub') {
       this.pos++;
       const s = this.readSubscript();
       wrt.push({ k: 'sym', name: s.text, display: toDisplay(s.text), span: s.span });
     }
     let order: 1 | 2 = 1;
-    if (this.cur.type === 'sup') {
+    if (this.kind() === 'sup') {
       this.pos++;
       const sup = this.readSuperscript();
       if (sup.text === '2') order = 2;
@@ -902,7 +933,7 @@ export class Parser {
   private finishExpectation(span: Span, kind: string): Node {
     let over: string[] = [];
     let idxText: string | null = null;
-    if (this.cur.type === 'sub') {
+    if (this.kind() === 'sub') {
       this.pos++;
       const s = this.readSubscript();
       idxText = s.text;
@@ -912,13 +943,13 @@ export class Parser {
       if (m) over = [m[1]];
     }
     const op: 'E' | 'Var' | 'Cov' = kind === 'var' ? 'Var' : kind === 'cov' ? 'Cov' : 'E';
-    if (this.cur.type === 'lbrack') {
+    if (this.kind() === 'lbrack') {
       this.pos++;
       const args: Node[] = [];
-      if (this.cur.type !== 'rbrack') {
+      if (this.kind() !== 'rbrack') {
         for (;;) {
           args.push(this.parseExpression());
-          if (this.cur.type === 'comma') {
+          if (this.kind() === 'comma') {
             this.pos++;
             continue;
           }
@@ -936,7 +967,7 @@ export class Parser {
     let lo: Node | null = null;
     let hi: Node | null = null;
 
-    if (this.cur.type === 'sub') {
+    if (this.kind() === 'sub') {
       this.pos++;
       const g = this.rawGroupText();
       const m = g.text.match(/^\s*([A-Za-z]+)\s*=\s*(.*)$/);
@@ -953,7 +984,7 @@ export class Parser {
         }
       }
     }
-    if (this.cur.type === 'sup') {
+    if (this.kind() === 'sup') {
       this.pos++;
       const g = this.rawGroupText();
       const p = new Parser(tokenize(g.text), g.text, this.opts);
@@ -981,25 +1012,25 @@ export class Parser {
     const env = t.value;
     const rows: Node[][] = [];
     let row: Node[] = [];
-    while (this.cur.type !== 'end' && this.cur.type !== 'eof') {
-      if (this.cur.type === 'amp') {
+    while (this.kind() !== 'end' && this.kind() !== 'eof') {
+      if (this.kind() === 'amp') {
         this.pos++;
         continue;
       }
-      if (this.cur.type === 'nl') {
+      if (this.kind() === 'nl') {
         this.pos++;
         rows.push(row);
         row = [];
         continue;
       }
       row.push(this.parseExpression());
-      if (this.cur.type === 'amp' || this.cur.type === 'nl') continue;
-      if (this.cur.type === 'end' || this.cur.type === 'eof') break;
+      if (this.kind() === 'amp' || this.kind() === 'nl') continue;
+      if (this.kind() === 'end' || this.kind() === 'eof') break;
       // unexpected token, stop to avoid an infinite loop
       break;
     }
     if (row.length) rows.push(row);
-    const endTok = this.cur.type === 'end' ? this.cur : null;
+    const endTok = this.kind() === 'end' ? this.cur : null;
     if (endTok) this.pos++;
     const span = { from: t.from, to: endTok ? endTok.to : t.to };
     void env;
@@ -1078,8 +1109,9 @@ export function findRelations(
       continue;
     }
     if (inText) {
-      if (t.type === 'lbrace') inText++;
-      else if (t.type === 'rbrace') inText--;
+      const kind = t.type as string;
+      if (kind === 'lbrace') inText++;
+      else if (kind === 'rbrace') inText--;
       continue;
     }
     if (depth > 0) continue;
@@ -1115,7 +1147,13 @@ export function findRelations(
  * A row can hold a single relation, a chain (a = b = c) or an implication
  * (A = B => C = D). Each of those becomes one or more RowParts.
  */
-export function parseRow(src: string, rowText: string, offset: number, index: number): ParsedRow {
+export function parseRow(
+  _src: string,
+  rowText: string,
+  offset: number,
+  index: number,
+  knownFns?: Set<string>,
+): ParsedRow {
   let tokens = tokenize(rowText);
   const annotation = extractAnnotation(tokens);
   tokens = stripAnnotation(tokens);
@@ -1138,8 +1176,8 @@ export function parseRow(src: string, rowText: string, offset: number, index: nu
     const imp = rels[impIndex];
     const premiseTokens = tokens.slice(0, imp.index);
     const conclusionTokens = tokens.slice(imp.index + imp.length);
-    const premise = splitAssertion(premiseTokens);
-    const conclusion = splitAssertion(conclusionTokens);
+    const premise = splitAssertion(premiseTokens, knownFns);
+    const conclusion = splitAssertion(conclusionTokens, knownFns);
     const part: RowPart = {
       relation: imp.relation,
       relText: imp.text,
@@ -1164,8 +1202,8 @@ export function parseRow(src: string, rowText: string, offset: number, index: nu
     const rel = rels[i];
     const lhsSeg = i === 0 ? tokens.slice(bounds[0], bounds[1]) : [];
     const rhsSeg = tokens.slice(bounds[2 * i + 2], bounds[2 * i + 3]);
-    const lhs = lhsSeg.length ? parseNode(lhsSeg) : undefined;
-    const rhs = rhsSeg.length ? parseNode(rhsSeg) : undefined;
+    const lhs = (lhsSeg.length ? parseNode(lhsSeg, knownFns) : null) ?? undefined;
+    const rhs = (rhsSeg.length ? parseNode(rhsSeg, knownFns) : null) ?? undefined;
     parts.push({
       lhs,
       relation: rel.relation,
@@ -1181,18 +1219,18 @@ export function parseRow(src: string, rowText: string, offset: number, index: nu
 }
 
 /** Splits a token slice at its first relation into an assertion. */
-function splitAssertion(tokens: Token[]): Assertion | null {
+function splitAssertion(tokens: Token[], knownFns?: Set<string>): Assertion | null {
   const rels = findRelations(tokens);
   if (!rels.length) {
-    const node = parseNode(tokens);
+    const node = parseNode(tokens, knownFns);
     if (!node) return null;
     return { lhs: node, relation: 'other', relText: '', lhsSpan: node.span };
   }
   const r0 = rels[0];
   const lhsSeg = tokens.slice(0, r0.index);
   const rhsSeg = tokens.slice(r0.index + 1);
-  const lhs = lhsSeg.length ? parseNode(lhsSeg) : undefined;
-  const rhs = rhsSeg.length ? parseNode(rhsSeg) : undefined;
+  const lhs = (lhsSeg.length ? parseNode(lhsSeg, knownFns) : null) ?? undefined;
+  const rhs = (rhsSeg.length ? parseNode(rhsSeg, knownFns) : null) ?? undefined;
   return {
     lhs,
     relation: r0.relation,
@@ -1203,9 +1241,9 @@ function splitAssertion(tokens: Token[]): Assertion | null {
   };
 }
 
-function parseNode(tokens: Token[]): Node | null {
+function parseNode(tokens: Token[], knownFns?: Set<string>): Node | null {
   if (!tokens.length) return null;
-  const parser = new Parser(tokens, '', {});
+  const parser = new Parser(tokens, '', knownFns ? { knownFns } : {});
   try {
     return parser.parseExpression();
   } catch {
@@ -1221,8 +1259,9 @@ function extractAnnotation(tokens: Token[]): string | undefined {
         let depth = 1;
         let j = i + 2;
         while (j < tokens.length && depth > 0) {
-          if (tokens[j].type === 'lbrace') depth++;
-          if (tokens[j].type === 'rbrace') {
+          const kind = (tokens[j] as Token).type as string;
+          if (kind === 'lbrace') depth++;
+          if (kind === 'rbrace') {
             depth--;
             if (depth === 0) break;
           }

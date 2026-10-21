@@ -1,0 +1,261 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/geist-mono';
+@import '@fontsource-variable/inter';
+
+/*
+ * The visual system of SAMOSA (F22).
+ *
+ * A terminal that happens to render perfect math. Dark first, near black
+ * "terminal ink", a hairline on every panel, and a dot grid on the page.
+ * The only non mono element is the math itself, which keeps the Computer
+ * Modern look of LaTeX inside the terminal.
+ */
+
+@theme {
+  --color-ink: #0b0a08;
+  --color-panel: #14120f;
+  --color-panel-2: #1a1713;
+  --color-line: #2a251e;
+  --color-line-soft: #201c16;
+  --color-text: #ede6da;
+  --color-muted: #8c8273;
+  --color-faint: #5c554a;
+  --color-gold: #e8b04b;
+  --color-saffron: #f28c28;
+  --color-chutney: #5bc27a;
+  --color-tamarind: #e0533d;
+  --color-slate: #7a8594;
+
+  --font-mono: 'Geist Mono Variable', ui-monospace, 'JetBrains Mono', monospace;
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+
+  --radius-panel: 10px;
+}
+
+:root {
+  color-scheme: dark;
+  --dot: #ffffff0d;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-ink);
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-synthesis-weight: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-display {
+  font-weight: 300;
+  letter-spacing: -0.04em;
+}
+
+.font-prose {
+  font-family: var(--font-sans);
+  letter-spacing: 0;
+}
+
+/* the dot grid of the page */
+.dotted {
+  background-image: radial-gradient(circle at 1px 1px, var(--dot) 1px, transparent 0);
+  background-size: 24px 24px;
+}
+
+/* the scanline overlay of the terminal */
+.scanlines::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0) 0px,
+    rgba(0, 0, 0, 0) 2px,
+    rgba(0, 0, 0, 0.16) 3px,
+    rgba(0, 0, 0, 0) 4px
+  );
+  opacity: 0.35;
+  mix-blend-mode: multiply;
+}
+
+.panel {
+  background: var(--color-panel);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-panel);
+}
+
+.pane-title {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-faint);
+}
+
+kbd {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  border: 1px solid var(--color-line);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 1px 5px;
+  color: var(--color-muted);
+  background: var(--color-panel-2);
+}
+
+/* the badges of the verdicts */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  line-height: 1;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  white-space: nowrap;
+}
+
+.badge-ok {
+  color: var(--color-chutney);
+  box-shadow: 0 0 6px #5bc27a40;
+}
+.badge-wrong {
+  color: var(--color-tamarind);
+  box-shadow: 0 0 6px #e0533d40;
+}
+.badge-shape {
+  color: var(--color-tamarind);
+}
+.badge-warn {
+  color: var(--color-saffron);
+  box-shadow: 0 0 6px #f28c2840;
+}
+.badge-unknown {
+  color: var(--color-slate);
+}
+.badge-defined {
+  color: var(--color-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* the CodeMirror theme */
+.cm-editor {
+  height: 100%;
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.65;
+}
+.cm-editor .cm-scroller {
+  font-family: var(--font-mono);
+  padding: 12px 0;
+}
+.cm-editor.cm-focused {
+  outline: none;
+}
+.cm-gutters {
+  background: transparent;
+  border-right: 1px solid var(--color-line-soft);
+  color: var(--color-faint);
+}
+.cm-activeLine {
+  background: #ffffff08;
+}
+.cm-activeLineGutter {
+  background: transparent;
+  color: var(--color-muted);
+}
+.cm-lintRange-error {
+  background: #e0533d1f;
+  text-decoration: underline wavy var(--color-tamarind);
+  text-underline-offset: 3px;
+}
+.cm-lintRange-warning {
+  background: #f28c281f;
+  text-decoration: underline wavy var(--color-saffron);
+  text-underline-offset: 3px;
+}
+.cm-lintRange-info {
+  text-decoration: underline dotted var(--color-slate);
+  text-underline-offset: 3px;
+}
+.cm-lint-marker-error,
+.cm-lint-marker-warning,
+.cm-lint-marker-info {
+  width: 8px;
+  height: 8px;
+}
+.cm-tooltip {
+  background: var(--color-panel-2);
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 8px 10px;
+}
+.cm-tooltip-autocomplete > ul > li[aria-selected] {
+  background: #e8b04b1f;
+  color: var(--color-text);
+}
+.cm-completionIcon {
+  opacity: 0.6;
+}
+
+/* the KaTeX output */
+.katex {
+  font-size: 1.05em;
+}
+.samosa-hl {
+  background: #e0533d26;
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px #e0533d55;
+}
+.samosa-fix {
+  background: #5bc27a26;
+  border-radius: 3px;
+}
+
+/* the ASCII samosa */
+.samosa {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: clamp(6px, 0.95vw, 12px);
+  line-height: 1;
+  font-variant-ligatures: none;
+  white-space: pre;
+  background: linear-gradient(180deg, #fff2c8 0%, #e8b04b 30%, #f28c28 70%, #a5501c 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 10px #e8b04b40);
+}
+
+/* the reveal of the sections */
+.reveal {
+  opacity: 0;
+  transform: translateY(8px);
+  transition:
+    opacity 400ms ease-out,
+    transform 400ms ease-out;
+}
+.reveal.in {
+  opacity: 1;
+  transform: none;
+}

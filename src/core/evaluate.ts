@@ -36,11 +36,11 @@ import type { Rng } from './prng.ts';
  */
 
 export class EvalError extends Error {
-  constructor(
-    message: string,
-    readonly where?: string,
-  ) {
+  readonly where?: string;
+
+  constructor(message: string, where?: string) {
     super(message);
+    this.where = where;
   }
 }
 
@@ -122,19 +122,31 @@ export function evalNode<T>(f: Field<T>, node: Node, env: EvalEnv<T>): Val<T> {
   }
 }
 
-function evalOp<T>(f: Field<T>, op: string, args: Val<T>[], env: EvalEnv<T>): Val<T> {
+/** A 1 by 1 matrix behaves like a scalar in the arithmetic operations. */
+function scalarOf<T>(val: Val<T>): T | null {
+  if (isScalarVal(val)) return val.v;
+  if (val.m.r === 1 && val.m.c === 1) return val.m.d[0];
+  return null;
+}
+
+function evalOp<T>(f: Field<T>, op: string, args: Val<T>[], _env: EvalEnv<T>): Val<T> {
   switch (op) {
     case 'add':
     case 'sub': {
       const a = args[0];
       const b = args[1];
-      if (isScalarVal(a) && isScalarVal(b)) return scalar(op === 'add' ? f.add(a.v, b.v) : f.sub(a.v, b.v));
-      if (isScalarVal(a) && isMatrixVal(b)) {
-        const scaled = matScale(f, a.v, b.m);
+      const sa = scalarOf(a);
+      const sb = scalarOf(b);
+      const bothTiny = isMatrixVal(a) && isMatrixVal(b) && a.m.r === 1 && b.m.r === 1;
+      if (sa !== null && sb !== null && (isScalarVal(a) || isScalarVal(b) || bothTiny)) {
+        return scalar(op === 'add' ? f.add(sa, sb) : f.sub(sa, sb));
+      }
+      if (sa !== null && isMatrixVal(b)) {
+        const scaled = matScale(f, sa, b.m);
         return { k: 'm', m: op === 'add' ? matAdd(f, scaled, b.m) : matSub(f, scaled, b.m) };
       }
-      if (isMatrixVal(a) && isScalarVal(b)) {
-        const scaled = matScale(f, b.v, a.m);
+      if (sb !== null && isMatrixVal(a)) {
+        const scaled = matScale(f, sb, a.m);
         return { k: 'm', m: op === 'add' ? matAdd(f, a.m, scaled) : matSub(f, a.m, scaled) };
       }
       const ma = requireMatrix(a, 'a sum');
@@ -152,9 +164,14 @@ function evalOp<T>(f: Field<T>, op: string, args: Val<T>[], env: EvalEnv<T>): Va
     case 'mul': {
       const a = args[0];
       const b = args[1];
-      if (isScalarVal(a) && isScalarVal(b)) return scalar(f.mul(a.v, b.v));
-      if (isScalarVal(a) && isMatrixVal(b)) return { k: 'm', m: matScale(f, a.v, b.m) };
-      if (isMatrixVal(a) && isScalarVal(b)) return { k: 'm', m: matScale(f, b.v, a.m) };
+      const sa = scalarOf(a);
+      const sb = scalarOf(b);
+      const bothTiny = isMatrixVal(a) && isMatrixVal(b) && a.m.r === 1 && b.m.r === 1;
+      if (sa !== null && sb !== null && (isScalarVal(a) || isScalarVal(b) || bothTiny)) {
+        return scalar(f.mul(sa, sb));
+      }
+      if (sa !== null && isMatrixVal(b)) return { k: 'm', m: matScale(f, sa, b.m) };
+      if (sb !== null && isMatrixVal(a)) return { k: 'm', m: matScale(f, sb, a.m) };
       const ma = requireMatrix(a, 'a product');
       const mb = requireMatrix(b, 'a product');
       if (ma.c !== mb.r) {
@@ -165,8 +182,15 @@ function evalOp<T>(f: Field<T>, op: string, args: Val<T>[], env: EvalEnv<T>): Va
     case 'div': {
       const a = args[0];
       const b = args[1];
-      if (isScalarVal(a) && isScalarVal(b)) return scalar(f.div(a.v, b.v));
-      if (isMatrixVal(a) && isScalarVal(b)) return { k: 'm', m: matScale(f, f.inv(b.v), a.m) };
+      const sa = scalarOf(a);
+      const sb = scalarOf(b);
+      const bothTiny = isMatrixVal(a) && isMatrixVal(b) && a.m.r === 1 && b.m.r === 1;
+      if (sa !== null && sb !== null && (isScalarVal(a) || isScalarVal(b) || bothTiny)) {
+        return scalar(f.div(sa, sb));
+      }
+      if (isMatrixVal(a) && sb !== null) {
+        return { k: 'm', m: matScale(f, f.inv(sb), a.m) };
+      }
       const ma = requireMatrix(a, 'a quotient');
       const mb = requireMatrix(b, 'a quotient');
       const inv = matInv(f, mb);
@@ -221,7 +245,7 @@ function evalOp<T>(f: Field<T>, op: string, args: Val<T>[], env: EvalEnv<T>): Va
       return { k: 'm', m: cofactors };
     }
     case 'kron':
-      return { k: 'm', m: kron(requireMatrix(args[0], 'a Kronecker product'), requireMatrix(args[1], 'a Kronecker product')) };
+      return { k: 'm', m: kron(f, requireMatrix(args[0], 'a Kronecker product'), requireMatrix(args[1], 'a Kronecker product')) };
     case 'had':
       return { k: 'm', m: hadamard(f, requireMatrix(args[0], 'an element wise product'), requireMatrix(args[1], 'an element wise product')) };
     case 'inner':
@@ -263,25 +287,24 @@ function evalCall<T>(f: Field<T>, fn: string, args: Val<T>[], _env: EvalEnv<T>):
     case 'sin':
     case 'cos':
     case 'tan':
-    case 'tanh': {
-      const x = requireScalar(a0, fn);
-      let r: T;
-      if (fn === 'exp') r = f.exp(x);
-      else if (fn === 'log' || fn === 'ln') r = f.log(x);
-      else if (fn === 'sqrt') r = f.sqrt(x);
-      else if (fn === 'sin') r = f.sin(x);
-      else if (fn === 'cos') r = f.cos(x);
-      else if (fn === 'tan') r = f.div(f.sin(x), f.cos(x));
-      else r = f.tanh(x);
-      return scalar(r);
-    }
-    case 'sigmoid': {
-      const x = requireScalar(a0, 'a sigmoid');
-      return scalar(f.div(f.one, f.add(f.one, f.exp(f.neg(x)))));
-    }
+    case 'tanh':
+    case 'sigmoid':
     case 'relu': {
-      const x = requireScalar(a0, 'a ReLU');
-      return scalar(f.cmp(x, f.zero) > 0 ? x : f.zero);
+      // these act element wise, on a scalar or on a matrix
+      const unary = (x: T): T => {
+        if (fn === 'exp') return f.exp(x);
+        if (fn === 'log' || fn === 'ln') return f.log(x);
+        if (fn === 'sqrt') return f.sqrt(x);
+        if (fn === 'sin') return f.sin(x);
+        if (fn === 'cos') return f.cos(x);
+        if (fn === 'tan') return f.div(f.sin(x), f.cos(x));
+        if (fn === 'tanh') return f.tanh(x);
+        if (fn === 'sigmoid') return f.div(f.one, f.add(f.one, f.exp(f.neg(x))));
+        return f.cmp(x, f.zero) > 0 ? x : f.zero;
+      };
+      if (isScalarVal(a0)) return scalar(unary(a0.v));
+      const m = a0.m;
+      return { k: 'm', m: { r: m.r, c: m.c, d: m.d.map(unary) } };
     }
     case 'softmax': {
       const m = requireMatrix(a0, 'a softmax');
@@ -339,7 +362,7 @@ function toHyperDual<T>(f: Field<T>, m: Mat<T>): Mat<HyperDualValue> {
   };
 }
 
-function dualEnv<T>(env: EvalEnv<T>, dual: DualField<T>): EvalEnv<DualValue> {
+function dualEnv<T>(env: EvalEnv<T>, dual: DualField<Field<T>>): EvalEnv<DualValue> {
   const values = new Map<string, Val<DualValue>>();
   for (const [name, val] of env.values) {
     if (isScalarVal(val)) values.set(name, scalar({ v: val.v, t: dual.base.zero }));
@@ -348,7 +371,7 @@ function dualEnv<T>(env: EvalEnv<T>, dual: DualField<T>): EvalEnv<DualValue> {
   return { field: dual, values, defs: env.defs, memo: new Map(), random: env.random };
 }
 
-function hyperEnv<T>(env: EvalEnv<T>, hyper: HyperDualField<T>): EvalEnv<HyperDualValue> {
+function hyperEnv<T>(env: EvalEnv<T>, hyper: HyperDualField<Field<T>>): EvalEnv<HyperDualValue> {
   const values = new Map<string, Val<HyperDualValue>>();
   for (const [name, val] of env.values) {
     if (isScalarVal(val)) {
@@ -373,7 +396,7 @@ export function directionalDerivative<T>(
   wrtName: string,
   baseValue: Mat<T>,
   direction: Mat<T>,
-): Val<DualValue> {
+): Val<T> {
   const dual = new DualField(base);
   const dEnv = dualEnv(env, dual);
   const dMat = toDual(base, baseValue);
@@ -398,7 +421,7 @@ export function mixedSecondDerivative<T>(
   baseValue: Mat<T>,
   v: Mat<T>,
   w: Mat<T>,
-): Val<HyperDualValue> {
+): Val<T> {
   const hyper = new HyperDualField(base);
   const hEnv = hyperEnv(env, hyper);
   const hMat = toHyperDual(base, baseValue);

@@ -25,7 +25,10 @@ export class HyperDualField<F extends Field<any>> implements Field<HyperDualValu
   readonly zero: HyperDualValue;
   readonly one: HyperDualValue;
 
-  constructor(readonly base: F) {
+  readonly base: F;
+
+  constructor(base: F) {
+    this.base = base;
     this.name = `hyperdual(${base.name})`;
     this.zero = { v: base.zero, e1: base.zero, e2: base.zero, e12: base.zero };
     this.one = { v: base.one, e1: base.zero, e2: base.zero, e12: base.zero };
@@ -172,7 +175,6 @@ export class HyperDualField<F extends Field<any>> implements Field<HyperDualValu
   tanh(a: HyperDualValue): HyperDualValue {
     const t = this.base.tanh(a.v);
     const d = this.base.sub(this.base.one, this.base.mul(t, t));
-    const d2 = this.base.mul(d, d);
     return {
       v: t,
       e1: this.base.div(a.e1, d),

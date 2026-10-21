@@ -17,7 +17,11 @@ export class GFpField implements Field<number> {
   readonly zero = 0;
   readonly one = 1;
 
-  constructor(readonly p: number) {}
+  readonly p: number;
+
+  constructor(p: number) {
+    this.p = p;
+  }
 
   /** Reduce to the canonical representative in [0, p). */
   mod(a: number): number {

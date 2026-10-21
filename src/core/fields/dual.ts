@@ -23,7 +23,10 @@ export class DualField<F extends Field<any>> implements Field<DualValue> {
   readonly zero: DualValue;
   readonly one: DualValue;
 
-  constructor(readonly base: F) {
+  readonly base: F;
+
+  constructor(base: F) {
+    this.base = base;
     this.name = `dual(${base.name})`;
     this.zero = { v: base.zero, t: base.zero };
     this.one = { v: base.one, t: base.zero };
