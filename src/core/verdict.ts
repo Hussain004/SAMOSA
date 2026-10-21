@@ -86,6 +86,12 @@ export interface StepResult {
   id: string;
   row: number;
   span: Span;
+  /** the source text of the row */
+  text?: string;
+  /** the line of the source, one based, when the caller knows it */
+  line?: number;
+  /** the column of the source, one based */
+  column?: number;
   lhsSpan?: Span;
   rhsSpan?: Span;
   relation: Relation | 'defined';
@@ -125,6 +131,8 @@ interface Step {
   id: string;
   row: number;
   span: Span;
+  /** the source text of the row */
+  text: string;
   lhs?: Node;
   rhs?: Node;
   relation: Relation | 'defined';
@@ -206,6 +214,7 @@ export function check(src: string, opts: CheckOptions = {}): Report {
           id: `s${steps.length}`,
           row: rowIndex,
           span: part.span,
+          text: row.text,
           relation: part.relation,
           premise: part.premise,
           conclusion: part.conclusion,
@@ -236,6 +245,7 @@ export function check(src: string, opts: CheckOptions = {}): Report {
         id: `s${steps.length}`,
         row: rowIndex,
         span: part.span,
+        text: row.text,
         lhs,
         rhs,
         relation: part.relation === ':=' ? 'defined' : part.relation,
@@ -320,6 +330,7 @@ function checkStep(
       id: step.id,
       row: step.row,
       span: step.span,
+      text: step.text,
       lhsSpan: step.lhs?.span,
       rhsSpan: step.rhs?.span,
       relation: 'defined',
@@ -341,6 +352,7 @@ function checkStep(
       id: step.id,
       row: step.row,
       span: step.span,
+      text: step.text,
       relation: step.relation,
       verdict: 'unchecked',
       card: base,
@@ -356,6 +368,7 @@ function checkStep(
       id: step.id,
       row: step.row,
       span: step.span,
+      text: step.text,
       relation: step.relation,
       verdict: 'unchecked',
       card: base,
@@ -543,6 +556,7 @@ function checkExact(
           id: step.id,
           row: step.row,
           span: step.span,
+          text: step.text,
           lhsSpan: step.lhs?.span,
           rhsSpan: step.rhs?.span,
           relation: step.relation,
@@ -589,6 +603,7 @@ function checkExact(
     id: step.id,
     row: step.row,
     span: step.span,
+    text: step.text,
     lhsSpan: step.lhs?.span,
     rhsSpan: step.rhs?.span,
     relation: step.relation,
@@ -1039,6 +1054,7 @@ function checkNumeric(
           id: step.id,
           row: step.row,
           span: step.span,
+          text: step.text,
           relation: step.relation,
           verdict: 'unchecked',
           card: { ...card, sizes, assumptions },
@@ -1085,6 +1101,7 @@ function checkNumeric(
         id: step.id,
         row: step.row,
         span: step.span,
+        text: step.text,
         relation: step.relation,
         verdict: 'unchecked',
         card: { ...card, sizes, assumptions },
@@ -1101,6 +1118,7 @@ function checkNumeric(
       id: step.id,
       row: step.row,
       span: step.span,
+      text: step.text,
       lhsSpan: step.lhs?.span,
       rhsSpan: step.rhs?.span,
       relation: step.relation,

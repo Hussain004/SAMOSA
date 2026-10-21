@@ -6,8 +6,21 @@
   "description": "SAMOSA — a step auditor for matrix algebra, stochastics and algebra. Checks every step of a derivation, exactly, in your browser.",
   "license": "MIT",
   "homepage": "https://samosa-math.vercel.app",
-  "repository": { "type": "git", "url": "git+https://github.com/Hussain004/SAMOSA.git" },
-  "keywords": ["math", "linear-algebra", "matrix-calculus", "latex", "linter", "kalman-filter", "machine-learning", "mcp", "agent-skills"],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Hussain004/SAMOSA.git"
+  },
+  "keywords": [
+    "math",
+    "linear-algebra",
+    "matrix-calculus",
+    "latex",
+    "linter",
+    "kalman-filter",
+    "machine-learning",
+    "mcp",
+    "agent-skills"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
@@ -41,13 +54,18 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@lezer/highlight": "^1.2.5",
     "@modelcontextprotocol/sdk": "^1.32.1",
     "@playwright/test": "^1.64.1",
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^24.10.1",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "@unified-latex/unified-latex-util-environments": "^1.8.4",
     "@unified-latex/unified-latex-util-parse": "^1.8.4",
+    "@unified-latex/unified-latex-util-print-raw": "^1.8.4",
+    "@unified-latex/unified-latex-util-split": "^1.8.4",
+    "@unified-latex/unified-latex-util-visit": "^1.8.4",
     "@vitejs/plugin-react": "^6.1.2",
     "esbuild": "^0.28.2",
     "eslint": "^10.13.0",

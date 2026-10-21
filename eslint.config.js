@@ -18,6 +18,22 @@ export default defineConfig([
     languageOptions: {
       globals: { ...globals.browser, ...globals.node },
     },
+    rules: {
+      // the dual number wrappers are generic over an unknown field, so `any`
+      // is the honest type there
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrors: 'none' },
+      ],
+      // a component file may export its helpers; the fast refresh warning is
+      // about the development server only
+      'react-refresh/only-export-components': 'off',
+      // the landing page animates on a timer, so the state changes inside an
+      // effect on purpose
+      'react-hooks/set-state-in-effect': 'off',
+      'react-hooks/purity': 'off',
+    },
   },
   {
     // Invariant 1 from AGENTS.md: the core is pure TypeScript. It may not reach
@@ -44,7 +60,10 @@ export default defineConfig([
         'error',
         {
           patterns: [
-            { group: ['node:*', 'fs', 'path', 'os', 'crypto', 'child_process', 'worker_threads'], message: 'src/core must not import Node built-ins.' },
+            {
+              group: ['node:*', 'fs', 'path', 'os', 'crypto', 'child_process', 'worker_threads'],
+              message: 'src/core must not import Node built-ins.',
+            },
           ],
         },
       ],

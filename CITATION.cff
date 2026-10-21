@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+title: "SAMOSA: a step auditor for matrix derivations"
+message: "If you use this software, please cite it as below."
+type: software
+authors:
+  - family-names: Hussain
+    given-names: Hussain
+repository-code: "https://github.com/Hussain004/SAMOSA"
+url: "https://samosa-math.vercel.app"
+license: MIT
+abstract: >-
+  SAMOSA checks every step of a matrix algebra, matrix calculus and
+  probability derivation by evaluating it on sampled instances, exactly over
+  finite fields, and reports a wrong step with a small counterexample and a
+  fix.
+keywords:
+  - mathematics
+  - linear algebra
+  - matrix calculus
+  - formal verification
+  - linter

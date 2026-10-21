@@ -57,6 +57,9 @@ importers:
       '@eslint/js':
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.13.0(jiti@2.7.0))
+      '@lezer/highlight':
+        specifier: ^1.2.5
+        version: 1.2.5
       '@modelcontextprotocol/sdk':
         specifier: ^1.32.1
         version: 1.32.1(zod@4.6.7)
@@ -75,7 +78,19 @@ importers:
       '@types/react-dom':
         specifier: ^19.3.0
         version: 19.3.0(@types/react@19.3.0)
+      '@unified-latex/unified-latex-util-environments':
+        specifier: ^1.8.4
+        version: 1.8.4
       '@unified-latex/unified-latex-util-parse':
+        specifier: ^1.8.4
+        version: 1.8.4
+      '@unified-latex/unified-latex-util-print-raw':
+        specifier: ^1.8.4
+        version: 1.8.4
+      '@unified-latex/unified-latex-util-split':
+        specifier: ^1.8.4
+        version: 1.8.4
+      '@unified-latex/unified-latex-util-visit':
         specifier: ^1.8.4
         version: 1.8.4
       '@vitejs/plugin-react':

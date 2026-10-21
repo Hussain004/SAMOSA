@@ -65,7 +65,7 @@ export class Dims {
   private rank = new Map<string, number>();
 
   find(v: string): string {
-    let p = this.parent.get(v);
+    const p = this.parent.get(v);
     if (p === undefined) {
       this.parent.set(v, v);
       return v;
@@ -461,9 +461,9 @@ function opType(ctx: TypeContext, node: Extract<Node, { k: 'op' }>): Ty {
       if (isScalar(a) && isMatrix(b)) return b;
       if (isMatrix(a) && isScalar(b)) return a;
       if (isMatrix(a) && isMatrix(b)) {
-        const r = unifyDim(ctx, a.r, b.r, 'in a sum', node.span);
-        const c = unifyDim(ctx, a.c, b.c, 'in a sum', node.span);
-        return { t: 'mat', r: r ?? a.r, c: c ?? a.c };
+        const rows = unifyDim(ctx, a.r, b.r, 'in a sum', node.span);
+        const cols = unifyDim(ctx, a.c, b.c, 'in a sum', node.span);
+        return { t: 'mat', r: rows ?? a.r, c: cols ?? a.c };
       }
       ctx.errors.push({ message: 'these two terms do not have the same shape', span: node.span });
       return { t: 'poly' };
@@ -480,9 +480,8 @@ function opType(ctx: TypeContext, node: Extract<Node, { k: 'op' }>): Ty {
       if (isScalar(a) && isMatrix(b)) return b;
       if (isMatrix(a) && isScalar(b)) return a;
       if (isMatrix(a) && isMatrix(b)) {
-        const c = unifyDim(ctx, a.c, b.r, 'in a product', node.span);
+        unifyDim(ctx, a.c, b.r, 'in a product', node.span);
         return { t: 'mat', r: a.r, c: b.c };
-        void c;
       }
       ctx.errors.push({ message: 'these two factors do not have compatible shapes', span: node.span });
       return { t: 'poly' };
@@ -551,9 +550,9 @@ function opType(ctx: TypeContext, node: Extract<Node, { k: 'op' }>): Ty {
       const a = args[0];
       const b = args[1];
       if (isMatrix(a) && isMatrix(b)) {
-        const r = unifyDim(ctx, a.r, b.r, 'in an element wise product', node.span);
-        const c = unifyDim(ctx, a.c, b.c, 'in an element wise product', node.span);
-        return { t: 'mat', r: r ?? a.r, c: c ?? a.c };
+        const rows = unifyDim(ctx, a.r, b.r, 'in an element wise product', node.span);
+        const cols = unifyDim(ctx, a.c, b.c, 'in an element wise product', node.span);
+        return { t: 'mat', r: rows ?? a.r, c: cols ?? a.c };
       }
       return { t: 'poly' };
     }
@@ -615,14 +614,19 @@ function callType(ctx: TypeContext, fn: string, args: Node[], span: Span): Ty {
     case 'normalDensity':
     case 'uniformDensity':
       return { t: 'scalar' };
-    default:
+    default: {
       // a user declared function
       const decl = ctx.decls.get(fn);
       if (decl && decl.kind === 'function') {
-        return { t: 'fn', dom: (decl.dom ?? []).map((d) => ({ t: 'mat', r: d, c: d })), cod: { t: 'scalar' } };
+        return {
+          t: 'fn',
+          dom: (decl.dom ?? []).map((d) => ({ t: 'mat', r: d, c: d })),
+          cod: { t: 'scalar' },
+        };
       }
       ctx.errors.push({ message: `unknown function ${fn}`, span });
       return { t: 'poly' };
+    }
   }
 }
 

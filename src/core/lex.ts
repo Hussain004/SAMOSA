@@ -153,7 +153,7 @@ export function tokenize(src: string): Token[] {
         continue;
       }
       // control symbol: a single character, except for the row break \\
-      let sym = text[i];
+      const sym = text[i];
       i += 1;
       if (sym === '\\') {
         // \\ is the row separator

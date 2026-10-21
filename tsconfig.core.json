@@ -17,5 +17,5 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src/core", "cli", "mcp"]
+  "include": ["src/core"]
 }

@@ -731,7 +731,7 @@ export class Parser {
   /** Reads the base of an accent: a letter, a single symbol, or a one item group. */
   private parseAccentBase(accent: string): Node {
     const startTok = this.cur;
-    let baseLatex = '';
+    let baseLatex: string;
     let span: Span = { from: startTok.from, to: startTok.to };
     let accents: string[] = [];
 
@@ -908,7 +908,7 @@ export class Parser {
   }
 
   private parseDerivativeAfterNabla(t: Token): Node {
-    let wrt: Node[] = [];
+    const wrt: Node[] = [];
     if (this.kind() === 'sub') {
       this.pos++;
       const s = this.readSubscript();

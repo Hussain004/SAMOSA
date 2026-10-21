@@ -1,0 +1,42 @@
+{
+  "name": "samosa-math",
+  "version": "1.0.0",
+  "description": "A step auditor for matrix algebra, stochastics and algebra. Checks every step of a derivation, exactly, with counterexamples and fixes.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "samosa": "dist/cli.mjs",
+    "samosa-mcp": "dist/mcp.mjs"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "math",
+    "linear-algebra",
+    "matrix-calculus",
+    "latex",
+    "linter",
+    "kalman-filter",
+    "mcp",
+    "agent-skills"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Hussain004/SAMOSA.git"
+  },
+  "homepage": "https://samosa-math.vercel.app",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "@unified-latex/unified-latex-util-parse": "^1.8.4",
+    "@unified-latex/unified-latex-util-split": "^1.8.4",
+    "@unified-latex/unified-latex-util-environments": "^1.8.4",
+    "decimal.js": "^10.6.0",
+    "zod": "^4.6.7"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
