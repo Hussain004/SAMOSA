@@ -3,7 +3,7 @@ import { evalNode, makeEnv } from './evaluate.ts';
 import { Sampler } from './sample.ts';
 import { rngFor } from './prng.ts';
 import { renderNode } from './render.ts';
-import { sizeSettings } from './verdict.ts';
+import { compareSides, sizeSettings } from './verdict.ts';
 import { dimSizeOf, type TypeContext } from './types.ts';
 import type { Node, Span } from './ir.ts';
 import type { Fix } from './verdict.ts';
@@ -63,13 +63,12 @@ export function repairs(
 
   out.push(...residualRepairs(sh));
 
-  // The same fix is only offered once, and the order is by how much the fix
-  // says: a change to the expression first, then the missing term, then the
-  // missing assumption.
+  // The same fix is only offered once: two rules that lead to the same
+  // expression are one fix, however they are phrased.
   const deduped: Fix[] = [];
   const seen = new Set<string>();
   for (const fix of out) {
-    const key = `${fix.kind}|${fix.title}|${fix.edit?.insert ?? ''}|${fix.addDecl ?? ''}`;
+    const key = `${fix.edit?.insert ?? ''}|${fix.addDecl ?? ''}`;
     if (seen.has(key)) continue;
     seen.add(key);
     deduped.push(fix);
@@ -302,34 +301,42 @@ function replaceAt(node: Node, path: number[], replacement: Node): Node {
   return node;
 }
 
+/**
+ * The mutations, applied to either side of the step.
+ *
+ * A mistake is as often on the left as on the right, so both are tried, and
+ * the fix that is offered edits the side that was changed.
+ */
 function mutationRepairs(sh: RepairCtx): Fix[] {
   const out: Fix[] = [];
-  const candidates = walk(sh.rhs);
   let count = 0;
-  for (const { node, path } of candidates) {
-    if (count > CANDIDATE_LIMIT) break;
-    for (const mutation of MUTATIONS) {
+  for (const side of ['rhs', 'lhs'] as const) {
+    const original = side === 'rhs' ? sh.rhs : sh.lhs;
+    for (const { node, path } of walk(original)) {
       if (count > CANDIDATE_LIMIT) break;
-      const mutated = mutation.apply(node);
-      if (!mutated) continue;
-      count++;
-      const candidate = replaceAt(sh.rhs, path, mutated);
-      if (renderNode(candidate) === renderNode(sh.rhs)) continue;
-      if (!holdsWith(sh, candidate)) continue;
-      out.push({
-        kind: 'mutation',
-        title: mutation.title,
-        edit: { span: sh.rhs.span, insert: renderNode(candidate) },
-        verified: true,
-        detail: renderNode(candidate),
-      });
+      for (const mutation of MUTATIONS) {
+        if (count > CANDIDATE_LIMIT) break;
+        const mutated = mutation.apply(node);
+        if (!mutated) continue;
+        count++;
+        const candidate = replaceAt(original, path, mutated);
+        if (renderNode(candidate) === renderNode(original)) continue;
+        if (!holdsWith(sh, side, candidate)) continue;
+        out.push({
+          kind: 'mutation',
+          title: mutation.title,
+          edit: { span: original.span, insert: renderNode(candidate) },
+          verified: true,
+          detail: renderNode(candidate),
+        });
+      }
     }
   }
   return out;
 }
 
-/** Does the step hold with this right hand side? */
-function holdsWith(sh: RepairCtx, rhs: Node): boolean {
+/** Does the step hold with this side replaced? */
+function holdsWith(sh: RepairCtx, side: 'lhs' | 'rhs', candidate: Node): boolean {
   const settings = sizeSettings(sh.dimVars);
   const field = new GFpField(2147483647);
   for (const setting of settings.slice(0, 2)) {
@@ -341,9 +348,14 @@ function holdsWith(sh: RepairCtx, rhs: Node): boolean {
     if (!values) return false;
     for (const [name, value] of values.entries()) if (value) env.values.set(name, value);
     try {
-      const l = evalNode(field, sh.lhs, env);
-      const r = evalNode(field, rhs, env);
-      if (!same(field, l, r)) return false;
+      const sides = compareSides(
+        field,
+        side === 'lhs' ? candidate : sh.lhs,
+        side === 'rhs' ? candidate : sh.rhs,
+        env,
+        sampler,
+      );
+      if (sides.kind !== 'equal') return false;
     } catch {
       return false;
     }
@@ -371,6 +383,13 @@ function sampleSymbols(
   };
   collect(sh.lhs);
   collect(sh.rhs);
+  // A symbol the step brings with it, a defined one, brings its definition
+  // and the symbols that definition is written with: the noise term of the
+  // Kalman filter is written with a symbol that never appears in the step.
+  for (const name of [...names]) {
+    const def = sh.defs.get(name);
+    if (def) collect(def);
+  }
   for (const name of names) {
     if (sh.defs.has(name)) continue;
     const info = ctx.symbols.get(name);
@@ -387,16 +406,6 @@ function sampleSymbols(
     values.set(name, val);
   }
   return values;
-}
-
-function same<T>(field: { eq: (a: T, b: T) => boolean }, a: any, b: any): boolean {
-  if (a.k === 's' && b.k === 's') return field.eq(a.v, b.v);
-  if (a.k === 'm' && b.k === 'm') {
-    if (a.m.r !== b.m.r || a.m.c !== b.m.c) return false;
-    for (let i = 0; i < a.m.d.length; i++) if (!field.eq(a.m.d[i], b.m.d[i])) return false;
-    return true;
-  }
-  return false;
 }
 
 // ------------------------------------------------------------ assumptions
@@ -468,7 +477,7 @@ function holdsWithProps(sh: RepairCtx, name: string, props: Prop[]): boolean {
   const saved = sh.ctx.symbols.get(name);
   if (!saved) return false;
   sh.ctx.symbols.set(name, { ...saved, props });
-  const ok = holdsWith(sh, sh.rhs);
+  const ok = holdsWith(sh, 'rhs', sh.rhs);
   sh.ctx.symbols.set(name, saved);
   return ok;
 }
@@ -537,8 +546,9 @@ function residualRepairs(sh: RepairCtx): Fix[] {
   const settings = sizeSettings(sh.dimVars);
   const field = new GFpField(2147483647);
 
-  // the difference on a few instances
-  const diffs: number[][] = [];
+  // The difference on a few instances. The environments are kept, because a
+  // candidate term has to be tried on the very same instances.
+  const samples: Array<{ env: ReturnType<typeof makeEnv<number>>; diff: number[] }> = [];
   for (const setting of settings.slice(0, 2)) {
     const rng = rngFor(sh.seed, 'repair', 'residual');
     const sampler = new Sampler(field, rng);
@@ -552,17 +562,17 @@ function residualRepairs(sh: RepairCtx): Fix[] {
       const r = evalNode(field, sh.rhs, env);
       if (l.k !== 'm' || r.k !== 'm') return out;
       const d = l.m.d.map((x, i) => field.sub(x, r.m.d[i]));
-      diffs.push(d);
+      samples.push({ env, diff: d });
     } catch {
       return out;
     }
   }
-  if (diffs.length < 2) return out;
+  if (samples.length < 2) return out;
 
   const terms = candidateTerms(sh);
 
   for (const [text, term] of terms) {
-    const scale = matchesScale(field, term, sh, diffs);
+    const scale = matchesScale(field, term, samples);
     if (scale === null) continue;
     out.push({
       kind: 'residual',
@@ -639,35 +649,34 @@ function candidateTerms(sh: RepairCtx): Map<string, Node> {
 function matchesScale(
   field: GFpField,
   term: Node,
-  sh: RepairCtx,
-  diffs: number[][],
+  samples: Array<{ env: ReturnType<typeof makeEnv<number>>; diff: number[] }>,
 ): number | null {
-  const settings = sizeSettings(sh.dimVars);
-  const rng = rngFor(sh.seed, 'repair', 'residual', 'term');
-  const sampler = new Sampler(field, rng);
-  const env = makeEnv(field, rng);
-  env.defs = sh.defs;
-  const values = sampleSymbols(sh.ctx, sh, settings[0], sampler);
-  if (!values) return null;
-  for (const [name, value] of values.entries()) if (value) env.values.set(name, value);
-  let termValues: number[];
-  try {
-    const t = evalNode(field, term, env);
-    if (t.k !== 'm') return null;
-    termValues = t.m.d;
-  } catch {
-    return null;
+  // The term is evaluated on the same instances as the difference, or the
+  // two would never agree.
+  const termValues: number[][] = [];
+  for (const { env, diff } of samples) {
+    let value: number[];
+    try {
+      const t = evalNode(field, term, env);
+      if (t.k !== 'm') return null;
+      value = t.m.d;
+    } catch {
+      return null;
+    }
+    if (value.length !== diff.length) return null;
+    termValues.push(value);
   }
-  if (termValues.length !== diffs[0].length) return null;
 
   // The scale is read off one entry and then checked against all of them, so
   // the search is over the small rationals and not over the entries.
-  const scale = niceScale(field, field.div(diffs[0][0], termValues[0]));
+  const scale = niceScale(field, field.div(samples[0].diff[0], termValues[0][0]));
   if (scale === null) return null;
 
-  for (const diff of diffs) {
-    for (let i = 0; i < diff.length; i++) {
-      if (field.mul(field.fromRational(scale.n, scale.d), termValues[i]) !== diff[i]) return null;
+  for (let s = 0; s < samples.length; s++) {
+    for (let i = 0; i < samples[s].diff.length; i++) {
+      if (field.mul(field.fromRational(scale.n, scale.d), termValues[s][i]) !== samples[s].diff[i]) {
+        return null;
+      }
     }
   }
   return scale.n / scale.d;

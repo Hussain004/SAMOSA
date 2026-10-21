@@ -664,7 +664,7 @@ function runExactTrial(
   for (const [name, value] of sampled.values.entries()) env.values.set(name, value);
   for (const [name, quadVar] of sampled.quad.entries()) env.quad.set(name, quadVar);
 
-  const sides = evaluateSides(field, step, env, sampler);
+  const sides = evaluateSides(field, step.lhs!, step.rhs!, env, sampler);
   if (sides.kind === 'unknown') return { kind: 'unknown', message: sides.message, domain: sides.domain };
   if (sides.kind === 'equal') return { kind: 'ok' };
 
@@ -682,6 +682,22 @@ type Sides<T> =
   | { kind: 'unknown'; message: string; domain?: boolean };
 
 /**
+ * Compares two sides of a step.
+ *
+ * The repair engine uses it as well, because a fix for a gradient row has to
+ * be checked the way the verdict was: with a directional derivative.
+ */
+export function compareSides<T>(
+  field: Field<T>,
+  lhs: Node,
+  rhs: Node,
+  env: ReturnType<typeof makeEnv<T>>,
+  sampler: Sampler<T>,
+): Sides<T> {
+  return evaluateSides(field, lhs, rhs, env, sampler);
+}
+
+/**
  * Evaluates both sides of a step and compares them.
  *
  * A derivative on the left is special: the claim is about a gradient or a
@@ -689,17 +705,18 @@ type Sides<T> =
  */
 function evaluateSides<T>(
   field: Field<T>,
-  step: Step,
+  lhsNode: Node,
+  rhsNode: Node,
   env: ReturnType<typeof makeEnv<T>>,
   sampler: Sampler<T>,
 ): Sides<T> {
-  const derivNode = step.lhs && step.lhs.k === 'deriv' ? step.lhs : undefined;
+  const derivNode = lhsNode.k === 'deriv' ? lhsNode : undefined;
   try {
     if (derivNode) {
-      return compareDerivative(field, derivNode, step.rhs!, env, sampler);
+      return compareDerivative(field, derivNode, rhsNode, env, sampler);
     }
-    const lhs = evalNode(field, step.lhs!, env);
-    const rhs = evalNode(field, step.rhs!, env);
+    const lhs = evalNode(field, lhsNode, env);
+    const rhs = evalNode(field, rhsNode, env);
     if (valuesEqual(field, lhs, rhs)) return { kind: 'equal' };
     return { kind: 'different', lhs, rhs, message: 'the two sides are not equal' };
   } catch (error) {
@@ -1359,7 +1376,7 @@ function numericDelta<T>(
   for (const [name, value] of sampled.values.entries()) env.values.set(name, value);
   for (const [name, quadVar] of sampled.quad.entries()) env.quad.set(name, quadVar);
 
-  const sides = evaluateSides(field, step, env, sampler);
+  const sides = evaluateSides(field, step.lhs!, step.rhs!, env, sampler);
   if (sides.kind === 'unknown') return null;
   if (sides.kind === 'equal') return 0;
   return relativeDelta(field, sides.lhs, sides.rhs);
