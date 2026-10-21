@@ -242,6 +242,7 @@ export function App() {
           </div>
           <div className="min-h-0 flex-1">
             <RenderedRows
+              source={source}
               report={report}
               selectedStep={selectedStep}
               onSelectStep={select}

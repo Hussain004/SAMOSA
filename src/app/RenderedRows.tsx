@@ -4,6 +4,8 @@ import type { Report, StepResult } from '../core/index.ts';
 import { VERDICT_LABEL, VERDICT_ICON } from './verdicts.ts';
 
 export interface RenderedProps {
+  /** the whole source, so the spans of a step can be sliced */
+  source: string;
   report: Report | null;
   selectedStep: string | null;
   onSelectStep: (id: string) => void;
@@ -18,7 +20,7 @@ export interface RenderedProps {
  * mode. The offending sub-expression is highlighted, so the eye goes
  * straight to the part that is wrong.
  */
-export function RenderedRows({ report, selectedStep, onSelectStep, hoverStep, onHoverStep }: RenderedProps) {
+export function RenderedRows({ source, report, selectedStep, onSelectStep, hoverStep, onHoverStep }: RenderedProps) {
   if (!report || report.steps.length === 0) {
     return (
       <div className="flex h-full items-center justify-center p-8 text-center text-sm text-[var(--color-faint)]">
@@ -36,6 +38,7 @@ export function RenderedRows({ report, selectedStep, onSelectStep, hoverStep, on
         <Row
           key={step.id}
           step={step}
+          source={source}
           selected={selectedStep === step.id}
           hovered={hoverStep === step.id}
           onSelect={() => onSelectStep(step.id)}
@@ -48,19 +51,21 @@ export function RenderedRows({ report, selectedStep, onSelectStep, hoverStep, on
 
 function Row({
   step,
+  source,
   selected,
   hovered,
   onSelect,
   onHover,
 }: {
   step: StepResult;
+  source: string;
   selected: boolean;
   hovered: boolean;
   onSelect: () => void;
   onHover: (on: boolean) => void;
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
-  const html = useMemo(() => renderStep(step), [step]);
+  const html = useMemo(() => renderStep(step, source), [step, source]);
 
   useEffect(() => {
     if (selected) ref.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
@@ -120,11 +125,11 @@ function badgeClass(step: StepResult): string {
 }
 
 /** Renders a step with KaTeX, highlighting the part that is wrong. */
-export function renderStep(step: StepResult): string {
-  const source = stepLaTeX(step);
-  if (!source) return '';
+export function renderStep(step: StepResult, source = ''): string {
+  const latex = stepLaTeX(step, source);
+  if (!latex) return '';
   try {
-    return katex.renderToString(source, {
+    return katex.renderToString(latex, {
       displayMode: false,
       throwOnError: false,
       trust: (ctx: { command: string; class?: string }) =>
@@ -133,7 +138,7 @@ export function renderStep(step: StepResult): string {
       output: 'html',
     });
   } catch {
-    return escapeHtml(source);
+    return escapeHtml(latex);
   }
 }
 
@@ -144,9 +149,14 @@ function escapeHtml(text: string): string {
     .replace(/>/g, '&gt;');
 }
 
-/** The LaTeX of a step, with the wrong part wrapped in a highlight. */
-function stepLaTeX(step: StepResult): string {
-  const text = step.text ?? '';
+/**
+ * The LaTeX of a step, with the wrong part wrapped in a highlight.
+ *
+ * The spans are offsets into the whole source, so the source is what gets
+ * sliced. The row text is only used when there is no source to slice.
+ */
+function stepLaTeX(step: StepResult, source: string): string {
+  const text = source || step.text || '';
   if (!text) return '';
   if (step.verdict === 'wrong' && step.lhsSpan && step.rhsSpan) {
     const lhs = text.slice(step.lhsSpan.from, step.lhsSpan.to);
@@ -154,7 +164,7 @@ function stepLaTeX(step: StepResult): string {
     const rhs = text.slice(step.rhsSpan.to);
     return `${tex(lhs)}${tex(relation)}\\htmlClass{samosa-hl}{${tex(rhs)}}`;
   }
-  return tex(text);
+  return tex(step.text ?? text);
 }
 
 /** The LaTeX of a piece of a row, with the alignment markers removed. */
