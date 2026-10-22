@@ -159,9 +159,9 @@ with the mistakes the catalog can make of them.
 | | |
 | --- | --- |
 | the false checkmarks | **0** |
-| the caught mutants | 196 of 267 (**73.4%**) |
+| the caught mutants | 196 of 262 (**74.8%**) |
 
-The plan's gate asks for 95% of the bugs caught. The cookbook is at 73.4%,
+The plan's gate asks for 95% of the bugs caught. The cookbook is at 74.8%,
 and every miss is a step the engine says it cannot decide, never one it
 calls right. The method, the misses and the bugs the corpus found are in
 [docs/COOKBOOK.md](docs/COOKBOOK.md).

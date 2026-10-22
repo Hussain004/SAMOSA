@@ -24,11 +24,11 @@ Measured by `pnpm check:corpus`:
 | | |
 | --- | --- |
 | the identities | 48 |
-| the mutants | 267 |
+| the mutants | 262 |
 | **the false checkmarks** | **0** |
 | the identities SAMOSA cannot check | 10 |
-| the caught mutants | 196 of 267 (**73.4%**) |
-| the harmless mutants, where the mistake changes nothing | 19 |
+| the caught mutants | 196 of 262 (**74.8%**) |
+| the harmless mutants, where the mistake changes nothing | 30 |
 
 The plan's gate G2 asks for 95% of the planted bugs caught with the expected
 repair in the top three. The cookbook is at 73.4%, and the difference is
