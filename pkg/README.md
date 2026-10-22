@@ -50,8 +50,8 @@ treating a non-symmetric matrix as symmetric. A gradient in the wrong layout.
 The step that nobody checks is the one that says "after some algebraic
 manipulation, we may obtain ...".
 
-SAMOSA started with exactly that step. The Kalman measurement update from
-Mobile Robotics Lecture 8 says
+SAMOSA started with exactly that step. The Kalman measurement update, as it
+is usually written, says
 
 > after some algebraic manipulation we may obtain K = Σ̄Cᵀ(CΣ̄Cᵀ + Q)⁻¹
 

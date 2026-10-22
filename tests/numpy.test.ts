@@ -24,10 +24,10 @@ function runPython(snippet: string): string {
   return execFileSync('python3', ['-c', snippet], { encoding: 'utf8' });
 }
 
-/** Is there a Python to run the snippet with? */
+/** Is there a Python with NumPy to run the snippet with? */
 function hasPython(): boolean {
   try {
-    execFileSync('python3', ['--version'], { stdio: 'ignore' });
+    execFileSync('python3', ['-c', 'import numpy'], { stdio: 'ignore' });
     return true;
   } catch {
     return false;
