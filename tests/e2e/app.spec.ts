@@ -52,6 +52,18 @@ test('a wrong step is flagged and the card opens', async ({ page }) => {
   await page.locator('textarea').fill(DECLARATIONS);
   await type(page, DERIVATION);
   await expect(page.getByText('wrong').first()).toBeVisible({ timeout: 15_000 });
+
+  // the card draws the counterexample, the two sides and the computed values
+  await page.getByText('wrong').first().click();
+  const card = page.getByTestId('inspector');
+  await expect(card.getByRole('heading', { name: 'the two sides' })).toBeVisible({ timeout: 15_000 });
+  await expect(card.getByRole('heading', { name: 'computed by SAMOSA' })).toBeVisible();
+  await expect(card.locator('.katex').first()).toBeVisible();
+
+  // the assumptions are readable names, not LaTeX
+  const assumptions = card.getByTestId('assumptions');
+  await expect(assumptions.getByText('checked assuming')).toBeVisible();
+  await expect(assumptions).not.toContainText('\\bar');
 });
 
 test('a quick fix applies', async ({ page }) => {
@@ -151,7 +163,9 @@ test('nothing leaves the browser', async ({ page }) => {
 test('the app works on a phone', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/app/');
-  await page.waitForSelector('.cm-content');
+  // the source pane starts closed on a phone, so the editor is attached but
+  // not visible
+  await page.waitForSelector('.cm-content', { state: 'attached' });
   await page.waitForTimeout(1000);
 
   // the page does not scroll sideways
@@ -163,6 +177,50 @@ test('the app works on a phone', async ({ page }) => {
 
   // and the rows are still there
   await expect(page.getByText('holds').first()).toBeVisible();
+});
+
+test('the spot the bug game gives feedback and keeps a streak', async ({ page }) => {
+  await page.getByRole('button', { name: 'Menu', exact: true }).click();
+  await page.getByTestId('spot-joseph').click();
+
+  await expect(page.getByText('one row is wrong. click it.')).toBeVisible();
+
+  // a row that holds is not the answer, and the game goes on
+  await page.locator('[data-step-id="s1"]').click();
+  await expect(page.getByText('not that row, try again')).toBeVisible();
+
+  // the row that is wrong ends the game
+  await page.locator('[data-verdict="wrong"]').first().click();
+  await expect(page.getByText(/found it in 2 tries/)).toBeVisible();
+  await expect(page.getByText('streak 1')).toBeVisible();
+
+  // the next bug is a different derivation, and the streak stays
+  await page.getByRole('button', { name: 'next bug →' }).click();
+  await expect(page.getByText('one row is wrong. click it.')).toBeVisible();
+  await expect(page.getByText('streak 1')).toBeVisible();
+});
+
+test('the phone has one pane at a time', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/app/');
+  // the source pane starts closed on a phone, so the editor is attached but
+  // not visible
+  await page.waitForSelector('.cm-content', { state: 'attached' });
+  await page.waitForTimeout(1000);
+
+  // the rendered pane is the one that is open
+  await expect(page.getByRole('button', { name: 'rendered', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'source', exact: true })).toBeVisible();
+  await expect(page.locator('.cm-content')).toBeHidden();
+
+  // the source is one tap away
+  await page.getByRole('button', { name: 'source', exact: true }).click();
+  await expect(page.locator('.cm-content')).toBeVisible();
+
+  // and a row opens the card
+  await page.getByRole('button', { name: 'rendered', exact: true }).click();
+  await page.locator('[data-step-id]').first().click();
+  await expect(page.getByTestId('inspector')).toBeVisible();
 });
 
 test('the command palette opens with the keyboard', async ({ page }) => {

@@ -3,6 +3,8 @@ import { encodeShare, readShareLink } from '../core/share.ts';
 import type { Explanation, Report } from '../core/index.ts';
 import type { WorkerRequest, WorkerResponse } from '../worker.ts';
 import { PRESETS } from '../core/index.ts';
+import { splitRows } from '../core/steps.ts';
+import { MENU } from '../../corpus/menu.ts';
 
 /**
  * The state of the checker.
@@ -32,6 +34,12 @@ export interface AppState {
   guess: string | null;
   /** the row that really is wrong */
   revealed: string | null;
+  /** the Menu item the game came from, so the next bug is a different one */
+  spotItem: string | null;
+  /** how many rows were tried in this game */
+  tries: number;
+  /** how many games in a row were found */
+  streak: number;
   explanations: Record<string, Explanation>;
   busy: boolean;
   error: string | null;
@@ -42,8 +50,10 @@ export interface AppState {
   setSource: (source: string) => void;
   setSettings: (patch: Partial<Settings>) => void;
   select: (id: string | null) => void;
-  startSpotTheBug: (source: string, decls: string) => void;
+  startSpotTheBug: (source: string, decls: string, itemId?: string) => void;
   makeGuess: (id: string) => void;
+  nextBug: () => void;
+  stopSpotTheBug: () => void;
   reroll: () => void;
   loadShare: () => void;
   applyShare: (hash: string) => void;
@@ -175,6 +185,9 @@ export const useApp = create<AppState>((set, get) => ({
   spotTheBug: false,
   guess: null,
   revealed: null,
+  spotItem: null,
+  tries: 0,
+  streak: 0,
   explanations: {},
   busy: false,
   error: null,
@@ -193,7 +206,7 @@ export const useApp = create<AppState>((set, get) => ({
     schedule(get());
   },
 
-  startSpotTheBug: (source, decls) => {
+  startSpotTheBug: (source, decls, itemId) => {
     set({
       source,
       settings: { ...get().settings, decls },
@@ -201,6 +214,8 @@ export const useApp = create<AppState>((set, get) => ({
       guess: null,
       revealed: null,
       selectedStep: null,
+      spotItem: itemId ?? null,
+      tries: 0,
     });
     schedule(get());
   },
@@ -208,8 +223,19 @@ export const useApp = create<AppState>((set, get) => ({
   makeGuess: (id) => {
     const report = get().report;
     if (!report) return;
-    const wrong = report.steps.find((s) => s.verdict === 'wrong' || s.verdict === 'shape');
-    set({ guess: id, revealed: wrong?.id ?? null, selectedStep: id });
+    // once the bug is found, a click is just a click
+    if (get().revealed) {
+      set({ selectedStep: id });
+      return;
+    }
+    const target = report.steps.find((s) => s.verdict === 'wrong' || s.verdict === 'shape');
+    const tries = get().tries + 1;
+    if (target && id === target.id) {
+      set({ guess: id, revealed: target.id, selectedStep: id, tries, streak: get().streak + 1 });
+    } else {
+      // a row that holds is not the answer, and the game goes on
+      set({ guess: id, tries, streak: 0 });
+    }
     // the fixes of the row the user pointed at
     const { source, settings, explanations } = get();
     if (explanations[id]) return;
@@ -217,6 +243,22 @@ export const useApp = create<AppState>((set, get) => ({
     if (!step) return;
     if (step.verdict !== 'wrong' && step.verdict !== 'shape') return;
     runExplain(source, id, settings);
+  },
+
+  nextBug: () => {
+    // A one row derivation has nothing to find, so the next bug is a
+    // derivation with more than one row, and not the one already on screen.
+    const candidates = MENU.filter(
+      (item) => item.bugSource && item.id !== get().spotItem && splitRows(item.bugSource).length > 1,
+    );
+    const pool = candidates.length ? candidates : MENU.filter((item) => item.bugSource);
+    const item = pool[Math.floor(Math.random() * pool.length)];
+    if (!item?.bugSource) return;
+    get().startSpotTheBug(item.bugSource, item.decls, item.id);
+  },
+
+  stopSpotTheBug: () => {
+    set({ spotTheBug: false, guess: null, revealed: null, tries: 0 });
   },
 
   select: (id) => {

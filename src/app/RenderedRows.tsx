@@ -101,6 +101,8 @@ function Row({
   return (
     <div
       ref={ref}
+      data-step-id={step.id}
+      data-verdict={step.verdict}
       onClick={onSelect}
       onMouseEnter={() => onHover(true)}
       onMouseLeave={() => onHover(false)}

@@ -231,6 +231,10 @@ kbd {
   background: #5bc27a26;
   border-radius: 3px;
 }
+/* the nonzero cells of the difference, which are the ones that matter */
+.samosa-diff .katex {
+  filter: drop-shadow(0 0 6px #e0533d33);
+}
 
 /* the ASCII samosa */
 .samosa {

@@ -8,6 +8,9 @@ import { exportJson, exportMarkdown, exportLatex } from './export.ts';
 import { MENU } from '../../corpus/menu.ts';
 import { VERDICT_LABEL } from './verdicts.ts';
 
+const HEADER_BUTTON =
+  'rounded border border-[var(--color-line)] px-2 py-1 text-[11px] text-[var(--color-muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-text)]';
+
 export function App() {
   const {
     source,
@@ -21,6 +24,10 @@ export function App() {
     spotTheBug,
     guess,
     revealed,
+    tries,
+    streak,
+    nextBug,
+    stopSpotTheBug,
     setSource,
     setSettings,
     select,
@@ -33,6 +40,8 @@ export function App() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [copied, setCopied] = useState('');
   const [showSettings, setShowSettings] = useState(false);
+  const [headerMenu, setHeaderMenu] = useState(false);
+  const [mobilePane, setMobilePane] = useState<'rendered' | 'source' | 'inspector'>('rendered');
 
   useEffect(() => {
     const open = () => {
@@ -85,6 +94,30 @@ export function App() {
     window.setTimeout(() => setCopied(''), 1200);
   }, []);
 
+  const share = useCallback(() => {
+    const url = shareUrl(source, settings);
+    // the fragment keeps the derivation in the browser, so the address bar
+    // is a share link too
+    window.history.replaceState(null, '', `#v1.${url.split('#v1.')[1]}`);
+    copy(url);
+  }, [copy, settings, source]);
+
+  // The header actions are the same on a wide screen and in the panel that
+  // the phone opens, so they are written once.
+  const headerActions = useMemo(
+    () => [
+      { id: 'menu', label: 'Menu', run: () => setMenuOpen((v) => !v) },
+      {
+        id: 'spot',
+        label: spotTheBug ? 'Stop the game' : 'Spot the bug',
+        run: () => (spotTheBug ? stopSpotTheBug() : nextBug()),
+      },
+      { id: 'presets', label: 'Presets', run: () => setShowSettings((v) => !v) },
+      { id: 'share', label: copied ? '✓ copied' : 'Share', run: share },
+    ],
+    [copied, nextBug, share, spotTheBug, stopSpotTheBug],
+  );
+
   const commands = useMemo<Command[]>(
     () => [
       { id: 'menu', label: 'Open the menu', hint: 'sixteen derivations', run: () => setMenuOpen(true) },
@@ -122,64 +155,103 @@ export function App() {
 
   return (
     <div className="flex h-full flex-col bg-[var(--color-ink)] text-[var(--color-text)]">
-      <header className="flex shrink-0 items-center gap-3 overflow-x-auto border-b border-[var(--color-line)] px-4 py-2.5 whitespace-nowrap">
+      <header className="flex shrink-0 items-center gap-3 border-b border-[var(--color-line)] px-4 py-2.5">
         <a href="/" className="flex items-center gap-2 text-sm text-[var(--color-gold)]">
           <span className="text-lg leading-none">∇</span>
           <span className="tracking-[0.18em]">SAMOSA</span>
         </a>
+        <div className="hidden items-center gap-3 md:flex">
+          {headerActions.map((action) => (
+            <button key={action.id} onClick={action.run} className={HEADER_BUTTON}>
+              {action.label}
+            </button>
+          ))}
+          <a
+            href="https://github.com/Hussain004/SAMOSA"
+            target="_blank"
+            rel="noreferrer"
+            className={HEADER_BUTTON}
+          >
+            ★ GitHub
+          </a>
+        </div>
         <button
-          onClick={() => setMenuOpen((v) => !v)}
-          className="rounded border border-[var(--color-line)] px-2 py-1 text-[11px] text-[var(--color-muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-text)]"
+          onClick={() => setHeaderMenu((v) => !v)}
+          className={`${HEADER_BUTTON} md:hidden`}
+          aria-label="more actions"
+          aria-expanded={headerMenu}
         >
-          Menu
+          ⋯
         </button>
-        {spotTheBug ? (
+        {spotTheBug && (
           <span className="rounded border border-[var(--color-saffron)]/60 px-2 py-1 text-[11px] text-[var(--color-saffron)]">
             spot the bug
           </span>
-        ) : (
-          <button
-            onClick={() => {
-              const item = MENU.find((m) => m.bugSource);
-              if (item?.bugSource) startSpotTheBug(item.bugSource, item.decls);
-            }}
-            className="rounded border border-[var(--color-line)] px-2 py-1 text-[11px] text-[var(--color-muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-text)]"
-          >
-            Spot the bug
-          </button>
         )}
-        <button
-          onClick={() => setShowSettings((v) => !v)}
-          className="rounded border border-[var(--color-line)] px-2 py-1 text-[11px] text-[var(--color-muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-text)]"
-        >
-          Presets
-        </button>
-        <button
-          onClick={() => {
-            const url = shareUrl(source, settings);
-            // the fragment keeps the derivation in the browser, so the address
-            // bar is a share link too
-            window.history.replaceState(null, '', `#v1.${url.split('#v1.')[1]}`);
-            copy(url);
-          }}
-          className="rounded border border-[var(--color-line)] px-2 py-1 text-[11px] text-[var(--color-muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-text)]"
-        >
-          {copied ? '✓ copied' : 'Share'}
-        </button>
-        <a
-          href="https://github.com/Hussain004/SAMOSA"
-          target="_blank"
-          rel="noreferrer"
-          className="rounded border border-[var(--color-line)] px-2 py-1 text-[11px] text-[var(--color-muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-text)]"
-        >
-          ★ GitHub
-        </a>
-        <div className="ml-auto flex items-center gap-2 text-[11px] text-[var(--color-faint)]">
+        <div className="ml-auto hidden items-center gap-2 text-[11px] text-[var(--color-faint)] sm:flex">
           <kbd>ctrl</kbd>
           <kbd>K</kbd>
           <span>for the commands</span>
         </div>
       </header>
+
+      {headerMenu && (
+        <div className="flex flex-wrap gap-2 border-b border-[var(--color-line)] bg-[var(--color-panel)] px-4 py-2 md:hidden">
+          {headerActions.map((action) => (
+            <button key={action.id} onClick={action.run} className={HEADER_BUTTON}>
+              {action.label}
+            </button>
+          ))}
+          <a
+            href="https://github.com/Hussain004/SAMOSA"
+            target="_blank"
+            rel="noreferrer"
+            className={HEADER_BUTTON}
+          >
+            ★ GitHub
+          </a>
+        </div>
+      )}
+
+      {spotTheBug && (
+        <div className="flex flex-wrap items-center gap-3 border-b border-[var(--color-line)] bg-[var(--color-panel)] px-4 py-2 text-[11px]">
+          {revealed ? (
+            <span className="text-[var(--color-chutney)]">
+              ✓ found it in {tries} {tries === 1 ? 'try' : 'tries'}
+            </span>
+          ) : tries > 0 ? (
+            <span className="text-[var(--color-tamarind)]">✗ not that row, try again</span>
+          ) : (
+            <span className="text-[var(--color-saffron)]">one row is wrong. click it.</span>
+          )}
+          {revealed && (
+            <button onClick={nextBug} className={HEADER_BUTTON}>
+              next bug →
+            </button>
+          )}
+          <span className="text-[var(--color-faint)]">streak {streak}</span>
+          <button
+            onClick={stopSpotTheBug}
+            className="ml-auto text-[10px] text-[var(--color-faint)] hover:text-[var(--color-text)]"
+          >
+            leave the game
+          </button>
+        </div>
+      )}
+
+      <div className="flex shrink-0 border-b border-[var(--color-line)] text-[10px] md:hidden">
+        {(['rendered', 'source', 'inspector'] as const).map((pane) => (
+          <button
+            key={pane}
+            onClick={() => setMobilePane(pane)}
+            className={`flex-1 px-3 py-2 uppercase tracking-wider ${
+              mobilePane === pane ? 'text-[var(--color-gold)]' : 'text-[var(--color-faint)]'
+            }`}
+          >
+            {pane}
+          </button>
+        ))}
+      </div>
 
       {showSettings && (
         <div className="border-b border-[var(--color-line)] bg-[var(--color-panel)] px-4 py-3">
@@ -247,8 +319,8 @@ export function App() {
                 setSettings({ decls });
                 setMenuOpen(false);
               }}
-              onSpotTheBug={(src, decls) => {
-                startSpotTheBug(src, decls);
+              onSpotTheBug={(src, decls, id) => {
+                startSpotTheBug(src, decls, id);
                 setMenuOpen(false);
               }}
               onClose={() => setMenuOpen(false)}
@@ -257,8 +329,16 @@ export function App() {
         </div>
       )}
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(140px,2fr)_minmax(160px,3fr)] md:grid-rows-1 md:grid-cols-2">
-        <section className="flex min-h-0 flex-col border-b border-[var(--color-line)] md:border-b-0 md:border-r">
+      <div
+        className={`min-h-0 flex-1 grid-cols-1 grid-rows-1 md:grid md:grid-cols-2 ${
+          mobilePane === 'inspector' ? 'hidden' : 'grid'
+        }`}
+      >
+        <section
+          className={`${
+            mobilePane === 'source' ? 'flex' : 'hidden'
+          } min-h-0 flex-col border-b border-[var(--color-line)] md:flex md:border-b-0 md:border-r`}
+        >
           <div className="flex items-center justify-between px-3 py-1.5">
             <span className="pane-title">source</span>
             <span className="text-[10px] text-[var(--color-faint)]">{source.length} characters</span>
@@ -275,7 +355,7 @@ export function App() {
           </div>
         </section>
 
-        <section className="flex min-h-0 flex-col">
+        <section className={`${mobilePane === 'rendered' ? 'flex' : 'hidden'} min-h-0 flex-col md:flex`}>
           <div className="flex items-center justify-between px-3 py-1.5">
             <span className="pane-title">rendered</span>
             {busy && <span className="text-[10px] text-[var(--color-saffron)]">checking…</span>}
@@ -285,7 +365,11 @@ export function App() {
               source={source}
               report={report}
               selectedStep={selectedStep}
-              onSelectStep={select}
+              onSelectStep={(id) => {
+                select(id);
+                // on a phone the card is a pane, so a tap opens it
+                if (window.matchMedia('(max-width: 767px)').matches) setMobilePane('inspector');
+              }}
               hoverStep={null}
               onHoverStep={() => {}}
               spotTheBug={spotTheBug}
@@ -296,7 +380,11 @@ export function App() {
         </section>
       </div>
 
-      <section className="flex max-h-[38vh] min-h-[160px] flex-col border-t border-[var(--color-line)]">
+      <section
+        className={`${
+          mobilePane === 'inspector' ? 'flex' : 'hidden'
+        } min-h-0 flex-1 flex-col border-t border-[var(--color-line)] md:flex md:max-h-[38vh] md:min-h-[160px] md:flex-none`}
+      >
         <div className="flex items-center justify-between px-3 py-1.5">
           <span className="pane-title">inspector</span>
           {step && (

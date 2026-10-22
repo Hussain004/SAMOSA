@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import katex from 'katex';
 import type { Report, StepResult } from '../core/index.ts';
 import { VERDICT_ICON, VERDICT_LABEL, VERDICT_TITLE } from './verdicts.ts';
 
@@ -30,7 +31,7 @@ export function Inspector({ step, report, explanation, onApplyFix, onCopy, onClo
   const card = step.card;
 
   return (
-    <div className="h-full overflow-auto p-4">
+    <div data-testid="inspector" className="h-full overflow-auto p-4">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="flex items-center gap-2 text-sm font-medium">
@@ -78,7 +79,7 @@ export function Inspector({ step, report, explanation, onApplyFix, onCopy, onClo
       </div>
 
       {card.assumptions.length > 0 && (
-        <div className="mt-4">
+        <div className="mt-4" data-testid="assumptions">
           <h3 className="pane-title">checked assuming</h3>
           <ul className="mt-1 space-y-0.5 text-xs text-[var(--color-muted)]">
             {card.assumptions.map((a) => (
@@ -159,42 +160,120 @@ function CounterexampleView({
   const [copied, setCopied] = useState(false);
   useEffect(() => setCopied(false), [counterexample]);
 
+  // The values are drawn as the matrices they are. A symbol the derivation
+  // defines is shown under its own heading, because it is computed and not
+  // an input of the counterexample.
+  const inputs = Object.entries(counterexample.values);
+  const computed = Object.entries(counterexample.derived);
+  const shape = (name: string): [number, number] => counterexample.shapes?.[name] ?? [1, 1];
+
+  const left = matrixLatex(counterexample.lhs, counterexample.lhsShape ?? [1, 1]);
+  const right = matrixLatex(counterexample.rhs, counterexample.rhsShape ?? [1, 1]);
+  const difference = matrixLatex(counterexample.diff, counterexample.diffShape ?? [1, 1], true);
+
   return (
     <div className="mt-4">
       <h3 className="pane-title">counterexample</h3>
       <p className="mt-1 text-xs text-[var(--color-muted)]">
         These values break the step, and they are small enough to read.
       </p>
-      <pre className="mt-2 overflow-x-auto rounded border border-[var(--color-line)] bg-black/30 p-2 text-[11px] leading-relaxed">
-        {formatInstance(counterexample)}
-      </pre>
-      <button
-        onClick={() => {
-          onCopy(counterexample.numpy);
-          setCopied(true);
-        }}
-        className="mt-2 rounded border border-[var(--color-line)] px-2 py-1 text-[10px] text-[var(--color-muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-text)]"
-      >
-        {copied ? '✓ copied' : 'copy as NumPy'}
-      </button>
+
+      <div className="mt-2 space-y-1 rounded border border-[var(--color-line)] bg-black/20 p-2">
+        {inputs.map(([name, value]) => (
+          <Tex key={name} display latex={`${name} = ${matrixLatex(value, shape(name))}`} />
+        ))}
+      </div>
+
+      {computed.length > 0 && (
+        <div className="mt-3">
+          <h3 className="pane-title">computed by SAMOSA</h3>
+          <p className="mt-0.5 text-[10px] text-[var(--color-faint)]">
+            The rows that define a symbol, run with the values above.
+          </p>
+          <div className="mt-1 space-y-1 rounded border border-[var(--color-line)] bg-black/10 p-2">
+            {computed.map(([name, value]) => (
+              <Tex key={name} display latex={`${name} = ${matrixLatex(value, shape(name))}`} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="mt-3">
+        <h3 className="pane-title">the two sides</h3>
+        <Tex
+          display
+          className="samosa-diff mt-1 overflow-x-auto rounded border border-[var(--color-line)] bg-black/20 p-2"
+          latex={String.raw`\begin{aligned} \text{left side} &= ${left} \\ \text{right side} &= ${right} \\ \text{difference} &= ${difference} \end{aligned}`}
+        />
+        <p className="mt-1 text-[10px] text-[var(--color-faint)]">
+          The difference is what the step claims is zero. The nonzero entries are the ones in red.
+        </p>
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <button
+          onClick={() => {
+            onCopy(counterexample.numpy);
+            setCopied(true);
+          }}
+          className="rounded border border-[var(--color-line)] px-2 py-1 text-[10px] text-[var(--color-muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-text)]"
+        >
+          {copied ? '✓ copied' : 'copy as NumPy'}
+        </button>
+      </div>
+      <details className="mt-2">
+        <summary className="cursor-pointer text-[10px] text-[var(--color-faint)]">the NumPy snippet</summary>
+        <pre className="mt-1 max-h-56 overflow-auto rounded border border-[var(--color-line)] bg-black/30 p-2 text-[10px] leading-relaxed">
+          {counterexample.numpy}
+        </pre>
+      </details>
     </div>
   );
 }
 
-function formatInstance(instance: import('../core/index.ts').ShrunkInstance): string {
-  const lines: string[] = [];
-  for (const [name, value] of Object.entries(instance.values)) {
-    if (typeof value === 'number') {
-      lines.push(`${name} = ${value}`);
-      continue;
+/** Renders a piece of LaTeX, and never throws at the reader. */
+function Tex({ latex, display = false, className }: { latex: string; display?: boolean; className?: string }) {
+  const html = useMemo(() => {
+    try {
+      return katex.renderToString(latex, {
+        displayMode: display,
+        throwOnError: false,
+        strict: 'ignore',
+        output: 'html',
+      });
+    } catch {
+      return escapeHtml(latex);
     }
-    const size = Math.max(1, Math.round(Math.sqrt(value.length)));
-    lines.push(`${name} =`);
-    for (let i = 0; i < value.length; i += size) {
-      lines.push(`  [ ${value.slice(i, i + size).join(', ')} ]`);
-    }
+  }, [latex, display]);
+  return <div className={className} dangerouslySetInnerHTML={{ __html: html }} />;
+}
+
+function escapeHtml(text: string): string {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/** A value as a matrix, in the shape it was found at. */
+function matrixLatex(value: number[] | number, shape: [number, number], highlight = false): string {
+  if (typeof value === 'number') return cellLatex(value, highlight);
+  let [rows, cols] = shape;
+  if (!rows || !cols || rows * cols !== value.length) {
+    rows = 1;
+    cols = value.length;
   }
-  return lines.join('\n');
+  const body: string[] = [];
+  for (let i = 0; i < rows; i++) {
+    const cells: string[] = [];
+    for (let j = 0; j < cols; j++) cells.push(cellLatex(value[i * cols + j] ?? 0, highlight));
+    body.push(cells.join(' & '));
+  }
+  return String.raw`\begin{bmatrix} ${body.join(' \\ ')} \end{bmatrix}`;
+}
+
+/** A number, short enough to read, and in red when it is the difference. */
+function cellLatex(x: number, highlight: boolean): string {
+  const short = Number(x.toFixed(4));
+  const text = String(short);
+  return highlight && short !== 0 ? String.raw`\color{#e25555}{${text}}` : text;
 }
 
 function Field({ label, value }: { label: string; value: string }) {
