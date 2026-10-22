@@ -87,7 +87,7 @@ export function App() {
 
   const commands = useMemo<Command[]>(
     () => [
-      { id: 'menu', label: 'Open the menu', hint: 'fifteen derivations', run: () => setMenuOpen(true) },
+      { id: 'menu', label: 'Open the menu', hint: 'sixteen derivations', run: () => setMenuOpen(true) },
       { id: 'reroll', label: 'Re-roll the seed', hint: 'ctrl+enter', run: reroll },
       {
         id: 'share',
@@ -329,7 +329,7 @@ export function App() {
         <span className="text-[var(--color-chutney)]">●</span>
         <span className="hidden sm:inline">all checks local, nothing uploaded</span>
         <span className="hidden text-[var(--color-faint)] sm:inline">·</span>
-        <span>seed 0x{settings.seed.toString(16).toUpperCase()}</span>
+        <span>seed {settings.seed}</span>
         <span className="text-[var(--color-faint)]">·</span>
         {spotTheBug && !revealed ? (
           <span className="text-[var(--color-saffron)]">find the wrong row</span>

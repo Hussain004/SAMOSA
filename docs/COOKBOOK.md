@@ -31,7 +31,7 @@ Measured by `pnpm check:corpus`:
 | the harmless mutants, where the mistake changes nothing | 30 |
 
 The plan's gate G2 asks for 95% of the planted bugs caught with the expected
-repair in the top three. The cookbook is at 73.4%, and the difference is
+repair in the top three. The cookbook is at 74.8%, and the difference is
 named below.
 
 ### The ten identities SAMOSA cannot check
@@ -78,9 +78,9 @@ The corpus is not only a measurement. It found real bugs, and they are fixed:
 
 | gate | what the plan asks | what we measure |
 | --- | --- | --- |
-| G1: no false checkmark | the golden suite and the Cookbook | 0 false checkmarks in 48 identities, and 0 in the 15 Menu derivations |
-| G2: the bugs caught | 95%, with the repair in the top three | 73.4% of the Cookbook mutants; the four planted bugs of the golden suite all get their expected repair in the top three |
-| G3: the parse coverage | 70% | 78.3%, measured in [COVERAGE.md](COVERAGE.md) |
+| G1: no false checkmark | the golden suite and the Cookbook | 0 false checkmarks in 48 identities, and 0 in the 16 Menu derivations |
+| G2: the bugs caught | 95%, with the repair in the top three | 74.8% of the Cookbook mutants; the four planted bugs of the golden suite all get their expected repair in the top three |
+| G3: the parse coverage | 70% | 86.8%, measured in [COVERAGE.md](COVERAGE.md) |
 
 The number that does not meet the gate is published rather than hidden. The
 misses are the steps the engine cannot decide, and each one says so.

@@ -34,11 +34,11 @@ The first release.
 - The GitHub Action, with the CLI shipped inside it.
 - The npm package `samosa-math`, with the `samosa` CLI and the `samosa-mcp`
   server, so `npx samosa-math check paper.tex` works with no install.
-- Fifteen derivations in the Menu, each with its planted bug.
+- Sixteen derivations in the Menu, each with its planted bug.
 
 ### Measured
 
-- 78.3% of the display math of 39 recent arXiv papers parses, and 54.6% is
+- 86.8% of the display math of 39 recent arXiv papers parses, and 50.0% is
   understood well enough to check. The method is in
   [docs/COVERAGE.md](docs/COVERAGE.md).
 

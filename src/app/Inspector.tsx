@@ -58,7 +58,7 @@ export function Inspector({ step, report, explanation, onApplyFix, onCopy, onClo
 
       <div className="mt-4 grid gap-2 text-xs sm:grid-cols-2">
         <Field label="mode" value={step.mode ?? VERDICT_LABEL[step.verdict]} />
-        <Field label="seed" value={`0x${card.seed.toString(16).toUpperCase()}`} />
+        <Field label="seed" value={String(card.seed)} />
         <Field label="trials per size" value={String(card.trialsPerSize)} />
         {/* A step that is wrong has no guarantee to show, so the fields of
             the guarantee are only there when the step holds. */}

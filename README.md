@@ -135,7 +135,7 @@ with three trials in each of two primes, and a false checkmark bound below
 10⁻⁴⁶ per size.
 
 Now change one thing. Put `Q_t^{-1}` inside the inverse on the push-through
-row, and SAMOSA says the two sides are not equal, gives you a 2 by 2
+row, and SAMOSA says the two sides are not equal, gives you the smallest
 counterexample, and tells you the term you are missing.
 
 ## How much of a real paper it reads
@@ -180,12 +180,13 @@ Being straight about the edges is part of the product:
 
 ## The menu
 
-Fifteen derivations that people actually write, each with a correct version
+Sixteen derivations that people actually write, each with a correct version
 and a planted bug, in the app and in the golden test suite: Woodbury,
-Sherman-Morrison, the matrix determinant lemma, the Kalman update, the
-Joseph form, least squares, ridge regression, logistic regression, the
-softmax cross entropy, backprop, the variance of a Gaussian, the KL of two
-Gaussians, the Riccati recursion and the trace identities.
+Sherman-Morrison, the matrix determinant lemma, the trace identities, the
+Kalman update, the Joseph form, least squares, ridge regression, logistic
+regression, the softmax cross entropy, a two layer network, the variance of
+a Gaussian, the expectation of a quadratic form, the KL of two Gaussians,
+the Riccati recursion, and rotations and the cross product.
 
 ## The install
 

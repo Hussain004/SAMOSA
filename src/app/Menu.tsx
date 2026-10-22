@@ -8,7 +8,7 @@ export interface MenuProps {
   onSpotTheBug?: (source: string, decls: string) => void;
 }
 
-/** The Menu: fifteen derivations, with their planted bugs. */
+/** The Menu: sixteen derivations, with their planted bugs. */
 export function Menu({ onPick, onClose, onSpotTheBug }: MenuProps) {
   return (
     <div className="h-full overflow-auto p-4">

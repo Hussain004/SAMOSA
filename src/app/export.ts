@@ -41,7 +41,7 @@ export function exportMarkdown(report: Report | null, source: string): string {
   lines.push('# SAMOSA report');
   lines.push('');
   if (report) {
-    lines.push(`Seed \`0x${report.seed.toString(16).toUpperCase()}\`, ${report.ms} ms.`);
+    lines.push(`Seed \`${report.seed}\`, ${report.ms} ms.`);
     lines.push('');
     lines.push(summarise(report));
     lines.push('');

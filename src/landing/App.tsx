@@ -187,7 +187,7 @@ function Intro() {
       <div className="mx-auto max-w-[1180px] px-6 py-10">
         <p className="max-w-[900px] text-[17px] leading-relaxed tracking-wide text-[var(--color-text)]">
           SAMOSA checks every step of your derivation by evaluating it on random matrices: exactly,
-          over finite fields. Wrong steps come with a 2×2 counterexample and a fix.
+          over finite fields. Wrong steps come with the smallest counterexample and a fix.
         </p>
       </div>
     </section>
@@ -287,7 +287,7 @@ function TourVideo() {
 const FEATURES = [
   {
     title: 'Counterexamples',
-    body: 'Not "the numbers differ". A 2 by 2 instance, shrunk until it is small enough to read, that breaks the step.',
+    body: 'Not "the numbers differ". The smallest instance that breaks the step, shrunk until it is small enough to read.',
     mock: <CounterexampleMock />,
   },
   {
@@ -554,7 +554,7 @@ const DEEP_DIVES = [
   {
     n: '06',
     title: 'It reads real papers',
-    body: 'Of the display math of 39 recent papers, 78% parses and 55% is understood well enough to check. The number is measured, and published.',
+    body: 'Of the display math of 39 recent papers, 86.8% parses and 50.0% is understood well enough to check. The number is measured, and published.',
     link: '/docs/COVERAGE.md',
   },
 ];
@@ -746,7 +746,7 @@ const CHANGELOG = [
   {
     date: '2026-10-21',
     title: 'The first release',
-    body: 'The engine, the app, the CLI, the MCP server and fifteen derivations.',
+    body: 'The engine, the app, the CLI, the MCP server and sixteen derivations.',
   },
   {
     date: '2026-10-21',

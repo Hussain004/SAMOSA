@@ -1,7 +1,7 @@
 /**
  * The Menu (F11).
  *
- * Fifteen derivations that people actually write, each with a correct version
+ * Sixteen derivations that people actually write, each with a correct version
  * and one or two planted bugs. They are the golden test suite, the demo
  * material of the landing page and the examples of the app.
  */
