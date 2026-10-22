@@ -14,6 +14,24 @@ import { allMutants } from '../corpus/cookbook/mutants.ts';
 
 const CATCHES = ['wrong', 'shape'];
 
+/** The identities the engine cannot check yet, and why they are named. */
+const CANNOT_CHECK = new Set([
+  'spectral-norm-of-transpose',
+  'stationary-point',
+  'variance-of-sum',
+  'covariance-of-scaled',
+  'gaussian-moment',
+  'gaussian-mean',
+  'gaussian-trace',
+  'kalman-covariance',
+  'kalman-gain',
+  'riccati',
+  'least-squares',
+  'ridge-gradient',
+  'softmax',
+  'kl-of-gaussians',
+]);
+
 describe('the cookbook', () => {
   it('has the identities it claims to have', () => {
     expect(IDENTITIES.length).toBeGreaterThan(40);
@@ -35,6 +53,39 @@ describe('the cookbook', () => {
       }
     }
     expect(falseCheckmarks).toEqual([]);
+  });
+
+  it('has an identity that is checked', () => {
+    // An identity that produces no checkmark tests nothing. The ones that
+    // cannot be checked yet are named, so a new silent identity fails here.
+    const known = CANNOT_CHECK;
+    const silent: string[] = [];
+    for (const identity of IDENTITIES) {
+      const report = check(identity.source, { decls: identity.decls });
+      const holds = report.steps.filter((s) => s.relation !== 'defined' && s.verdict === 'ok');
+      if (!holds.length && !known.has(identity.id)) silent.push(identity.id);
+    }
+    expect(silent).toEqual([]);
+  });
+
+  it('does not declare a symbol the derivation does not use', () => {
+    // A declaration with the wrong spelling does nothing, and the engine
+    // says so. The identities that share one declaration list are left out:
+    // a list of four matrices is a convenience, not a mistake.
+    const unused: string[] = [];
+    for (const identity of IDENTITIES) {
+      // The identities that share one declaration list are left out: a list
+      // of four matrices is a convenience of the corpus, not a mistake. So
+      // are the ones the engine cannot read yet, because a row it did not
+      // read has no symbols to compare.
+      if (identity.decls === 'A, B, C, D: n×n') continue;
+      if (CANNOT_CHECK.has(identity.id)) continue;
+      const report = check(identity.source, { decls: identity.decls });
+      for (const chip of report.chips) {
+        if (chip.id === 'unused-declaration') unused.push(`${identity.id}: ${chip.message}`);
+      }
+    }
+    expect(unused).toEqual([]);
   });
 
   it('catches most of the mutants', () => {

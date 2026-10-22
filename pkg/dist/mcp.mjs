@@ -6600,8 +6600,6 @@ function opType(ctx, node) {
       if (isMatrix(a) && isScalar(b)) return a;
       if (isMatrix(a) && isMatrix(b)) {
         unifyDim(ctx, a.c, b.r, "in a quotient", node.span);
-        unifyDim(ctx, a.r, b.r, "in a quotient", node.span);
-        unifyDim(ctx, a.c, b.c, "in a quotient", node.span);
         return { t: "mat", r: a.r, c: a.c };
       }
       return { t: "poly" };
@@ -7457,7 +7455,8 @@ function evaluateSides(field, lhsNode, rhsNode, env, sampler) {
     if (error instanceof DomainError) {
       return { kind: "unknown", message: error.message, domain: true };
     }
-    return { kind: "unknown", message: String(error) };
+    const detail = error instanceof Error ? error.message : String(error);
+    return { kind: "unknown", message: `SAMOSA could not evaluate this step: ${detail}` };
   }
 }
 function compareDerivative(field, deriv, claimed, env, sampler) {
@@ -7539,7 +7538,7 @@ function compareDerivative(field, deriv, claimed, env, sampler) {
       message: "the claimed derivative is not the derivative of that function"
     };
   }
-  if (isMatrixVal(tangent) && isMatrixVal(claimedVal)) {
+  if (isMatrixVal(tangent) && isMatrixVal(claimedVal) && isMatrixVal(direction)) {
     const product = matMul(field, claimedVal.m, direction.m);
     if (product.r === tangent.m.r && product.c === tangent.m.c) {
       let same = true;

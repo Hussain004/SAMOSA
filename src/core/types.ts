@@ -492,9 +492,9 @@ function opType(ctx: TypeContext, node: Extract<Node, { k: 'op' }>): Ty {
       if (isScalar(a) && isScalar(b)) return { t: 'scalar' };
       if (isMatrix(a) && isScalar(b)) return a;
       if (isMatrix(a) && isMatrix(b)) {
+        // a quotient of matrices keeps the shape of the numerator: the inner
+        // sizes have to agree, and nothing else is constrained
         unifyDim(ctx, a.c, b.r, 'in a quotient', node.span);
-        unifyDim(ctx, a.r, b.r, 'in a quotient', node.span);
-        unifyDim(ctx, a.c, b.c, 'in a quotient', node.span);
         return { t: 'mat', r: a.r, c: a.c };
       }
       return { t: 'poly' };

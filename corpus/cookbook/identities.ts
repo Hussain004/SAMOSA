@@ -300,7 +300,7 @@ J &:= \frac{1}{2} x^\top A x \\
   {
     id: 'variance-of-sum',
     name: 'the variance of a sum',
-    decls: 'x: n; y: n; \\Sigma: spd n',
+    decls: 'x: n; y: n',
     source: String.raw`\begin{align*}
 \operatorname{Var}(x + y) &= \operatorname{Var}(x) + \operatorname{Var}(y)
 \end{align*}`,
@@ -324,7 +324,7 @@ J &:= \frac{1}{2} x^\top A x \\
   {
     id: 'gaussian-mean',
     name: 'the mean of a Gaussian',
-    decls: 'x: n; \\mu: n; \\Sigma: spd n',
+    decls: 'x: n; \\mu: n',
     source: String.raw`\begin{align*}
 \mathbb{E}[x] &= \mu
 \end{align*}`,

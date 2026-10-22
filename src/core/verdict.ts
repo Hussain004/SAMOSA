@@ -815,7 +815,10 @@ function evaluateSides<T>(
     if (error instanceof DomainError) {
       return { kind: 'unknown', message: error.message, domain: true };
     }
-    return { kind: 'unknown', message: String(error) };
+    // A crash is a gap in the engine, and it is said in words a person can
+    // read, not as a stack trace.
+    const detail = error instanceof Error ? error.message : String(error);
+    return { kind: 'unknown', message: `SAMOSA could not evaluate this step: ${detail}` };
   }
 }
 
@@ -917,8 +920,8 @@ function compareDerivative<T>(
     };
   }
 
-  if (isMatrixVal(tangent) && isMatrixVal(claimedVal)) {
-    const product = matMul(field, claimedVal.m, (direction as { k: 'm'; m: Mat<T> }).m);
+  if (isMatrixVal(tangent) && isMatrixVal(claimedVal) && isMatrixVal(direction)) {
+    const product = matMul(field, claimedVal.m, direction.m);
     if (product.r === tangent.m.r && product.c === tangent.m.c) {
       let same = true;
       for (let i = 0; i < product.d.length; i++) {
