@@ -6482,6 +6482,7 @@ function plainName(name) {
   return name.replace(/^(\\[A-Za-z]+)+/, "").toLowerCase();
 }
 var Parser = class _Parser {
+  /** how far the parser has read: the tokens after it are the ones it did not use */
   pos = 0;
   /** is the next factor the first of its product? */
   firstFactor = false;
@@ -6774,7 +6775,7 @@ var Parser = class _Parser {
     if (t.type === "op" && t.value === "-") {
       this.pos++;
       const arg2 = this.parseUnary();
-      return { k: "op", op: "neg", args: [arg2], span: { from: t.from, to: arg2.span.to } };
+      return { k: "op", op: "neg", args: [arg2], span: { from: t.from, to: this.closingParen(t.to, [arg2]) } };
     }
     if (t.type === "op" && t.value === "+") {
       this.pos++;
@@ -6871,7 +6872,7 @@ var Parser = class _Parser {
           this.inDivergence = DIVERGENCES.has(plainName(t.value));
           const args = this.parseArgs();
           this.inDivergence = wasDivergence;
-          return { k: "call", fn: t.value, args, span: { from: t.from, to: args.at(-1)?.span.to ?? t.to } };
+          return { k: "call", fn: t.value, args, span: { from: t.from, to: this.closingParen(t.to, args) } };
         }
         return scripted;
       }
@@ -6946,6 +6947,17 @@ var Parser = class _Parser {
     const close = this.expect("rbrack", "]");
     return { ...inner2, span: { from: open.from, to: close.to } };
   }
+  /**
+   * The end of a call.
+   *
+   * The closing bracket is part of the call, so the span of the call has to
+   * cover it: an edit over the call replaces the whole of it.
+   */
+  closingParen(fallback, args) {
+    const last = this.tokens[this.pos - 1];
+    if (last && (last.type === "rparen" || last.type === "rbrack")) return last.to;
+    return args.at(-1)?.span.to ?? fallback;
+  }
   parseArgs() {
     this.expect("lparen", "(");
     const args = [];
@@ -6990,7 +7002,7 @@ var Parser = class _Parser {
           this.expect("rbrack", "]");
         }
         const arg2 = this.kind() === "lbrace" ? this.parseGroupAsExpression() : this.parsePrimary();
-        return { k: "call", fn: "sqrt", args: [arg2], span: { from: t.from, to: arg2.span.to } };
+        return { k: "call", fn: "sqrt", args: [arg2], span: { from: t.from, to: this.closingParen(t.to, [arg2]) } };
       }
       case "nabla": {
         this.pos++;
@@ -7040,12 +7052,12 @@ var Parser = class _Parser {
             wrt: [],
             order: 1,
             form: "diff",
-            span: { from: t.from, to: arg2.span.to }
+            span: { from: t.from, to: this.closingParen(t.to, [arg2]) }
           };
         }
         if (this.kind() === "lparen") {
           const args = this.parseArgs();
-          return { k: "call", fn: text.toLowerCase(), args, span: { from: t.from, to: args.at(-1)?.span.to ?? t.to } };
+          return { k: "call", fn: text.toLowerCase(), args, span: { from: t.from, to: this.closingParen(t.to, args) } };
         }
         const sym = this.makeSym([name], text, null, null, { from: t.from, to: g.span.to });
         const scripted = this.applyScripts(sym, [name], text);
@@ -7094,12 +7106,12 @@ var Parser = class _Parser {
             k: "call",
             fn: name === "sigma" ? "sigmoid" : name,
             args,
-            span: { from: t.from, to: args.at(-1)?.span.to ?? t.to }
+            span: { from: t.from, to: this.closingParen(t.to, args) }
           };
         }
         if (this.kind() === "lbrace") {
           const arg2 = this.parseGroupAsExpression();
-          return { k: "call", fn: name === "sigma" ? "sigmoid" : name, args: [arg2], span: { from: t.from, to: arg2.span.to } };
+          return { k: "call", fn: name === "sigma" ? "sigmoid" : name, args: [arg2], span: { from: t.from, to: this.closingParen(t.to, [arg2]) } };
         }
         const nextKind = this.kind();
         if (nextKind === "ident" || nextKind === "cmd" && !NON_OPERAND_COMMANDS.has(this.cur.value)) {
@@ -7108,7 +7120,7 @@ var Parser = class _Parser {
             k: "call",
             fn: name === "sigma" ? "sigmoid" : name,
             args: [arg2],
-            span: { from: t.from, to: arg2.span.to }
+            span: { from: t.from, to: this.closingParen(t.to, [arg2]) }
           };
         }
         const sym = this.makeSym([], name, null, null, { from: t.from, to: t.to });
@@ -7132,7 +7144,7 @@ var Parser = class _Parser {
           k: "call",
           fn: `\\${name}`,
           args,
-          span: { from: t.from, to: args.at(-1)?.span.to ?? t.to }
+          span: { from: t.from, to: this.closingParen(t.to, args) }
         };
       }
       return scripted;
@@ -7577,6 +7589,7 @@ function parseRow(_src, rowText, offset, index2, knownFns) {
   let tokens = tokenize(rowText);
   const annotation = extractAnnotation(tokens);
   tokens = stripAnnotation(tokens);
+  tokens = blankAlignmentMarkers(tokens);
   const rels = findRelations(tokens);
   if (rels.length === 0) {
     return {
@@ -7589,12 +7602,25 @@ function parseRow(_src, rowText, offset, index2, knownFns) {
   }
   const parts = [];
   const impIndex = rels.findIndex((r) => r.relation === "=>" || r.relation === "<=>");
+  const failure = (error) => ({
+    index: index2,
+    span: { from: offset, to: offset + rowText.length },
+    parts: [],
+    annotation,
+    error: error instanceof ParseFailure ? { message: error.message, span: { from: offset + error.span.from, to: offset + error.span.to } } : { message: String(error?.message ?? error), span: { from: offset, to: offset + rowText.length } }
+  });
   if (impIndex >= 0) {
     const imp = rels[impIndex];
     const premiseTokens = tokens.slice(0, imp.index);
     const conclusionTokens = tokens.slice(imp.index + imp.length);
-    const premise = splitAssertion(premiseTokens, knownFns);
-    const conclusion = splitAssertion(conclusionTokens, knownFns);
+    let premise;
+    let conclusion;
+    try {
+      premise = splitAssertion(premiseTokens, knownFns);
+      conclusion = splitAssertion(conclusionTokens, knownFns);
+    } catch (error) {
+      return failure(error);
+    }
     const part = {
       relation: imp.relation,
       relText: imp.text,
@@ -7623,8 +7649,14 @@ function parseRow(_src, rowText, offset, index2, knownFns) {
       proportionalTo = read.name;
       rhsSeg = rhsSeg.slice(read.tokens);
     }
-    const lhs = (lhsSeg.length ? parseNode(lhsSeg, knownFns) : null) ?? void 0;
-    const rhs = (rhsSeg.length ? parseNode(rhsSeg, knownFns) : null) ?? void 0;
+    let lhs;
+    let rhs;
+    try {
+      lhs = (lhsSeg.length ? parseNode(lhsSeg, knownFns) : null) ?? void 0;
+      rhs = (rhsSeg.length ? parseNode(rhsSeg, knownFns) : null) ?? void 0;
+    } catch (error) {
+      return failure(error);
+    }
     parts.push({
       lhs,
       relation: rel.relation,
@@ -7662,11 +7694,28 @@ function splitAssertion(tokens, knownFns) {
 function parseNode(tokens, knownFns) {
   if (!tokens.length) return null;
   const parser2 = new Parser(tokens, "", knownFns ? { knownFns } : {});
-  try {
-    return parser2.parseExpression();
-  } catch {
-    return null;
+  const node = parser2.parseExpression();
+  let rest = parser2.pos;
+  while (rest < tokens.length && !tokens[rest].value) rest++;
+  if (rest < tokens.length) {
+    const leftover = tokens[rest];
+    const closing = leftover.type === "rparen" || leftover.type === "rbrace" || leftover.type === "rbrack";
+    const what = closing ? "unbalanced" : "unexpected";
+    throw new ParseFailure(
+      `${what} \`${leftover.value}\` at column ${leftover.from + 1}`,
+      { from: leftover.from, to: leftover.to }
+    );
   }
+  return node;
+}
+function blankAlignmentMarkers(tokens) {
+  let depth = 0;
+  return tokens.map((token) => {
+    if (token.type === "lbrace" || token.type === "lparen" || token.type === "lbrack") depth++;
+    else if (token.type === "rbrace" || token.type === "rparen" || token.type === "rbrack") depth--;
+    else if (depth === 0 && token.value === "&") return { ...token, value: "" };
+    return token;
+  });
 }
 function extractAnnotation(tokens) {
   for (let i = tokens.length - 1; i >= 0; i--) {
@@ -9111,11 +9160,27 @@ function check(src, opts = {}) {
   const definedNames = /* @__PURE__ */ new Set();
   const knownFns = new Set(decls.filter((d) => d.kind === "function").map((d) => d.name));
   const steps = [];
+  const unparsed = [];
   let previousRhs;
   let rowIndex = 0;
   for (const row of rows) {
     const parsed = parseRow(src, row.text, row.from, rowIndex, knownFns);
     rowIndex++;
+    if (parsed.error) {
+      steps.push({
+        id: `s${steps.length}`,
+        row: rowIndex,
+        span: parsed.error.span,
+        text: row.text,
+        relation: "other",
+        annotation: parsed.annotation,
+        isDefinition: false,
+        unreadable: parsed.error.message,
+        symbols: /* @__PURE__ */ new Set()
+      });
+      unparsed.push({ row: rowIndex, message: parsed.error.message, span: parsed.error.span });
+      continue;
+    }
     if (parsed.prose || !parsed.parts.length) continue;
     for (const part of parsed.parts) {
       if (part.relation === "=>" || part.relation === "<=>") {
@@ -9146,7 +9211,9 @@ function check(src, opts = {}) {
       collectSymbols(lhs, symbols);
       collectSymbols(rhs, symbols);
       const bareLhs = defNameOf(lhs, ctx);
-      const isDefinition = part.relation === ":=" || bareLhs !== void 0 && !definedNames.has(bareLhs) && !isFunctionName(ctx, bareLhs);
+      const rightSymbols = /* @__PURE__ */ new Set();
+      collectSymbols(rhs, rightSymbols);
+      const isDefinition = part.relation === ":=" || bareLhs !== void 0 && !definedNames.has(bareLhs) && !isFunctionName(ctx, bareLhs) && !ctx.decls.has(bareLhs) && !rightSymbols.has(bareLhs);
       steps.push({
         id: `s${steps.length}`,
         row: rowIndex,
@@ -9227,6 +9294,20 @@ function checkStep(step, ctx, defs, opts, diagnostics) {
     assumptions: [],
     seed: opts.seed
   };
+  if (step.unreadable) {
+    return {
+      id: step.id,
+      row: step.row,
+      span: step.span,
+      text: step.text,
+      relation: "other",
+      verdict: "unchecked",
+      card: base2,
+      message: step.unreadable,
+      reason: step.unreadable,
+      annotation: step.annotation
+    };
+  }
   if (step.isDefinition) {
     return {
       id: step.id,

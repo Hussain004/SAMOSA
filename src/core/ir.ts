@@ -92,6 +92,8 @@ export interface ParsedRow {
   annotation?: string;
   /** true when the row had no mathematical content */
   prose?: boolean;
+  /** the row could not be read, and this is why */
+  error?: ParseError;
 }
 
 export interface ParseError {

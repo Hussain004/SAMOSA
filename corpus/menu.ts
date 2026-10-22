@@ -192,13 +192,13 @@ L(z) &:= -y\log\sigma(z) - (1 - y)\log\left(1 - \sigma(z)\right) \\
     blurb: 'Backpropagation through one hidden layer.',
     decls: 'x: d; W_1: h×d; b_1: h; h_1: h; W_2: k×h; b_2: k; y: k',
     source: String.raw`\begin{align*}
-h_1 &= \sigma(W_1 x + b_1) \\
-\hat y &= W_2 h_1 + b_2 \\
+h_1 &:= \sigma(W_1 x + b_1) \\
+\hat y &:= W_2 h_1 + b_2 \\
 \frac{\partial \hat y}{\partial h_1} &= W_2
 \end{align*}`,
     bugSource: String.raw`\begin{align*}
-h_1 &= \sigma(W_1 x + b_1) \\
-\hat y &= W_2 h_1 + b_2 \\
+h_1 &:= \sigma(W_1 x + b_1) \\
+\hat y &:= W_2 h_1 + b_2 \\
 \frac{\partial \hat y}{\partial h_1} &= W_2^\top
 \end{align*}`,
   },

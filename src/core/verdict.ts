@@ -158,6 +158,8 @@ interface Step {
   conclusion?: Assertion;
   /** for a proportionality, the variable it is taken in */
   proportionalTo?: string;
+  /** the row could not be read, and this is why */
+  unreadable?: string;
   symbols: Set<string>;
 }
 
@@ -212,12 +214,30 @@ export function check(src: string, opts: CheckOptions = {}): Report {
 
   const knownFns = new Set<string>(decls.filter((d) => d.kind === 'function').map((d) => d.name));
   const steps: Step[] = [];
+  /** the rows the parser could not read, with the reason */
+  const unparsed: Array<{ row: number; message: string; span: Span }> = [];
   let previousRhs: Node | undefined;
   let rowIndex = 0;
 
   for (const row of rows) {
     const parsed = parseRow(src, row.text, row.from, rowIndex, knownFns);
     rowIndex++;
+    if (parsed.error) {
+      // a row SAMOSA did not read is a row it did not check, and it says so
+      steps.push({
+        id: `s${steps.length}`,
+        row: rowIndex,
+        span: parsed.error.span,
+        text: row.text,
+        relation: 'other',
+        annotation: parsed.annotation,
+        isDefinition: false,
+        unreadable: parsed.error.message,
+        symbols: new Set(),
+      });
+      unparsed.push({ row: rowIndex, message: parsed.error.message, span: parsed.error.span });
+      continue;
+    }
     if (parsed.prose || !parsed.parts.length) continue;
 
     for (const part of parsed.parts) {
@@ -252,11 +272,19 @@ export function check(src: string, opts: CheckOptions = {}): Report {
       collectSymbols(rhs, symbols);
 
       const bareLhs = defNameOf(lhs, ctx);
-      // an equation whose left hand side is a bare symbol that has not been
-      // defined yet is a definition, not a claim
+      // An equation whose left hand side is a bare symbol is a definition only
+      // when the symbol is new: it is not declared, and it does not occur on
+      // the right hand side. A symbol that was declared is a claim, and so is
+      // a symbol that occurs on the right, because that row is circular.
+      const rightSymbols = new Set<string>();
+      collectSymbols(rhs, rightSymbols);
       const isDefinition =
         part.relation === ':=' ||
-        (bareLhs !== undefined && !definedNames.has(bareLhs) && !isFunctionName(ctx, bareLhs));
+        (bareLhs !== undefined &&
+          !definedNames.has(bareLhs) &&
+          !isFunctionName(ctx, bareLhs) &&
+          !ctx.decls.has(bareLhs) &&
+          !rightSymbols.has(bareLhs));
 
       steps.push({
         id: `s${steps.length}`,
@@ -364,6 +392,22 @@ function checkStep(
     assumptions: [],
     seed: opts.seed,
   };
+
+  if (step.unreadable) {
+    // a row the parser did not read is never checked, and it says why
+    return {
+      id: step.id,
+      row: step.row,
+      span: step.span,
+      text: step.text,
+      relation: 'other',
+      verdict: 'unchecked',
+      card: base,
+      message: step.unreadable,
+      reason: step.unreadable,
+      annotation: step.annotation,
+    };
+  }
 
   if (step.isDefinition) {
     return {

@@ -119,7 +119,8 @@ function plainName(name: string): string {
 }
 
 export class Parser {
-  private pos = 0;
+  /** how far the parser has read: the tokens after it are the ones it did not use */
+  pos = 0;
   /** is the next factor the first of its product? */
   private firstFactor = false;
   /** is the parser inside the arguments of a divergence? */
@@ -448,7 +449,7 @@ export class Parser {
     if (t.type === 'op' && t.value === '-') {
       this.pos++;
       const arg = this.parseUnary();
-      return { k: 'op', op: 'neg', args: [arg], span: { from: t.from, to: arg.span.to } };
+      return { k: 'op', op: 'neg', args: [arg], span: { from: t.from, to: this.closingParen(t.to, [arg]) } };
     }
     if (t.type === 'op' && t.value === '+') {
       this.pos++;
@@ -557,7 +558,7 @@ export class Parser {
           this.inDivergence = DIVERGENCES.has(plainName(t.value));
           const args = this.parseArgs();
           this.inDivergence = wasDivergence;
-          return { k: 'call', fn: t.value, args, span: { from: t.from, to: args.at(-1)?.span.to ?? t.to } };
+          return { k: 'call', fn: t.value, args, span: { from: t.from, to: this.closingParen(t.to, args) } };
         }
         return scripted;
       }
@@ -640,6 +641,18 @@ export class Parser {
     return { ...inner, span: { from: open.from, to: close.to } };
   }
 
+  /**
+   * The end of a call.
+   *
+   * The closing bracket is part of the call, so the span of the call has to
+   * cover it: an edit over the call replaces the whole of it.
+   */
+  private closingParen(fallback: number, args: Node[]): number {
+    const last = this.tokens[this.pos - 1];
+    if (last && (last.type === 'rparen' || last.type === 'rbrack')) return last.to;
+    return args.at(-1)?.span.to ?? fallback;
+  }
+
   private parseArgs(): Node[] {
     this.expect('lparen', '(');
     const args: Node[] = [];
@@ -690,7 +703,7 @@ export class Parser {
           this.expect('rbrack', ']');
         }
         const arg = this.kind() === 'lbrace' ? this.parseGroupAsExpression() : this.parsePrimary();
-        return { k: 'call', fn: 'sqrt', args: [arg], span: { from: t.from, to: arg.span.to } };
+        return { k: 'call', fn: 'sqrt', args: [arg], span: { from: t.from, to: this.closingParen(t.to, [arg]) } };
       }
       case 'nabla': {
         this.pos++;
@@ -745,12 +758,12 @@ export class Parser {
             wrt: [],
             order: 1,
             form: 'diff',
-            span: { from: t.from, to: arg.span.to },
+            span: { from: t.from, to: this.closingParen(t.to, [arg]) },
           };
         }
         if (this.kind() === 'lparen') {
           const args = this.parseArgs();
-          return { k: 'call', fn: text.toLowerCase(), args, span: { from: t.from, to: args.at(-1)?.span.to ?? t.to } };
+          return { k: 'call', fn: text.toLowerCase(), args, span: { from: t.from, to: this.closingParen(t.to, args) } };
         }
         const sym = this.makeSym([name], text, null, null, { from: t.from, to: g.span.to });
         const scripted = this.applyScripts(sym, [name], text);
@@ -803,12 +816,12 @@ export class Parser {
             k: 'call',
             fn: name === 'sigma' ? 'sigmoid' : name,
             args,
-            span: { from: t.from, to: args.at(-1)?.span.to ?? t.to },
+            span: { from: t.from, to: this.closingParen(t.to, args) },
           };
         }
         if (this.kind() === 'lbrace') {
           const arg = this.parseGroupAsExpression();
-          return { k: 'call', fn: name === 'sigma' ? 'sigmoid' : name, args: [arg], span: { from: t.from, to: arg.span.to } };
+          return { k: 'call', fn: name === 'sigma' ? 'sigmoid' : name, args: [arg], span: { from: t.from, to: this.closingParen(t.to, [arg]) } };
         }
         // \log x and \log\sigma(z): the argument is the next operand
         const nextKind = this.kind();
@@ -818,7 +831,7 @@ export class Parser {
             k: 'call',
             fn: name === 'sigma' ? 'sigmoid' : name,
             args: [arg],
-            span: { from: t.from, to: arg.span.to },
+            span: { from: t.from, to: this.closingParen(t.to, [arg]) },
           };
         }
         const sym = this.makeSym([], name, null, null, { from: t.from, to: t.to });
@@ -843,7 +856,7 @@ export class Parser {
           k: 'call',
           fn: `\\${name}`,
           args,
-          span: { from: t.from, to: args.at(-1)?.span.to ?? t.to },
+          span: { from: t.from, to: this.closingParen(t.to, args) },
         };
       }
       return scripted;
@@ -1353,6 +1366,7 @@ export function parseRow(
   let tokens = tokenize(rowText);
   const annotation = extractAnnotation(tokens);
   tokens = stripAnnotation(tokens);
+  tokens = blankAlignmentMarkers(tokens);
   const rels = findRelations(tokens);
 
   if (rels.length === 0) {
@@ -1368,12 +1382,30 @@ export function parseRow(
   const parts: RowPart[] = [];
   const impIndex = rels.findIndex((r) => r.relation === '=>' || r.relation === '<=>');
 
+  // A row that cannot be read is reported, and never checked.
+  const failure = (error: unknown): ParsedRow => ({
+    index,
+    span: { from: offset, to: offset + rowText.length },
+    parts: [],
+    annotation,
+    error:
+      error instanceof ParseFailure
+        ? { message: error.message, span: { from: offset + error.span.from, to: offset + error.span.to } }
+        : { message: String((error as Error)?.message ?? error), span: { from: offset, to: offset + rowText.length } },
+  });
+
   if (impIndex >= 0) {
     const imp = rels[impIndex];
     const premiseTokens = tokens.slice(0, imp.index);
     const conclusionTokens = tokens.slice(imp.index + imp.length);
-    const premise = splitAssertion(premiseTokens, knownFns);
-    const conclusion = splitAssertion(conclusionTokens, knownFns);
+    let premise: Assertion | null;
+    let conclusion: Assertion | null;
+    try {
+      premise = splitAssertion(premiseTokens, knownFns);
+      conclusion = splitAssertion(conclusionTokens, knownFns);
+    } catch (error) {
+      return failure(error);
+    }
     const part: RowPart = {
       relation: imp.relation,
       relText: imp.text,
@@ -1408,8 +1440,14 @@ export function parseRow(
       rhsSeg = rhsSeg.slice(read.tokens);
     }
 
-    const lhs = (lhsSeg.length ? parseNode(lhsSeg, knownFns) : null) ?? undefined;
-    const rhs = (rhsSeg.length ? parseNode(rhsSeg, knownFns) : null) ?? undefined;
+    let lhs: Node | undefined;
+    let rhs: Node | undefined;
+    try {
+      lhs = (lhsSeg.length ? parseNode(lhsSeg, knownFns) : null) ?? undefined;
+      rhs = (rhsSeg.length ? parseNode(rhsSeg, knownFns) : null) ?? undefined;
+    } catch (error) {
+      return failure(error);
+    }
     parts.push({
       lhs,
       relation: rel.relation,
@@ -1448,14 +1486,47 @@ function splitAssertion(tokens: Token[], knownFns?: Set<string>): Assertion | nu
   };
 }
 
+/**
+ * Parses one side of a row.
+ *
+ * Anything the parser did not use is an error, and not the end of the side:
+ * a row with a stray bracket in it is a row SAMOSA did not read, and it has
+ * to say so instead of checking the part in front of the bracket.
+ */
 function parseNode(tokens: Token[], knownFns?: Set<string>): Node | null {
   if (!tokens.length) return null;
   const parser = new Parser(tokens, '', knownFns ? { knownFns } : {});
-  try {
-    return parser.parseExpression();
-  } catch {
-    return null;
+  const node = parser.parseExpression();
+  // the tokens that carry nothing are not left over, they are the spaces
+  let rest = parser.pos;
+  while (rest < tokens.length && !tokens[rest].value) rest++;
+  if (rest < tokens.length) {
+    const leftover = tokens[rest];
+    const closing = leftover.type === 'rparen' || leftover.type === 'rbrace' || leftover.type === 'rbrack';
+    const what = closing ? 'unbalanced' : 'unexpected';
+    throw new ParseFailure(
+      `${what} \`${leftover.value}\` at column ${leftover.from + 1}`,
+      { from: leftover.from, to: leftover.to },
+    );
   }
+  return node;
+}
+
+/**
+ * Blanks the alignment markers of a row.
+ *
+ * The `&` of an align block is not part of the mathematics, so it is removed
+ * before the row is parsed. The ones inside a group are kept, because a
+ * matrix is written with them.
+ */
+function blankAlignmentMarkers(tokens: Token[]): Token[] {
+  let depth = 0;
+  return tokens.map((token) => {
+    if (token.type === 'lbrace' || token.type === 'lparen' || token.type === 'lbrack') depth++;
+    else if (token.type === 'rbrace' || token.type === 'rparen' || token.type === 'rbrack') depth--;
+    else if (depth === 0 && token.value === '&') return { ...token, value: '' };
+    return token;
+  });
 }
 
 function extractAnnotation(tokens: Token[]): string | undefined {
