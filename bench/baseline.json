@@ -1,12 +1,22 @@
 {
   "the Kalman update, seven rows": {
-    "engine": 6.629,
-    "calibration": 164.933,
-    "ratio": 0.040192
+    "engine": 6.646,
+    "calibration": 164.457,
+    "ratio": 0.040412
   },
   "the Woodbury identity, one row": {
-    "engine": 1.417,
-    "calibration": 164.933,
-    "ratio": 0.008591
+    "engine": 1.438,
+    "calibration": 164.457,
+    "ratio": 0.008744
+  },
+  "the variance of a Gaussian, quadrature": {
+    "engine": 147.913,
+    "calibration": 164.457,
+    "ratio": 0.899401
+  },
+  "a wrong row, and the search for a counterexample": {
+    "engine": 5.612,
+    "calibration": 164.457,
+    "ratio": 0.034124
   }
 }

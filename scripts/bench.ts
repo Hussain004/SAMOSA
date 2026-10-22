@@ -16,6 +16,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { check } from '../src/core/index.ts';
+import { MENU } from '../corpus/menu.ts';
 
 const root = resolve(import.meta.dirname, '..');
 const baselineFile = resolve(root, 'bench/baseline.json');
@@ -40,7 +41,17 @@ const WOODBURY = String.raw`\begin{align*}
 
 const WOODBURY_DECLS = 'A: n×n; U: n×m; C: m×m; V: m×n';
 
-const CASES: Array<{ name: string; run: () => void }> = [
+// The same derivation with one term moved inside an inverse, so the check
+// has to find a counterexample and a fix.
+const KALMAN_WRONG = KALMAN.replace(
+  String.raw`\left(C_t \bar\Sigma_t C_t^\top + Q_t\right)^{-1}`,
+  String.raw`\left(C_t \bar\Sigma_t C_t^\top + Q_t^{-1}\right)^{-1}`,
+);
+
+const GAUSS = MENU.find((item) => item.id === 'gauss-cond');
+if (!GAUSS) throw new Error('the Gauss item is missing from the Menu');
+
+const CASES: Array<{ name: string; run: () => void; runs?: number }> = [
   {
     name: 'the Kalman update, seven rows',
     run: () => {
@@ -51,6 +62,20 @@ const CASES: Array<{ name: string; run: () => void }> = [
     name: 'the Woodbury identity, one row',
     run: () => {
       check(WOODBURY, { decls: WOODBURY_DECLS });
+    },
+  },
+  {
+    name: 'the variance of a Gaussian, quadrature',
+    // the quadrature is the slow mode, so fewer runs measure it well enough
+    runs: 3,
+    run: () => {
+      check(GAUSS.source, { decls: GAUSS.decls });
+    },
+  },
+  {
+    name: 'a wrong row, and the search for a counterexample',
+    run: () => {
+      check(KALMAN_WRONG, { decls: DECLS });
     },
   },
 ];
@@ -79,10 +104,9 @@ function calibration(): number {
 }
 
 /** The best of five rounds, in milliseconds per run. */
-function measure(run: () => void, rounds = 5): number {
+function measure(run: () => void, rounds = 5, runs = 100): number {
   let best = Infinity;
   for (let round = 0; round < rounds; round++) {
-    const runs = 100;
     const started = performance.now();
     for (let i = 0; i < runs; i++) run();
     const each = (performance.now() - started) / runs;
@@ -103,7 +127,7 @@ interface Measurement {
 const reference = Math.min(calibration(), calibration(), calibration());
 const measured: Record<string, Measurement> = {};
 for (const item of CASES) {
-  const engine = measure(item.run);
+  const engine = measure(item.run, 5, item.runs);
   measured[item.name] = {
     engine,
     calibration: Math.round(reference * 1000) / 1000,
