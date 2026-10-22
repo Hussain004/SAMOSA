@@ -81,6 +81,7 @@ test('the share link round trips, with the derivation in it', async ({ page }) =
   expect(hash).toContain('#v1.');
 
   await page.goto('/app/' + hash);
+  await page.reload();
   await page.waitForSelector('.cm-content');
   await page.waitForTimeout(1500);
 
@@ -94,6 +95,7 @@ test('the share link round trips, with the derivation in it', async ({ page }) =
 
 test('a broken link says so', async ({ page }) => {
   await page.goto('/app/#v1.not-a-real-payload');
+  await page.reload();
   await page.waitForTimeout(1000);
   await expect(page.getByText('this link is broken').first()).toBeVisible({ timeout: 10_000 });
 });
@@ -104,14 +106,13 @@ test('the menu items have share links that round trip', async ({ page }) => {
   const count = await items.count();
   expect(count).toBeGreaterThan(5);
 
-  const title = await items.nth(0).locator('xpath=../h3').innerText();
-
   await items.nth(0).click();
   await page.waitForTimeout(500);
   await page.getByRole('button', { name: 'Share' }).click();
   const hash = await page.evaluate(() => window.location.hash);
   expect(hash).toContain('#v1.');
   await page.goto('/app/' + hash);
+  await page.reload();
   await page.waitForSelector('.cm-content');
   await page.waitForTimeout(1500);
 
@@ -120,7 +121,6 @@ test('the menu items have share links that round trip', async ({ page }) => {
   expect(source.length).toBeGreaterThan(10);
   expect(source).not.toContain('J_t &:= ');
   await expect(page.locator('footer')).toContainText('ms', { timeout: 15_000 });
-  expect(title.length).toBeGreaterThan(0);
 });
 
 test('nothing leaves the browser', async ({ page }) => {

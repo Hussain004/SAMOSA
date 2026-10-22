@@ -35,6 +35,8 @@ export interface AppState {
   explanations: Record<string, Explanation>;
   busy: boolean;
   error: string | null;
+  /** the share link could not be read */
+  linkError: string | null;
   shareHash: string | null;
   gen: number;
   setSource: (source: string) => void;
@@ -87,7 +89,7 @@ function getWorker(): Worker {
       stopWatchdog();
       const state = useApp.getState();
       if (response.type === 'report') {
-        useApp.setState({ report: response.report, busy: false, error: null });
+        useApp.setState({ report: response.report, busy: false });
       } else if (response.type === 'explain') {
         useApp.setState({
           explanations: { ...state.explanations, [response.stepId]: response.explanation },
@@ -130,7 +132,7 @@ function stopWatchdog(): void {
 
 export function runCheck(source: string, settings: Settings): void {
   const gen = ++pending;
-  useApp.setState({ busy: true });
+  useApp.setState({ busy: true, error: null });
   const request: WorkerRequest = {
     type: 'check',
     gen,
@@ -176,6 +178,7 @@ export const useApp = create<AppState>((set, get) => ({
   explanations: {},
   busy: false,
   error: null,
+  linkError: null,
   shareHash: null,
   gen: 0,
 
@@ -248,7 +251,7 @@ export const useApp = create<AppState>((set, get) => ({
     const payload = readShareLink(`${window.location.origin}/app/#${hash}`);
     if (!payload) {
       // a broken link is said out loud, not swallowed
-      useApp.setState({ error: 'this link is broken, so the default derivation was loaded' });
+      useApp.setState({ linkError: 'this link is broken, so the default derivation was loaded' });
       return;
     }
     const settings = { ...DEFAULT_SETTINGS, ...(payload.settings ?? {}) } as Settings;
@@ -260,6 +263,7 @@ export const useApp = create<AppState>((set, get) => ({
       settings,
       shareHash: hash,
       error: null,
+      linkError: null,
     });
     schedule(get());
   },

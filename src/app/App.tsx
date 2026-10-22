@@ -17,6 +17,7 @@ export function App() {
     explanations,
     busy,
     error,
+    linkError,
     spotTheBug,
     guess,
     revealed,
@@ -34,18 +35,25 @@ export function App() {
   const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
-    loadShare();
-    // a deep link to a menu item, such as /app#menu=kalman
-    const hash = window.location.hash;
-    const menu = hash.match(/menu=([\w-]+)/);
-    if (menu) {
-      const item = MENU.find((m) => m.id === menu[1]);
-      if (item) {
-        setSource(item.source);
-        setSettings({ decls: item.decls });
+    const open = () => {
+      loadShare();
+      // a deep link to a menu item, such as /app#menu=kalman
+      const hash = window.location.hash;
+      const menu = hash.match(/menu=([\w-]+)/);
+      if (menu) {
+        const item = MENU.find((m) => m.id === menu[1]);
+        if (item) {
+          setSource(item.source);
+          setSettings({ decls: item.decls });
+        }
       }
-    }
-    runCheck(useApp.getState().source, useApp.getState().settings);
+      runCheck(useApp.getState().source, useApp.getState().settings);
+    };
+    open();
+    // a link that is opened in the same tab does not reload the page, so the
+    // hash is watched: the back button has to work too
+    window.addEventListener('hashchange', open);
+    return () => window.removeEventListener('hashchange', open);
   }, [loadShare, setSource, setSettings]);
 
   useEffect(() => {
@@ -339,10 +347,10 @@ export function App() {
             <span>{report.ms} ms</span>
           </>
         )}
-        {error && (
+        {(error ?? linkError) && (
           <>
             <span className="text-[var(--color-faint)]">·</span>
-            <span className="text-[var(--color-tamarind)]">{error}</span>
+            <span className="text-[var(--color-tamarind)]">{error ?? linkError}</span>
           </>
         )}
       </footer>
