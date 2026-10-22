@@ -6090,6 +6090,11 @@ var SUPERSCRIPTS = {
 function toDisplay(name) {
   let out = name;
   const map = [
+    // an accent over a command, as in \\bar\\Sigma_t, before the command itself
+    [/\\bar\{?(\\[A-Za-z]+)\}?/g, "$1\u0304"],
+    [/\\hat\{?(\\[A-Za-z]+)\}?/g, "$1\u0302"],
+    [/\\tilde\{?(\\[A-Za-z]+)\}?/g, "$1\u0303"],
+    [/\\vec\{?(\\[A-Za-z]+)\}?/g, "$1\u20D7"],
     [/\\bar\{?([A-Za-z]+)\}?/g, "$1\u0304"],
     [/\\hat\{?([A-Za-z]+)\}?/g, "$1\u0302"],
     [/\\tilde\{?([A-Za-z]+)\}?/g, "$1\u0303"],
@@ -10212,7 +10217,12 @@ function collectAssumptions(ctx, step) {
     if (!info) continue;
     if (info.assumption) out.add(info.assumption);
     const props = info.props.map((p) => typeof p === "string" ? PROP_WORDS2[p] : p && "rank" in p ? `of rank ${p.rank}` : null).filter((p) => Boolean(p));
-    if (props.length) out.add(`${name} is ${props.join(" and ")}`);
+    const alreadySaid = info.props.every(
+      (p) => typeof p === "string" && (p === "ident" || p === "zero" || p === "ones")
+    );
+    if (props.length && !(info.assumption && alreadySaid)) {
+      out.add(`${info.display || name} is ${props.join(" and ")}`);
+    }
   }
   if (!out.size) out.add("every symbol was declared");
   return [...out];
@@ -10838,7 +10848,7 @@ function shrinkCounterexample(ctx, lhs, rhs, defs, sizes, seed, budgetMs = 200) 
   const started = Date.now();
   const names = [...ctx.symbols.keys()].filter((name) => {
     const info = ctx.symbols.get(name);
-    return info && info.ty.t === "mat" && !defs.has(name);
+    return info && !defs.has(name) && (info.ty.t === "mat" || info.ty.t === "scalar");
   });
   const shrinkCtx = {
     ctx,
@@ -10860,9 +10870,16 @@ function shrinkCounterexample(ctx, lhs, rhs, defs, sizes, seed, budgetMs = 200) 
   const env = makeEnv(field, rngFor(seed, "shrink"));
   env.defs = defs;
   const values = /* @__PURE__ */ new Map();
+  const scalarRng = rngFor(seed, "scalar");
   for (const name of names) {
     const info = ctx.symbols.get(name);
-    if (!info || info.ty.t !== "mat") continue;
+    if (!info) continue;
+    if (info.ty.t === "scalar") {
+      const n = Math.floor(scalarRng() * 5) - 2;
+      values.set(name, { k: "s", v: field.fromRational(n, 1) });
+      continue;
+    }
+    if (info.ty.t !== "mat") continue;
     const r = dimSizeOf(ctx, info.ty.r, sizes);
     const c = dimSizeOf(ctx, info.ty.c, sizes);
     const val = sampler.sample({ name, r, c, props: info.props });
@@ -10897,7 +10914,13 @@ function searchSmallIntegers(sh, range, seed) {
     const values = /* @__PURE__ */ new Map();
     for (const name of sh.symbolNames) {
       const info = ctx.symbols.get(name);
-      if (!info || info.ty.t !== "mat") continue;
+      if (!info) continue;
+      if (info.ty.t === "scalar") {
+        const n = Math.floor(rng() * (2 * range + 1)) - range;
+        values.set(name, { k: "s", v: field.fromRational(n, 1) });
+        continue;
+      }
+      if (info.ty.t !== "mat") continue;
       const r = dimSizeOf(ctx, info.ty.r, sizes);
       const c = dimSizeOf(ctx, info.ty.c, sizes);
       const props = sh.propOf(name);
@@ -10996,6 +11019,10 @@ function describe(ctx, sizes, values, derived, propOf, lhsNode, rhsNode, defs, l
   const lhsPlain = lhs.k === "s" ? signed(field.toNumber(lhs.v)) : lhs.m.d.map((x) => signed(field.toNumber(x)));
   const rhsPlain = rhs.k === "s" ? signed(field.toNumber(rhs.v)) : rhs.m.d.map((x) => signed(field.toNumber(x)));
   const diffPlain = lhs.k === "s" && rhs.k === "s" ? signed(field.toNumber(lhs.v) - field.toNumber(rhs.v)) : lhs.k === "m" && rhs.k === "m" ? lhs.m.d.map((x, i) => signed(field.toNumber(x) - field.toNumber(rhs.m.d[i]))) : 0;
+  const shapes = {};
+  for (const name of Object.keys(plain)) shapes[name] = shapeOf(ctx, name, sizes);
+  for (const name of Object.keys(derivedPlain)) shapes[name] = shapeOf(ctx, name, sizes);
+  const valueShape = (val) => val.k === "s" ? [1, 1] : [val.m.r, val.m.c];
   return {
     dims,
     values: plain,
@@ -11003,6 +11030,10 @@ function describe(ctx, sizes, values, derived, propOf, lhsNode, rhsNode, defs, l
     lhs: lhsPlain,
     rhs: rhsPlain,
     diff: diffPlain,
+    shapes,
+    lhsShape: valueShape(lhs),
+    rhsShape: valueShape(rhs),
+    diffShape: lhs.k === "m" && rhs.k === "m" ? [lhs.m.r, lhs.m.c] : [1, 1],
     numpy: toNumpy(ctx, sizes, lhsNode, rhsNode, defs, plain)
   };
 }

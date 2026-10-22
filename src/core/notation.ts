@@ -252,6 +252,11 @@ const SUPERSCRIPTS: Record<string, string> = {
 export function toDisplay(name: string): string {
   let out = name;
   const map: Array<[RegExp, string]> = [
+    // an accent over a command, as in \\bar\\Sigma_t, before the command itself
+    [/\\bar\{?(\\[A-Za-z]+)\}?/g, '$1̄'],
+    [/\\hat\{?(\\[A-Za-z]+)\}?/g, '$1̂'],
+    [/\\tilde\{?(\\[A-Za-z]+)\}?/g, '$1̃'],
+    [/\\vec\{?(\\[A-Za-z]+)\}?/g, '$1⃗'],
     [/\\bar\{?([A-Za-z]+)\}?/g, '$1̄'],
     [/\\hat\{?([A-Za-z]+)\}?/g, '$1̂'],
     [/\\tilde\{?([A-Za-z]+)\}?/g, '$1̃'],

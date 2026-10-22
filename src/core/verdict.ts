@@ -1542,7 +1542,14 @@ function collectAssumptions(ctx: TypeContext, step: Step): string[] {
     const props = info.props
       .map((p) => (typeof p === 'string' ? PROP_WORDS[p] : p && 'rank' in p ? `of rank ${p.rank}` : null))
       .filter((p): p is string => Boolean(p));
-    if (props.length) out.add(`${name} is ${props.join(' and ')}`);
+    // The identity, the zero matrix and the ones vector have their own
+    // assumption, so the structural sentence would say the same thing twice.
+    const alreadySaid = info.props.every(
+      (p) => typeof p === 'string' && (p === 'ident' || p === 'zero' || p === 'ones'),
+    );
+    if (props.length && !(info.assumption && alreadySaid)) {
+      out.add(`${info.display || name} is ${props.join(' and ')}`);
+    }
   }
   if (!out.size) out.add('every symbol was declared');
   return [...out];

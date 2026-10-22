@@ -40,6 +40,11 @@ export interface ShrunkInstance {
   lhs: number[] | number;
   rhs: number[] | number;
   diff: number[] | number;
+  /** the rows and columns of every value, so a reader can draw the matrix */
+  shapes: Record<string, [number, number]>;
+  lhsShape: [number, number];
+  rhsShape: [number, number];
+  diffShape: [number, number];
   numpy: string;
 }
 
@@ -71,7 +76,7 @@ export function shrinkCounterexample(
   // the derivation at all.
   const names = [...ctx.symbols.keys()].filter((name) => {
     const info = ctx.symbols.get(name);
-    return info && info.ty.t === 'mat' && !defs.has(name);
+    return info && !defs.has(name) && (info.ty.t === 'mat' || info.ty.t === 'scalar');
   });
 
   const shrinkCtx: ShrinkCtx = {
@@ -98,9 +103,18 @@ export function shrinkCounterexample(
   const env = makeEnv(field, rngFor(seed, 'shrink'));
   env.defs = defs;
   const values = new Map<string, Val<number>>();
+  const scalarRng = rngFor(seed, 'scalar');
   for (const name of names) {
     const info = ctx.symbols.get(name);
-    if (!info || info.ty.t !== 'mat') continue;
+    if (!info) continue;
+    if (info.ty.t === 'scalar') {
+      // a free scalar is an input too, and leaving it out makes the search
+      // fail on every derivation that uses one
+      const n = Math.floor(scalarRng() * 5) - 2;
+      values.set(name, { k: 's', v: field.fromRational(n, 1) });
+      continue;
+    }
+    if (info.ty.t !== 'mat') continue;
     const r = dimSizeOf(ctx, info.ty.r, sizes);
     const c = dimSizeOf(ctx, info.ty.c, sizes);
     const val = sampler.sample({ name, r, c, props: info.props });
@@ -153,7 +167,13 @@ function searchSmallIntegers(sh: ShrinkCtx, range: number, seed: number): Shrunk
     const values = new Map<string, Val<Decimal>>();
     for (const name of sh.symbolNames) {
       const info = ctx.symbols.get(name);
-      if (!info || info.ty.t !== 'mat') continue;
+      if (!info) continue;
+      if (info.ty.t === 'scalar') {
+        const n = Math.floor(rng() * (2 * range + 1)) - range;
+        values.set(name, { k: 's', v: field.fromRational(n, 1) });
+        continue;
+      }
+      if (info.ty.t !== 'mat') continue;
       const r = dimSizeOf(ctx, info.ty.r, sizes);
       const c = dimSizeOf(ctx, info.ty.c, sizes);
       const props = sh.propOf(name);
@@ -304,6 +324,13 @@ function describe<T>(
         ? lhs.m.d.map((x, i) => signed(field.toNumber(x) - field.toNumber(rhs.m.d[i])))
         : 0;
 
+  // The shapes a reader needs to draw the values as matrices. A symbol that
+  // the derivation defines has a type as well, so it is looked up the same way.
+  const shapes: Record<string, [number, number]> = {};
+  for (const name of Object.keys(plain)) shapes[name] = shapeOf(ctx, name, sizes);
+  for (const name of Object.keys(derivedPlain)) shapes[name] = shapeOf(ctx, name, sizes);
+  const valueShape = (val: Val<T>): [number, number] => (val.k === 's' ? [1, 1] : [val.m.r, val.m.c]);
+
   return {
     dims,
     values: plain,
@@ -311,6 +338,10 @@ function describe<T>(
     lhs: lhsPlain,
     rhs: rhsPlain,
     diff: diffPlain,
+    shapes,
+    lhsShape: valueShape(lhs),
+    rhsShape: valueShape(rhs),
+    diffShape: lhs.k === 'm' && rhs.k === 'm' ? [lhs.m.r, lhs.m.c] : [1, 1],
     numpy: toNumpy(ctx, sizes, lhsNode, rhsNode, defs, plain),
   };
 }

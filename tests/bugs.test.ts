@@ -132,6 +132,20 @@ describe('the counterexamples', () => {
     expect(Object.keys(counterexample.derived)).toContain('K_t');
   });
 
+  it('samples a free scalar as an input', () => {
+    // The step uses a symbol the derivation never defines, and its type is a
+    // scalar. It is still an input of the counterexample.
+    const source = String.raw`\begin{align*}
+K_t &:= \Sigma_t C_t^\top Q_t^{-1} \\
+K_t &= \bar\Sigma_t C_t^\top \left(C_t \bar\Sigma_t C_t^\top + Q_t\right)^{-1}
+\end{align*}`;
+    const counterexample = counterexampleOf(source, 2, DECLS);
+    expect(Object.keys(counterexample.values)).toContain('\\Sigma_t');
+    // and every value has the shape a reader needs to draw it
+    expect(counterexample.shapes['C_t']).toEqual([1, 1]);
+    expect(counterexample.lhsShape).toEqual([1, 1]);
+  });
+
   it('reports the sizes the step uses, and no internal names', () => {
     const counterexample = counterexampleOf(B2, 11, DECLS);
     expect(counterexample.dims.n).toBeGreaterThanOrEqual(1);
