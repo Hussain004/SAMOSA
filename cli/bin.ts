@@ -174,7 +174,7 @@ function main(): void {
     // not only that the step is wrong. The rows that are wrong are few, so
     // this is affordable.
     if (!args.options.noExplain) {
-      const explanations = explainAll(rows, { ...args.options, decls });
+      const explanations = explainAll(rows, { ...args.options, decls }, 8, report);
       for (const step of report.steps) {
         const explanation = explanations.get(step.id);
         if (!explanation) continue;

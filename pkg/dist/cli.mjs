@@ -10643,7 +10643,7 @@ function shrinkCounterexample(ctx, lhs, rhs, defs, sizes, seed, budgetMs = 200) 
     const l = evalNode(field, lhs, env);
     const r = evalNode(field, rhs, env);
     if (!equal(field, l, r)) {
-      return describe(ctx, sizes, values, derivedValues(field, env, defs), l, r, field, true);
+      return describe(ctx, sizes, values, derivedValues(field, env, defs), (name) => ctx.symbols.get(name)?.props ?? [], l, r, field, true);
     }
   } catch {
   }
@@ -10683,7 +10683,7 @@ function searchSmallIntegers(sh, range, seed) {
       const l = evalNode(field, sh.lhs, env);
       const r = evalNode(field, sh.rhs, env);
       if (equal(field, l, r)) continue;
-      return describe(ctx, sizes, values, derivedValues(field, env, sh.defs), l, r, field, false);
+      return describe(ctx, sizes, values, derivedValues(field, env, sh.defs), sh.propOf, l, r, field, false);
     } catch {
       continue;
     }
@@ -10742,7 +10742,7 @@ function equal(field, a, b) {
   }
   return false;
 }
-function describe(ctx, sizes, values, derived, lhs, rhs, field, residue) {
+function describe(ctx, sizes, values, derived, propOf, lhs, rhs, field, residue) {
   const dims = {};
   for (const [root, size] of sizes) {
     const declared = ctx.dimVars.find((d) => ctx.dims.find(d) === root);
@@ -10756,6 +10756,7 @@ function describe(ctx, sizes, values, derived, lhs, rhs, field, residue) {
   };
   const plain = {};
   for (const [name, val] of values) {
+    if (propOf(name).includes("ident")) continue;
     plain[name] = val.k === "s" ? signed(field.toNumber(val.v)) : val.m.d.map((x) => signed(field.toNumber(x)));
   }
   const derivedPlain = {};
@@ -10840,7 +10841,11 @@ function repairs(ctx, lhs, rhs, defs, seed, dimVars, kind) {
     seen.add(key);
     deduped.push(fix);
   }
-  deduped.sort((a, b) => priority(a) - priority(b) || editSize(a) - editSize(b));
+  deduped.sort(
+    (a, b) => priority(a) - priority(b) || // a fix of the right hand side is a fix of the derivation, so it comes
+    // before a fix of the claim
+    (a.side ?? "rhs").localeCompare(b.side ?? "rhs") || editSize(a) - editSize(b)
+  );
   return deduped.slice(0, 3);
 }
 function priority(fix) {
@@ -11001,6 +11006,9 @@ var MUTATIONS = [
     }
   }
 ];
+function pretty(latex) {
+  return latex.replace(/[{}]/g, "");
+}
 function editSize(fix) {
   if (!fix.edit) return 0;
   return fix.edit.insert.length;
@@ -11056,7 +11064,8 @@ function mutationRepairs(sh) {
           title: mutation.title,
           edit: { span: original.span, insert: renderNode(candidate) },
           verified: true,
-          detail: renderNode(candidate)
+          detail: renderNode(candidate),
+          side: side === "rhs" ? "rhs" : "lhs"
         });
       }
     }
@@ -11247,12 +11256,20 @@ function residualRepairs(sh) {
   for (const [text, term] of terms) {
     const scale = matchesScale(field, term, samples);
     if (scale === null) continue;
+    const patched = {
+      k: "op",
+      op: "add",
+      args: [sh.rhs, term],
+      span: sh.rhs.span
+    };
+    const verified = holdsWith(sh, "rhs", patched);
     out.push({
       kind: "residual",
-      title: `this step is off by exactly ${scaleText(scale)} ${text}`,
+      title: `this step is off by exactly ${scaleText(scale)} ${pretty(text)}`,
       edit: { span: sh.rhs.span, insert: `${renderNode(sh.rhs)} ${scaleText(scale)} ${text}` },
-      verified: false,
-      detail: text
+      verified,
+      detail: text,
+      side: "rhs"
     });
     if (out.length >= 3) break;
   }
@@ -11345,7 +11362,7 @@ function scaleText(scale) {
 }
 
 // src/core/index.ts
-function explainAll(src, opts = {}, limit = 8) {
+function explainAll(src, opts = {}, limit = 8, report) {
   const out = /* @__PURE__ */ new Map();
   const parsed = parseForExplain(src, opts);
   const deadline = Date.now() + (opts.budgetMs ?? 4e3);
@@ -11355,6 +11372,8 @@ function explainAll(src, opts = {}, limit = 8) {
     if (Date.now() > deadline) break;
     if (!step.lhs || !step.rhs) continue;
     if (step.relation !== "=" && step.relation !== "shape") continue;
+    const verdict = report?.steps.find((s2) => s2.id === step.id)?.verdict;
+    if (verdict && verdict !== "wrong" && verdict !== "shape") continue;
     out.set(step.id, explainStep(parsed, step, opts));
     count++;
   }
@@ -34360,7 +34379,7 @@ ${usage()}`);
       step.column = 1;
     }
     if (!args.options.noExplain) {
-      const explanations = explainAll(rows, { ...args.options, decls });
+      const explanations = explainAll(rows, { ...args.options, decls }, 8, report);
       for (const step of report.steps) {
         const explanation = explanations.get(step.id);
         if (!explanation) continue;

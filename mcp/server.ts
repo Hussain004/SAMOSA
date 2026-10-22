@@ -92,11 +92,12 @@ server.registerTool(
     });
     // The fixes and the shrunk counterexample, so the agent has something it
     // can act on and not only the fact that a row is wrong.
-    const explanations = explainAll(args.latex, {
-      decls: args.declarations,
-      preset: args.preset,
-      seed: args.seed,
-    });
+    const explanations = explainAll(
+      args.latex,
+      { decls: args.declarations, preset: args.preset, seed: args.seed },
+      8,
+      report,
+    );
     const structured = {
       summary: summarise(report),
       steps: report.steps.map((step) => {

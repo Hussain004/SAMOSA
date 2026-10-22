@@ -8484,7 +8484,7 @@ function shrinkCounterexample(ctx, lhs, rhs, defs, sizes, seed, budgetMs = 200) 
     const l = evalNode(field, lhs, env);
     const r = evalNode(field, rhs, env);
     if (!equal(field, l, r)) {
-      return describe(ctx, sizes, values, derivedValues(field, env, defs), l, r, field, true);
+      return describe(ctx, sizes, values, derivedValues(field, env, defs), (name) => ctx.symbols.get(name)?.props ?? [], l, r, field, true);
     }
   } catch {
   }
@@ -8524,7 +8524,7 @@ function searchSmallIntegers(sh, range, seed) {
       const l = evalNode(field, sh.lhs, env);
       const r = evalNode(field, sh.rhs, env);
       if (equal(field, l, r)) continue;
-      return describe(ctx, sizes, values, derivedValues(field, env, sh.defs), l, r, field, false);
+      return describe(ctx, sizes, values, derivedValues(field, env, sh.defs), sh.propOf, l, r, field, false);
     } catch {
       continue;
     }
@@ -8583,7 +8583,7 @@ function equal(field, a, b) {
   }
   return false;
 }
-function describe(ctx, sizes, values, derived, lhs, rhs, field, residue) {
+function describe(ctx, sizes, values, derived, propOf, lhs, rhs, field, residue) {
   const dims = {};
   for (const [root, size] of sizes) {
     const declared = ctx.dimVars.find((d) => ctx.dims.find(d) === root);
@@ -8597,6 +8597,7 @@ function describe(ctx, sizes, values, derived, lhs, rhs, field, residue) {
   };
   const plain = {};
   for (const [name, val] of values) {
+    if (propOf(name).includes("ident")) continue;
     plain[name] = val.k === "s" ? signed(field.toNumber(val.v)) : val.m.d.map((x2) => signed(field.toNumber(x2)));
   }
   const derivedPlain = {};
@@ -8681,7 +8682,11 @@ function repairs(ctx, lhs, rhs, defs, seed, dimVars, kind) {
     seen.add(key);
     deduped.push(fix);
   }
-  deduped.sort((a, b) => priority(a) - priority(b) || editSize(a) - editSize(b));
+  deduped.sort(
+    (a, b) => priority(a) - priority(b) || // a fix of the right hand side is a fix of the derivation, so it comes
+    // before a fix of the claim
+    (a.side ?? "rhs").localeCompare(b.side ?? "rhs") || editSize(a) - editSize(b)
+  );
   return deduped.slice(0, 3);
 }
 function priority(fix) {
@@ -8842,6 +8847,9 @@ var MUTATIONS = [
     }
   }
 ];
+function pretty(latex) {
+  return latex.replace(/[{}]/g, "");
+}
 function editSize(fix) {
   if (!fix.edit) return 0;
   return fix.edit.insert.length;
@@ -8897,7 +8905,8 @@ function mutationRepairs(sh) {
           title: mutation.title,
           edit: { span: original.span, insert: renderNode(candidate) },
           verified: true,
-          detail: renderNode(candidate)
+          detail: renderNode(candidate),
+          side: side === "rhs" ? "rhs" : "lhs"
         });
       }
     }
@@ -9088,12 +9097,20 @@ function residualRepairs(sh) {
   for (const [text, term] of terms) {
     const scale = matchesScale(field, term, samples);
     if (scale === null) continue;
+    const patched = {
+      k: "op",
+      op: "add",
+      args: [sh.rhs, term],
+      span: sh.rhs.span
+    };
+    const verified = holdsWith(sh, "rhs", patched);
     out.push({
       kind: "residual",
-      title: `this step is off by exactly ${scaleText(scale)} ${text}`,
+      title: `this step is off by exactly ${scaleText(scale)} ${pretty(text)}`,
       edit: { span: sh.rhs.span, insert: `${renderNode(sh.rhs)} ${scaleText(scale)} ${text}` },
-      verified: false,
-      detail: text
+      verified,
+      detail: text,
+      side: "rhs"
     });
     if (out.length >= 3) break;
   }
@@ -9204,13 +9221,15 @@ function checkStep2(lhs, rhs, opts = {}) {
   }
   return step;
 }
-function explain(src, stepId, opts = {}) {
+function explain(src, stepId, opts = {}, report) {
   const parsed = parseForExplain(src, opts);
   const step = parsed.steps.find((s) => s.id === stepId);
   if (!step || !step.lhs || !step.rhs) return { fixes: [] };
+  const verdict = report?.steps.find((s) => s.id === stepId)?.verdict;
+  if (verdict && verdict !== "wrong" && verdict !== "shape") return { fixes: [] };
   return explainStep(parsed, step, opts);
 }
-function explainAll(src, opts = {}, limit = 8) {
+function explainAll(src, opts = {}, limit = 8, report) {
   const out = /* @__PURE__ */ new Map();
   const parsed = parseForExplain(src, opts);
   const deadline = Date.now() + (opts.budgetMs ?? 4e3);
@@ -9220,6 +9239,8 @@ function explainAll(src, opts = {}, limit = 8) {
     if (Date.now() > deadline) break;
     if (!step.lhs || !step.rhs) continue;
     if (step.relation !== "=" && step.relation !== "shape") continue;
+    const verdict = report?.steps.find((s) => s.id === step.id)?.verdict;
+    if (verdict && verdict !== "wrong" && verdict !== "shape") continue;
     out.set(step.id, explainStep(parsed, step, opts));
     count++;
   }
@@ -9928,11 +9949,12 @@ server.registerTool(
       preset: args.preset,
       seed: args.seed
     });
-    const explanations = explainAll(args.latex, {
-      decls: args.declarations,
-      preset: args.preset,
-      seed: args.seed
-    });
+    const explanations = explainAll(
+      args.latex,
+      { decls: args.declarations, preset: args.preset, seed: args.seed },
+      8,
+      report
+    );
     const structured = {
       summary: summarise(report),
       steps: report.steps.map((step) => {

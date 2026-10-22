@@ -73,7 +73,14 @@ export function repairs(
     seen.add(key);
     deduped.push(fix);
   }
-  deduped.sort((a, b) => priority(a) - priority(b) || editSize(a) - editSize(b));
+  deduped.sort(
+    (a, b) =>
+      priority(a) - priority(b) ||
+      // a fix of the right hand side is a fix of the derivation, so it comes
+      // before a fix of the claim
+      (a.side ?? 'rhs').localeCompare(b.side ?? 'rhs') ||
+      editSize(a) - editSize(b),
+  );
   return deduped.slice(0, 3);
 }
 
@@ -253,6 +260,15 @@ export const MUTATIONS: Mutation[] = [
   },
 ];
 
+/**
+ * The pretty form of a piece of LaTeX.
+ *
+ * The braces a renderer needs are noise in a sentence, so they go.
+ */
+function pretty(latex: string): string {
+  return latex.replace(/[{}]/g, '');
+}
+
 /** How big is the edit a fix proposes? */
 function editSize(fix: Fix): number {
   if (!fix.edit) return 0;
@@ -334,6 +350,7 @@ function mutationRepairs(sh: RepairCtx): Fix[] {
           edit: { span: original.span, insert: renderNode(candidate) },
           verified: true,
           detail: renderNode(candidate),
+          side: side === 'rhs' ? 'rhs' : 'lhs',
         });
       }
     }
@@ -580,12 +597,22 @@ function residualRepairs(sh: RepairCtx): Fix[] {
   for (const [text, term] of terms) {
     const scale = matchesScale(field, term, samples);
     if (scale === null) continue;
+    // the patched row is checked like any other candidate, so the fix that is
+    // offered is one that has been seen to hold
+    const patched: Node = {
+      k: 'op',
+      op: 'add',
+      args: [sh.rhs, term],
+      span: sh.rhs.span,
+    };
+    const verified = holdsWith(sh, 'rhs', patched);
     out.push({
       kind: 'residual',
-      title: `this step is off by exactly ${scaleText(scale)} ${text}`,
+      title: `this step is off by exactly ${scaleText(scale)} ${pretty(text)}`,
       edit: { span: sh.rhs.span, insert: `${renderNode(sh.rhs)} ${scaleText(scale)} ${text}` },
-      verified: false,
+      verified,
       detail: text,
+      side: 'rhs',
     });
     if (out.length >= 3) break;
   }

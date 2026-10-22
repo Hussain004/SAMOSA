@@ -300,7 +300,7 @@ J &:= \frac{1}{2} x^\top A x \\
   {
     id: 'variance-of-sum',
     name: 'the variance of a sum',
-    decls: 'x: n; y: n; Sigma: spd n',
+    decls: 'x: n; y: n; \\Sigma: spd n',
     source: String.raw`\begin{align*}
 \operatorname{Var}(x + y) &= \operatorname{Var}(x) + \operatorname{Var}(y)
 \end{align*}`,
@@ -316,7 +316,7 @@ J &:= \frac{1}{2} x^\top A x \\
   {
     id: 'gaussian-moment',
     name: 'the second moment of a Gaussian',
-    decls: 'x: n; Sigma: spd n',
+    decls: 'x: n; \\Sigma: spd n',
     source: String.raw`\begin{align*}
 \mathbb{E}[x x^\top] &= \Sigma
 \end{align*}`,
@@ -324,7 +324,7 @@ J &:= \frac{1}{2} x^\top A x \\
   {
     id: 'gaussian-mean',
     name: 'the mean of a Gaussian',
-    decls: 'x: n; mu: n; Sigma: spd n',
+    decls: 'x: n; \\mu: n; \\Sigma: spd n',
     source: String.raw`\begin{align*}
 \mathbb{E}[x] &= \mu
 \end{align*}`,
@@ -332,7 +332,7 @@ J &:= \frac{1}{2} x^\top A x \\
   {
     id: 'gaussian-trace',
     name: 'the trace of a Gaussian covariance',
-    decls: 'x: n; Sigma: spd n',
+    decls: 'x: n; \\Sigma: spd n',
     source: String.raw`\begin{align*}
 \mathbb{E}[x^\top x] &= \operatorname{tr}(\Sigma)
 \end{align*}`,
@@ -340,7 +340,7 @@ J &:= \frac{1}{2} x^\top A x \\
   {
     id: 'kalman-covariance',
     name: 'the covariance of the Kalman update',
-    decls: 'x: n; z: m; C: m×n; Q: spd m; R: spd n',
+    decls: 'C: m×n; Q: spd m; R: spd n',
     source: String.raw`\begin{align*}
 \Sigma &:= \left(C^\top Q^{-1} C + R^{-1}\right)^{-1}
 \end{align*}`,
@@ -348,7 +348,7 @@ J &:= \frac{1}{2} x^\top A x \\
   {
     id: 'kalman-gain',
     name: 'the Kalman gain',
-    decls: 'C: m×n; Q: spd m; Sigma: spd n',
+    decls: 'C: m×n; Q: spd m; \\Sigma: spd n',
     source: String.raw`\begin{align*}
 K &:= \Sigma C^\top Q^{-1}
 \end{align*}`,
@@ -356,15 +356,17 @@ K &:= \Sigma C^\top Q^{-1}
   {
     id: 'joseph-form',
     name: 'the Joseph form',
-    decls: 'C: m×n; Q: spd m; Sigma: spd n; K: n×m',
+    decls: 'C_t: m×n; Q_t: spd m; \\bar\\Sigma_t: spd n; \\Sigma_t: spd n; K_t: n×m',
     source: String.raw`\begin{align*}
-\Sigma &= (I - K C)\, \Sigma (I - K C)^\top + K Q K^\top
+\Sigma_t &:= \left(C_t^\top Q_t^{-1} C_t + \bar\Sigma_t^{-1}\right)^{-1} \\
+K_t &:= \Sigma_t C_t^\top Q_t^{-1} \\
+\Sigma_t &= (I - K_t C_t)\, \bar\Sigma_t (I - K_t C_t)^\top + K_t Q_t K_t^\top
 \end{align*}`,
   },
   {
     id: 'push-through',
     name: 'the push-through identity',
-    decls: 'C: m×n; Q: spd m; Sigma: spd n',
+    decls: 'C: m×n; Q: spd m; \\Sigma: spd n',
     source: String.raw`\begin{align*}
 \Sigma - \Sigma C^\top\left(Q + C \Sigma C^\top\right)^{-1} C \Sigma
 &= \left(C^\top Q^{-1} C + \Sigma^{-1}\right)^{-1}
@@ -381,7 +383,7 @@ K &:= \Sigma C^\top Q^{-1}
   {
     id: 'riccati',
     name: 'the Riccati recursion',
-    decls: 'A: n×n; B: n×m; Q: spd n; R: spd m; Sigma: spd n',
+    decls: 'A: n×n; B: n×m; Q: spd n; R: spd m; \\Sigma: spd n',
     source: String.raw`\begin{align*}
 \Sigma &:= A \Sigma A^\top + Q - A \Sigma B \left(R + B^\top \Sigma B\right)^{-1} B^\top \Sigma A^\top
 \end{align*}`,
@@ -406,7 +408,7 @@ J &:= \frac{1}{2}\|y - X\beta\|^2 + \frac{\lambda}{2}\beta^\top \Sigma \beta \\
   {
     id: 'softmax',
     name: 'the gradient of the softmax cross entropy',
-    decls: 'z: n; p: n',
+    decls: '',
     source: String.raw`\begin{align*}
 J &:= -\sum_i p_i \log \frac{e^{z_i}}{\sum_j e^{z_j}} \\
 \frac{\partial J}{\partial z} &= \frac{e^z}{\sum_j e^{z_j}} - p
@@ -415,7 +417,7 @@ J &:= -\sum_i p_i \log \frac{e^{z_i}}{\sum_j e^{z_j}} \\
   {
     id: 'kl-of-gaussians',
     name: 'the KL of two Gaussians',
-    decls: 'mu: n; nu: n; Sigma: spd n; Tau: spd n',
+    decls: '\\mu: n; \\nu: n; \\Sigma: spd n; \\Tau: spd n',
     source: String.raw`\begin{align*}
 D &= \frac{1}{2}\operatorname{tr}\left(\Sigma^{-1}\left(\tau + (\mu - \nu)(\mu - \nu)^\top\right)\right)
 - \frac{n}{2} + \frac{1}{2}\log\frac{\det(\Sigma)}{\det(\tau)}

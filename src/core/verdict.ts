@@ -88,6 +88,8 @@ export interface Fix {
   addDecl?: string;
   verified: boolean;
   detail?: string;
+  /** which side of the step the fix edits */
+  side?: 'lhs' | 'rhs';
 }
 
 export interface Diagnostic {

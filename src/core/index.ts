@@ -34,7 +34,7 @@ export { renderNode } from './render.ts';
 export { shrinkCounterexample } from './shrink.ts';
 export type { ShrunkInstance } from './shrink.ts';
 
-import { check, type CheckOptions, type Fix, type StepResult } from './verdict.ts';
+import { check, type CheckOptions, type Fix, type Report, type StepResult } from './verdict.ts';
 import { parseRow } from './parse.ts';
 import { splitRows } from './steps.ts';
 import { parseDeclarations } from './decl.ts';
@@ -86,10 +86,18 @@ export interface Explanation {
  * These are expensive, so they only run when somebody opens the card of a
  * wrong step.
  */
-export function explain(src: string, stepId: string, opts: CheckOptions = {}): Explanation {
+export function explain(
+  src: string,
+  stepId: string,
+  opts: CheckOptions = {},
+  report?: Report,
+): Explanation {
   const parsed = parseForExplain(src, opts);
   const step = parsed.steps.find((s) => s.id === stepId);
   if (!step || !step.lhs || !step.rhs) return { fixes: [] };
+  // A row that holds has nothing to repair, so no fixes are offered for it.
+  const verdict = report?.steps.find((s) => s.id === stepId)?.verdict;
+  if (verdict && verdict !== 'wrong' && verdict !== 'shape') return { fixes: [] };
   return explainStep(parsed, step, opts);
 }
 
@@ -103,6 +111,7 @@ export function explainAll(
   src: string,
   opts: CheckOptions = {},
   limit = 8,
+  report?: Report,
 ): Map<string, Explanation> {
   const out = new Map<string, Explanation>();
   const parsed = parseForExplain(src, opts);
@@ -113,6 +122,8 @@ export function explainAll(
     if (Date.now() > deadline) break;
     if (!step.lhs || !step.rhs) continue;
     if (step.relation !== '=' && step.relation !== 'shape') continue;
+    const verdict = report?.steps.find((s) => s.id === step.id)?.verdict;
+    if (verdict && verdict !== 'wrong' && verdict !== 'shape') continue;
     out.set(step.id, explainStep(parsed, step, opts));
     count++;
   }

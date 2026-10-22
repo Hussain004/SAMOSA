@@ -75,7 +75,7 @@
   },
   "joseph": {
     "wrongRow": 4,
-    "fixTitle": "this step is off by exactly + {K_t Q_t} {K_t}^\\top",
+    "fixTitle": "this step is off by exactly + K_t Q_t K_t^\\top",
     "fixEdit": "{{I - {K_t C_t}} \\bar\\Sigma_t} {I - {K_t C_t}}^\\top + {K_t Q_t} {K_t}^\\top",
     "counterexample": {
       "dims": {
@@ -91,16 +91,13 @@
         ],
         "\\bar\\Sigma_t": [
           5
-        ],
-        "I": [
-          1
         ]
       },
       "derived": {
         "\\Sigma_t": 2.5,
         "K_t": 0.5
       },
-      "numpy": "import numpy as np\ns0 = np.array([[1]])\ns1 = np.array([[5]])\ns2 = np.array([[5]])\ns3 = np.array([[1]])\n\n# the symbols the derivation defines, computed by SAMOSA from the values above\nd0 = 2.5  # \\Sigma_t\nd1 = 0.5  # K_t\n\n# the two sides of the step, with these values\n# lhs - rhs is not zero"
+      "numpy": "import numpy as np\ns0 = np.array([[1]])\ns1 = np.array([[5]])\ns2 = np.array([[5]])\n\n# the symbols the derivation defines, computed by SAMOSA from the values above\nd0 = 2.5  # \\Sigma_t\nd1 = 0.5  # K_t\n\n# the two sides of the step, with these values\n# lhs - rhs is not zero"
     },
     "rows": [
       {

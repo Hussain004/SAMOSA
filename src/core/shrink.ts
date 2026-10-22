@@ -110,7 +110,7 @@ export function shrinkCounterexample(
     const l = evalNode(field, lhs, env);
     const r = evalNode(field, rhs, env);
     if (!equal(field, l, r)) {
-      return describe(ctx, sizes, values, derivedValues(field, env, defs), l, r, field, true);
+      return describe(ctx, sizes, values, derivedValues(field, env, defs), (name) => ctx.symbols.get(name)?.props ?? [], l, r, field, true);
     }
   } catch {
     // fall through, the caller keeps the original counterexample
@@ -169,7 +169,7 @@ function searchSmallIntegers(sh: ShrinkCtx, range: number, seed: number): Shrunk
       const l = evalNode(field, sh.lhs, env);
       const r = evalNode(field, sh.rhs, env);
       if (equal(field, l, r)) continue;
-      return describe(ctx, sizes, values, derivedValues(field, env, sh.defs), l, r, field, false);
+      return describe(ctx, sizes, values, derivedValues(field, env, sh.defs), sh.propOf, l, r, field, false);
     } catch {
       continue;
     }
@@ -258,6 +258,7 @@ function describe<T>(
   sizes: Map<string, number>,
   values: Map<string, Val<T>>,
   derived: Map<string, Val<T>>,
+  propOf: (name: string) => Prop[],
   lhs: Val<T>,
   rhs: Val<T>,
   field: Field<T>,
@@ -281,6 +282,8 @@ function describe<T>(
   };
   const plain: Record<string, number[] | number> = {};
   for (const [name, val] of values) {
+    // the identity is not a free value, so it is not one of the inputs
+    if (propOf(name).includes('ident')) continue;
     plain[name] = val.k === 's' ? signed(field.toNumber(val.v)) : val.m.d.map((x) => signed(field.toNumber(x)));
   }
   const derivedPlain: Record<string, number[] | number> = {};
