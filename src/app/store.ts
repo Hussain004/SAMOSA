@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { decodeShare, encodeShare } from '../core/share.ts';
+import { encodeShare, readShareLink } from '../core/share.ts';
 import type { Explanation, Report } from '../core/index.ts';
 import type { WorkerRequest, WorkerResponse } from '../worker.ts';
 import { PRESETS } from '../core/index.ts';
@@ -243,21 +243,25 @@ export const useApp = create<AppState>((set, get) => ({
   },
 
   applyShare: (hash) => {
-    try {
-      const json = decodeShare(hash);
-      const settings = { ...DEFAULT_SETTINGS, ...(json.settings ?? {}) } as Settings;
-      // a link carries the declarations as well, so the derivation is checked
-      // the way it was checked when the link was made
-      if (json.decls) settings.decls = json.decls;
-      set({
-        source: json.src ?? '',
-        settings,
-        shareHash: hash,
-      });
-      schedule(get());
-    } catch {
-      // a broken link is not worth crashing over
+    // The hash carries the version, so it is read with the reader that knows
+    // about it: decodeShare takes the payload, not the whole fragment.
+    const payload = readShareLink(`${window.location.origin}/app/#${hash}`);
+    if (!payload) {
+      // a broken link is said out loud, not swallowed
+      useApp.setState({ error: 'this link is broken, so the default derivation was loaded' });
+      return;
     }
+    const settings = { ...DEFAULT_SETTINGS, ...(payload.settings ?? {}) } as Settings;
+    // a link carries the declarations as well, so the derivation is checked
+    // the way it was checked when the link was made
+    if (payload.decls) settings.decls = payload.decls;
+    set({
+      source: payload.src ?? '',
+      settings,
+      shareHash: hash,
+      error: null,
+    });
+    schedule(get());
   },
   setExplanation: (stepId, explanation) =>
     set((state) => ({ explanations: { ...state.explanations, [stepId]: explanation } })),

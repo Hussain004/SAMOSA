@@ -6,6 +6,10 @@ import { expect, test } from '@playwright/test';
  * They check the things that only exist in the browser: the verdicts appear,
  * a quick fix applies, the share link round trips, and nothing leaves the
  * machine.
+ *
+ * Every one of them has to be able to fail. A test that waits for the word
+ * "holds" passes on the default derivation, so the tests here type a
+ * derivation of their own and check that it is the one that comes back.
  */
 
 const DERIVATION = String.raw`\begin{align*}
@@ -13,8 +17,6 @@ K_t &:= \Sigma_t C_t^\top Q_t^{-1} \\
 K_t &= \bar\Sigma_t C_t^\top \left(C_t \bar\Sigma_t C_t^\top + Q_t\right)^{-1}
 \end{align*}
 `;
-
-const DECLARATIONS = 'x_t, \\bar\\mu_t: n; z_t: m; C_t: m×n; Q_t: spd m; \\bar\\Sigma_t: spd n';
 
 /** The Joseph form with the noise term missing: the step the engine can fix. */
 const JOSEPH = String.raw`\begin{align*}
@@ -24,10 +26,21 @@ K_t &:= \Sigma_t C_t^\top Q_t^{-1} \\
 \end{align*}
 `;
 
+const DECLARATIONS = 'x_t, \\bar\\mu_t: n; z_t: m; C_t: m×n; Q_t: spd m; \\bar\\Sigma_t: spd n';
+
 test.beforeEach(async ({ page }) => {
   await page.goto('/app/');
   await page.waitForSelector('.cm-content');
 });
+
+/** Puts a derivation in the editor. */
+async function type(page: import('@playwright/test').Page, source: string): Promise<void> {
+  await page.locator('.cm-content').click();
+  await page.keyboard.press('Control+A');
+  await page.keyboard.press('Delete');
+  await page.locator('.cm-content').click();
+  await page.keyboard.insertText(source);
+}
 
 test('the default derivation is checked', async ({ page }) => {
   await expect(page.getByText('holds').first()).toBeVisible();
@@ -37,18 +50,14 @@ test('the default derivation is checked', async ({ page }) => {
 test('a wrong step is flagged and the card opens', async ({ page }) => {
   await page.getByRole('button', { name: 'Presets' }).click();
   await page.locator('textarea').fill(DECLARATIONS);
-  await page.locator('.cm-content').click();
-  await page.keyboard.press('Control+A');
-  await page.keyboard.type(DERIVATION);
+  await type(page, DERIVATION);
   await expect(page.getByText('wrong').first()).toBeVisible({ timeout: 15_000 });
 });
 
 test('a quick fix applies', async ({ page }) => {
   await page.getByRole('button', { name: 'Presets' }).click();
   await page.locator('textarea').fill(DECLARATIONS);
-  await page.locator('.cm-content').click();
-  await page.keyboard.press('Control+A');
-  await page.keyboard.type(JOSEPH);
+  await type(page, JOSEPH);
   await expect(page.getByText('wrong').first()).toBeVisible({ timeout: 15_000 });
 
   // open the card of the wrong row
@@ -61,12 +70,32 @@ test('a quick fix applies', async ({ page }) => {
   await expect(page.getByText('wrong').first()).toHaveCount(0, { timeout: 15_000 });
 });
 
-test('the share link round trips', async ({ page }) => {
+test('the share link round trips, with the derivation in it', async ({ page }) => {
+  await page.getByRole('button', { name: 'Presets' }).click();
+  await page.locator('textarea').fill(DECLARATIONS);
+  await type(page, JOSEPH);
+  await expect(page.getByText('wrong').first()).toBeVisible({ timeout: 15_000 });
+
   await page.getByRole('button', { name: 'Share' }).click();
   const hash = await page.evaluate(() => window.location.hash);
   expect(hash).toContain('#v1.');
+
   await page.goto('/app/' + hash);
-  await expect(page.getByText('holds').first()).toBeVisible({ timeout: 15_000 });
+  await page.waitForSelector('.cm-content');
+  await page.waitForTimeout(1500);
+
+  // the derivation that was shared is the one that is there now
+  const source = await page.locator('.cm-content').innerText();
+  expect(source).toContain('Sigma_t');
+  expect(source).toContain('bar');
+  // and the verdicts are the ones of that derivation
+  await expect(page.getByText('wrong').first()).toBeVisible({ timeout: 15_000 });
+});
+
+test('a broken link says so', async ({ page }) => {
+  await page.goto('/app/#v1.not-a-real-payload');
+  await page.waitForTimeout(1000);
+  await expect(page.getByText('this link is broken').first()).toBeVisible({ timeout: 10_000 });
 });
 
 test('the menu items have share links that round trip', async ({ page }) => {
@@ -75,14 +104,23 @@ test('the menu items have share links that round trip', async ({ page }) => {
   const count = await items.count();
   expect(count).toBeGreaterThan(5);
 
+  const title = await items.nth(0).locator('xpath=../h3').innerText();
+
   await items.nth(0).click();
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(500);
   await page.getByRole('button', { name: 'Share' }).click();
   const hash = await page.evaluate(() => window.location.hash);
   expect(hash).toContain('#v1.');
   await page.goto('/app/' + hash);
-  // the derivation is back and it has been checked
+  await page.waitForSelector('.cm-content');
+  await page.waitForTimeout(1500);
+
+  // the derivation of the menu item is back, and it has been checked
+  const source = await page.locator('.cm-content').innerText();
+  expect(source.length).toBeGreaterThan(10);
+  expect(source).not.toContain('J_t &:= ');
   await expect(page.locator('footer')).toContainText('ms', { timeout: 15_000 });
+  expect(title.length).toBeGreaterThan(0);
 });
 
 test('nothing leaves the browser', async ({ page }) => {
@@ -94,9 +132,7 @@ test('nothing leaves the browser', async ({ page }) => {
       method: request.method(),
     });
   });
-  await page.locator('.cm-content').click();
-  await page.keyboard.press('Control+A');
-  await page.keyboard.type(DERIVATION);
+  await type(page, DERIVATION);
   await page.waitForTimeout(1500);
 
   // the derivation never appears in a URL
