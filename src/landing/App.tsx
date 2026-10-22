@@ -627,7 +627,7 @@ const DEEP_DIVES = [
   {
     n: '06',
     title: 'It reads real papers',
-    body: 'Of the claim rows in the display math of 36 recent papers, 9.6% parses end to end and 3.4% is understood well enough to check. The first measurement was lenient; this one parses the whole row, and the correction is published.',
+    body: 'Of the claim rows in the display math of 36 recent papers, 54.8% parses end to end and 24.6% is read with no named unknown construct. The first measurement was lenient; this one parses the whole row, and the correction is published.',
     link: '/docs/COVERAGE.md',
   },
 ];
@@ -794,22 +794,22 @@ function DiveVisual({ index }: { index: number }) {
           <div className="mt-3">
             <div className={row}>
               <span>parses end to end</span>
-              <span className="text-[var(--color-text)]">9.6%</span>
+              <span className="text-[var(--color-text)]">54.8%</span>
             </div>
             <div className="mt-1 h-1.5 rounded bg-[var(--color-line)]">
-              <div className="h-full rounded bg-[var(--color-gold)]" style={{ width: '9.6%' }} />
+              <div className="h-full rounded bg-[var(--color-gold)]" style={{ width: '54.8%' }} />
             </div>
           </div>
           <div className="mt-4">
             <div className={row}>
-              <span>understood enough to check</span>
-              <span className="text-[var(--color-text)]">3.4%</span>
+              <span>no unknown construct</span>
+              <span className="text-[var(--color-text)]">24.6%</span>
             </div>
             <div className="mt-1 h-1.5 rounded bg-[var(--color-line)]">
-              <div className="h-full rounded bg-[var(--color-chutney)]" style={{ width: '3.4%' }} />
+              <div className="h-full rounded bg-[var(--color-chutney)]" style={{ width: '24.6%' }} />
             </div>
           </div>
-          <p className="mt-4 text-[var(--color-faint)]">the first number was lenient; this one parses the whole row, and the correction is published</p>
+          <p className="mt-4 text-[var(--color-faint)]">the first number was lenient; this one parses the whole row. the second is an upper bound, because the run does not read the preamble</p>
         </div>
       );
   }

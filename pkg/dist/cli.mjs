@@ -6894,15 +6894,21 @@ var Parser = class _Parser {
         if (this.kind() === "lparen" && scripted.k === "sym" && this.looksLikeCall(t.value)) {
           const wasDivergence = this.inDivergence;
           this.inDivergence = DIVERGENCES.has(plainName(t.value));
-          const { args, conditional } = this.parseArgs();
+          const { args, unknown } = this.parseArgs();
           this.inDivergence = wasDivergence;
-          return this.makeCall(t.value, t.from, args, conditional);
+          return this.makeCall(t.value, t.from, args, unknown);
         }
         return scripted;
       }
       case "lparen": {
         const open = this.tokens[this.pos];
         this.pos++;
+        const condition = this.groupRelation();
+        if (condition) {
+          const close2 = this.tokens[condition.close];
+          this.pos = condition.close + 1;
+          return { k: "raw", text: "a relation inside a group", span: { from: open.from, to: close2.to } };
+        }
         const inner2 = this.parseExpression();
         const close = this.expect("rparen", ")");
         return { ...inner2, span: { from: open.from, to: close.to } };
@@ -6953,8 +6959,42 @@ var Parser = class _Parser {
     }
     throw new ParseFailure(`unexpected ${describeToken(t)}`, { from: t.from, to: t.to });
   }
+  /**
+   * Finds a relation inside the group that starts at the previous token.
+   *
+   * A condition such as `(M > \sqrt{n})` or a set such as `\{x : x = 1\}`
+   * is not an expression SAMOSA can evaluate, but it is not a parse error
+   * either. The whole group becomes one named unknown.
+   */
+  groupRelation() {
+    const open = this.tokens[this.pos - 1];
+    if (!open) return null;
+    const stack = [
+      open.type === "lparen" ? "rparen" : open.type === "lbrack" ? "rbrack" : "rbrace"
+    ];
+    for (let i = this.pos; i < this.tokens.length; i++) {
+      const t = this.tokens[i];
+      if (t.type === "lparen") stack.push("rparen");
+      else if (t.type === "lbrack") stack.push("rbrack");
+      else if (t.type === "lbrace") stack.push("rbrace");
+      else if (t.type === "rparen" || t.type === "rbrack" || t.type === "rbrace") {
+        if (stack[stack.length - 1] !== t.type) return null;
+        stack.pop();
+        if (!stack.length) {
+          return findRelations(this.tokens.slice(this.pos, i)).length ? { close: i } : null;
+        }
+      }
+    }
+    return null;
+  }
   parseGroupAsExpression() {
     const open = this.expect("lbrace", "{");
+    const condition = this.groupRelation();
+    if (condition) {
+      const close2 = this.tokens[condition.close];
+      this.pos = condition.close + 1;
+      return { k: "raw", text: "a relation inside a group", span: { from: open.from, to: close2.to } };
+    }
     const parts = [this.parseExpression()];
     while (this.kind() === "comma") {
       this.pos++;
@@ -6968,6 +7008,12 @@ var Parser = class _Parser {
   }
   parseBareBracket() {
     const open = this.expect("lbrack", "[");
+    const condition = this.groupRelation();
+    if (condition) {
+      const close2 = this.tokens[condition.close];
+      this.pos = condition.close + 1;
+      return { k: "raw", text: "a relation inside a group", span: { from: open.from, to: close2.to } };
+    }
     const inner2 = this.parseExpression();
     const close = this.expect("rbrack", "]");
     return { ...inner2, span: { from: open.from, to: close.to } };
@@ -6986,10 +7032,16 @@ var Parser = class _Parser {
   parseArgs() {
     this.expect("lparen", "(");
     const args = [];
-    let conditional = false;
+    let unknown = null;
     if (this.kind() !== "rparen") {
       for (; ; ) {
         args.push(this.parseExpression());
+        if (this.atRelation()) {
+          this.skipToCloseParen();
+          this.expect("rparen", ")");
+          unknown ??= "a relation inside a group";
+          return { args, unknown };
+        }
         if (this.kind() === "comma" || this.kind() === "semi") {
           this.pos++;
           continue;
@@ -7005,8 +7057,13 @@ var Parser = class _Parser {
         }
         if (this.kind() === "csym" && this.cur.value === "|") {
           this.pos++;
-          conditional = true;
+          unknown = "a conditional distribution";
           args.push(this.parseExpression());
+          if (this.atRelation()) {
+            this.skipToCloseParen();
+            this.expect("rparen", ")");
+            return { args, unknown };
+          }
           if (this.kind() === "comma" || this.kind() === "semi") {
             this.pos++;
             continue;
@@ -7017,16 +7074,34 @@ var Parser = class _Parser {
       }
     }
     this.expect("rparen", ")");
-    return { args, conditional };
+    return { args, unknown };
+  }
+  /** Is the next token a relation that the expression parser stopped at? */
+  atRelation() {
+    const t = this.cur;
+    if (t.type === "op" && (t.value === "=" || t.value === "<" || t.value === ">" || t.value === ":")) return true;
+    return t.type === "cmd" && RELATION_COMMANDS[t.value] !== void 0;
+  }
+  /** Moves to the closing parenthesis of the argument list being read. */
+  skipToCloseParen() {
+    let depth = 0;
+    for (; this.pos < this.tokens.length; this.pos++) {
+      const t = this.tokens[this.pos];
+      if (t.type === "lparen" || t.type === "lbrack" || t.type === "lbrace") depth++;
+      else if (t.type === "rparen" || t.type === "rbrack" || t.type === "rbrace") {
+        if (depth === 0 && t.type === "rparen") return;
+        if (depth > 0) depth--;
+      }
+    }
   }
   /**
    * A call, unless its arguments hold a conditional bar. The engine has no
    * model of a conditional distribution, so the row is read and left
    * unchecked with that reason rather than guessed at.
    */
-  makeCall(fn, from, args, conditional) {
+  makeCall(fn, from, args, unknown) {
     const span = { from, to: this.closingParen(from, args) };
-    if (conditional) return { k: "raw", text: "a conditional distribution", span };
+    if (unknown) return { k: "raw", text: unknown, span };
     return { k: "call", fn, args, span };
   }
   parseCommand() {
@@ -7103,8 +7178,8 @@ var Parser = class _Parser {
           };
         }
         if (this.kind() === "lparen") {
-          const { args, conditional } = this.parseArgs();
-          return this.makeCall(text.toLowerCase(), t.from, args, conditional);
+          const { args, unknown } = this.parseArgs();
+          return this.makeCall(text.toLowerCase(), t.from, args, unknown);
         }
         const sym = this.makeSym([name], text, null, null, { from: t.from, to: g.span.to });
         const scripted = this.applyScripts(sym, [name], text);
@@ -7148,8 +7223,8 @@ var Parser = class _Parser {
           return this.applyScripts(sym2, [], "\\sigma");
         }
         if (this.kind() === "lparen") {
-          const { args, conditional } = this.parseArgs();
-          return this.makeCall(name === "sigma" ? "sigmoid" : name, t.from, args, conditional);
+          const { args, unknown } = this.parseArgs();
+          return this.makeCall(name === "sigma" ? "sigmoid" : name, t.from, args, unknown);
         }
         if (this.kind() === "lbrace") {
           const arg2 = this.parseGroupAsExpression();
@@ -7181,8 +7256,8 @@ var Parser = class _Parser {
       const sym = this.makeSym([], `\\${name}`, null, null, { from: t.from, to: t.to });
       const scripted = this.applyScripts(sym, [], `\\${name}`);
       if (this.kind() === "lparen" && scripted.k === "sym") {
-        const { args, conditional } = this.parseArgs();
-        return this.makeCall(`\\${name}`, t.from, args, conditional);
+        const { args, unknown } = this.parseArgs();
+        return this.makeCall(`\\${name}`, t.from, args, unknown);
       }
       return scripted;
     }
@@ -7193,13 +7268,18 @@ var Parser = class _Parser {
       if (base2.k === "sym" && this.kind() === "lparen") {
         const density = base2.name.match(/^\\mathcal([NU])$/);
         if (density) {
-          const { args, conditional } = this.parseArgs();
+          const { args, unknown } = this.parseArgs();
           return this.makeCall(
             density[1] === "N" ? "normalDensity" : "uniformDensity",
             base2.span.from,
             args,
-            conditional
+            unknown
           );
+        }
+        const plain = base2.name.startsWith(`\\${name}`) ? base2.name.slice(name.length + 1) : plainName(base2.name);
+        if (this.looksLikeCall(plain)) {
+          const { args, unknown } = this.parseArgs();
+          return this.makeCall(base2.name, base2.span.from, args, unknown);
         }
       }
       return base2;
@@ -7635,12 +7715,49 @@ function findRelations(tokens) {
   }
   return out;
 }
+function clauseSplits(tokens) {
+  const separators = [];
+  let depth = 0;
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i];
+    if (t.type === "lbrace" || t.type === "lparen" || t.type === "lbrack") {
+      depth++;
+      continue;
+    }
+    if (t.type === "rbrace" || t.type === "rparen" || t.type === "rbrack") {
+      if (depth > 0) depth--;
+      continue;
+    }
+    if (depth > 0) continue;
+    if (t.type === "comma" || t.type === "semi" || t.type === "op" && t.value === ".") {
+      separators.push(i);
+    }
+  }
+  if (!separators.length) return [];
+  const bounds = [-1, ...separators, tokens.length];
+  const claims = bounds.slice(0, -1).map((b, k) => findRelations(tokens.slice(b + 1, bounds[k + 1])).length > 0);
+  const splits = [];
+  for (let k = 0; k < separators.length; k++) {
+    if (claims[k] && claims[k + 1]) splits.push(separators[k]);
+  }
+  if (!splits.length) return [];
+  const clauses = [];
+  let from = 0;
+  for (const split of splits) {
+    clauses.push({ start: from, end: split });
+    from = split + 1;
+  }
+  clauses.push({ start: from, end: tokens.length });
+  return clauses;
+}
 function parseRow(_src, rowText, offset, index2, knownFns) {
   let tokens = tokenize(rowText);
-  while (tokens.length) {
-    const last = tokens[tokens.length - 1];
+  for (; ; ) {
+    const at = tokens.length - 2;
+    const last = tokens[at];
+    if (!last) break;
     if (last.type === "comma" || last.type === "semi" || last.type === "op" && last.value === ".") {
-      tokens = tokens.slice(0, -1);
+      tokens = [...tokens.slice(0, at), tokens[tokens.length - 1]];
       continue;
     }
     break;
@@ -7657,6 +7774,30 @@ function parseRow(_src, rowText, offset, index2, knownFns) {
       annotation,
       prose: true
     };
+  }
+  const clauses = clauseSplits(tokens);
+  if (clauses.length > 1) {
+    const merged = [];
+    for (const clause of clauses) {
+      const first = tokens[clause.start];
+      const last = tokens[clause.end - 1];
+      if (!first || !last) continue;
+      const parsed = parseRow(_src, rowText.slice(first.from, last.to), offset + first.from, index2, knownFns);
+      if (parsed.prose) continue;
+      if (parsed.error) {
+        return {
+          index: index2,
+          span: { from: offset, to: offset + rowText.length },
+          parts: [],
+          annotation,
+          error: parsed.error
+        };
+      }
+      merged.push(...parsed.parts);
+    }
+    if (merged.length) {
+      return { index: index2, span: { from: offset, to: offset + rowText.length }, parts: merged, annotation };
+    }
   }
   const parts = [];
   const impIndex = rels.findIndex((r) => r.relation === "=>" || r.relation === "<=>");
@@ -7775,35 +7916,37 @@ function blankAlignmentMarkers(tokens) {
     return token;
   });
 }
-function extractAnnotation(tokens) {
-  for (let i = tokens.length - 1; i >= 0; i--) {
-    if (tokens[i].type === "cmd" && tokens[i].value === "text") {
-      const next = tokens[i + 1];
-      if (next && next.type === "lbrace") {
-        let depth = 1;
-        let j = i + 2;
-        while (j < tokens.length && depth > 0) {
-          const kind = tokens[j].type;
-          if (kind === "lbrace") depth++;
-          if (kind === "rbrace") {
-            depth--;
-            if (depth === 0) break;
-          }
-          j++;
-        }
-        return renderTokens(tokens.slice(i + 2, j)).trim();
+function trailingText(tokens) {
+  const eof = tokens.length - 1;
+  for (let i = eof; i >= 0; i--) {
+    if (tokens[i].type !== "cmd" || tokens[i].value !== "text") continue;
+    const next = tokens[i + 1];
+    if (!next || next.type !== "lbrace") continue;
+    let depth = 1;
+    let j = i + 2;
+    while (j < tokens.length && depth > 0) {
+      const t = tokens[j];
+      if (t.type === "lbrace") depth++;
+      else if (t.type === "rbrace") {
+        depth--;
+        if (depth === 0) break;
       }
+      j++;
     }
+    if (depth !== 0) continue;
+    if (j !== eof - 1) continue;
+    return { at: i, close: j };
   }
-  return void 0;
+  return null;
+}
+function extractAnnotation(tokens) {
+  const range = trailingText(tokens);
+  return range ? renderTokens(tokens.slice(range.at + 2, range.close)).trim() : void 0;
 }
 function stripAnnotation(tokens) {
-  for (let i = tokens.length - 1; i >= 0; i--) {
-    if (tokens[i].type === "cmd" && tokens[i].value === "text") {
-      return tokens.slice(0, i);
-    }
-  }
-  return tokens;
+  const range = trailingText(tokens);
+  if (!range) return tokens;
+  return [...tokens.slice(0, range.at), tokens[tokens.length - 1]];
 }
 
 // src/core/steps.ts

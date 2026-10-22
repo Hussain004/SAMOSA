@@ -146,13 +146,14 @@ the 1219 claim rows:
 
 | | |
 | --- | --- |
-| rows that parse end to end | 117 (**9.6%**) |
-| rows with no unknown construct | 41 (**3.4%**) |
+| rows that parse end to end | 668 (**54.8%**) |
+| rows with no unknown construct | 300 (**24.6%**) |
 
-The first version of this table parsed only the first expression of each row
-and reported 86.8% and 50.0%. It was lenient, and this one replaces it. Most
-of the gap is the end of the row: a `where` clause, a parenthetical
-condition, a `cases` block, and the macros the authors define themselves.
+That is 21.2% of all 1416 display rows. The first version of this table
+parsed only the first expression of each row and reported 86.8% and 50.0%.
+It was lenient, and this one replaces it. What stops the rest is a `cases`
+block inside a probability, a script on something that is not a symbol, a
+set the parser cannot close, and the macros the authors define themselves.
 The method, the correction and the full list of what stops the rest are in
 [docs/COVERAGE.md](docs/COVERAGE.md).
 

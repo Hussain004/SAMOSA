@@ -98,3 +98,76 @@ describe('conditioning and the long delimiters', () => {
     expect(call.args.length).toBe(2);
   });
 });
+
+describe('the end of the row and the shape of a clause', () => {
+  it('strips the punctuation before the end of file token', () => {
+    for (const row of ['a = b,', 'a = b.', 'a = b;']) {
+      const parsed = parseRow('', row, 0, 0);
+      expect(parsed.error).toBeUndefined();
+      expect(parsed.parts.length).toBe(1);
+    }
+  });
+
+  it('reads two claims separated by a comma', () => {
+    const parsed = parseRow('', 'a = b, c = d', 0, 0);
+    expect(parsed.error).toBeUndefined();
+    expect(parsed.parts.map((part) => part.relation)).toEqual(['=', '=']);
+  });
+
+  it('reads two claims separated by a period or a semicolon', () => {
+    for (const row of ['a = b. c = d', 'a = b; c = d']) {
+      const parsed = parseRow('', row, 0, 0);
+      expect(parsed.error).toBeUndefined();
+      expect(parsed.parts.length).toBe(2);
+    }
+  });
+
+  it('leaves the row unchecked when one clause cannot be read', () => {
+    const parsed = parseRow('', 'a = b, c = d +', 0, 0);
+    expect(parsed.error).toBeTruthy();
+  });
+
+  it('names a relation inside a group instead of failing', () => {
+    const rows = [
+      String.raw`P(X \neq Y) = 0.5`,
+      String.raw`\mathbb{I}\{x_j = 1\} = 1`,
+      String.raw`a(b > c) = d`,
+    ];
+    for (const row of rows) {
+      const parsed = parseRow('', row, 0, 0);
+      expect(parsed.error).toBeUndefined();
+      expect(JSON.stringify(parsed.parts[0].lhs)).toContain('a relation inside a group');
+    }
+  });
+
+  it('reads an accented lowercase name as a call', () => {
+    const parsed = parseRow('', String.raw`\hat{l}(f_j(x), y) = z`, 0, 0);
+    expect(parsed.error).toBeUndefined();
+    expect(parsed.parts[0].lhs).toMatchObject({ k: 'call' });
+  });
+
+
+  it('splits a claim after a text group, not at its comma', () => {
+    const parsed = parseRow('', String.raw`a = b \text{ x, y}, c = d`, 0, 0);
+    expect(parsed.error).toBeUndefined();
+    expect(parsed.parts.length).toBe(2);
+  });
+
+  it('keeps a trailing text group as an annotation', () => {
+    const parsed = parseRow('', String.raw`a = b \text{ for all x}`, 0, 0);
+    expect(parsed.error).toBeUndefined();
+    expect(parsed.parts.length).toBe(1);
+    expect(parsed.annotation).toBe('for all x');
+  });
+
+  it('does not drop a claim that follows a text group', () => {
+    const parsed = parseRow('', String.raw`x = 1 \text{ and } x = 2`, 0, 0);
+    expect(parsed.error || parsed.parts.length > 1).toBeTruthy();
+  });
+
+  it('keeps an accented capital name as a matrix product', () => {
+    const parsed = parseRow('', String.raw`X \hat{A}(B) = D`, 0, 0);
+    expect(parsed.error).toBeUndefined();
+    expect(parsed.parts[0].lhs).toMatchObject({ k: 'op', op: 'mul' });
+  });
+});

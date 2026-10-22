@@ -21,16 +21,19 @@ not counted.
 | display math rows | 1416 |
 | rows with no relation (prose, a tuple, a line of a definition) | 197 |
 | claim rows | 1219 |
-| claim rows that parse end to end | 117 (**9.6%**) |
-| claim rows with no unknown construct | 41 (**3.4%**) |
-| of all display rows, the checkable share | 41 of 1416 (**2.9%**) |
+| claim rows that parse end to end | 668 (**54.8%**) |
+| claim rows with no unknown construct | 300 (**24.6%**) |
+| of all display rows, the share with no unknown construct | 300 of 1416 (**21.2%**) |
 
-**9.6%** is the parse coverage: the whole row becomes a tree, so SAMOSA can
+**54.8%** is the parse coverage: the whole row becomes a tree, so SAMOSA can
 look at it. The plan's gate G3 asks for 70%. The gate is not met.
 
-**3.4%** is the checkable coverage: every part of the row is something
-SAMOSA knows, so it can decide whether the row is right. This is the number
-that matters, and it is lower.
+**24.6%** is the share with no named unknown construct: every part of the
+row is something the parser has a rule for. This is an upper bound on the
+checkable share. The run parses each row on its own and does not read the
+paper's preamble, so a function the paper declares counts as a call here,
+and the verdict path will still say unchecked. The parse coverage is the
+number the gate asks for.
 
 The first version of this page reported 86.8% and 50.0%. That measurement
 parsed only the first expression of a row and did not require the parser to
@@ -49,44 +52,61 @@ The failures, bucketed by the first thing that stopped the row:
 
 | rows | the construct |
 | --- | --- |
-| 390 | `unexpected ,`, a second clause after the claim |
-| 227 | `expected )`, a `cases` block or a condition inside a probability |
-| 187 | `unexpected .`, a period and a sentence after the claim |
-| 51 | `expected {`, usually a `\left\{` set the parser cannot close |
-| 39 | a script on something that is not a symbol |
-| 39 | `unexpected |`, a set builder or a conditional outside a call |
-| 39 | `expected }`, a macro of the authors that takes a block |
-| 37 | `unexpected \|`, a double bar used as a separator |
-| 37 | `expected ]`, a conditional inside a bracket |
-| 18 | `unexpected rbrace`, a macro that emits its own braces |
-| 16 | `unexpected end of input`, an unbalanced row |
+| 178 | `expected )`, a `cases` block or a condition inside a probability |
+| 126 | a script on something that is not a symbol |
+| 58 | `expected {`, usually a `\left\{` set the parser cannot close |
+| 52 | `unexpected ,`, a second clause with no claim of its own |
+| 46 | `expected ]`, a conditional inside a bracket |
+| 46 | a conditional distribution, `p(x \mid y)` |
+| 42 | `unexpected |`, a set builder or a conditional outside a call |
+| 39 | `unexpected \|`, a double bar used as a separator |
+| 23 | a relation inside a group, named and left unchecked |
+| 22 | `unexpected rbrace`, a macro that emits its own braces |
+| 19 | `unexpected nl`, a row break inside a nested environment |
+| 18 | `\*`, a macro of the authors |
+| 17 | `unexpected end of input`, an unbalanced row |
+| 13 | the unsquared norm, `\|2\|` |
+| 13 | `\norm`, a macro of the authors |
 | 13 | `expected \rangle`, an inner product |
 | 13 | `unexpected sub`, a subscript on an operator |
-| 10 | a conditional distribution, `p(x \mid y)` |
-| 8 | `unexpected \\`, a row break inside a nested environment |
-| 7 | `unbalanced }`, a macro that opens a brace it does not close |
-| 5 | `\*`, a macro of the authors |
-| 5 | the unsquared norm, `\|x\|` |
+| 10 | `unexpected \\`, a row break inside a nested environment |
+| 8 | `expected }`, a macro of the authors that takes a block |
+| 9 | an expectation without an argument list |
 
-Most of the list is not a missing piece of notation. It is the end of the
-row: a second clause, a `where` clause, a parenthetical condition, or a
-`cases` block inside a probability. The parser reads the relation and then
-meets the prose of the paper. The next work is to read those clauses as
-clauses, instead of asking the expression parser to swallow them.
+The top of the list is now notation, not punctuation. The trailing comma
+fell from 390 rows to 52, because the punctuation of the sentence is
+stripped and two claims separated by a comma are read as two clauses. What
+is left is a `cases` block inside a probability, a script on an operator or
+a call, a set the parser cannot close, and the macros the authors define.
+The parser reads the relation and then meets notation it has no rule for.
+The next ones are below.
 
 ## What this pass fixed
 
+- The punctuation at the end of a row is stripped from the token stream.
+  The tokenizer ends its list with an end of file token, and the earlier
+  strip looked at that token instead of the comma before it, so the fix
+  reaches most of the rows that ended in `,` or `.`.
+- Two claims separated by a top-level comma, semicolon or period are read
+  as two clauses. If either clause cannot be read, the whole row is
+  unchecked, so a half-read row is never checked.
+- A relation inside a group is a named `raw` node, not a parse error:
+  `(M > \sqrt{n})`, `\{x_j = 1\}`, `P(X \neq Y)`. The row is readable and
+  unchecked, never guessed at.
+- An accented lowercase name followed by parentheses is a call:
+  `\hat{l}(f, y)` is a loss, not a product of a hat and a group. A capital
+  name in a product is still a matrix product.
 - `\mid` and `\middle|` are read as conditioning bars. A conditional call
   or expectation becomes a named `raw` node, so the row is readable and
   unchecked, never guessed at.
 - `\lVert`, `\rVert` and `\Vert` are the long forms of the norm and the
   divergence bar. A squared long norm is checkable; an unsquared one comes
   back with the reason.
-- Trailing commas, semicolons and periods are the punctuation of the
-  sentence, not parse errors.
+- A `\text{...}` group is an annotation only when it ends the row. A claim
+  after one is no longer dropped: the row is read or unchecked, never
+  half-checked.
 - An unknown control symbol and `\operatorname*` are named rather than
   thrown away.
-- A relation inside parentheses or brackets is not a top-level relation.
 - A row with no relation is prose. It is excluded from the claim
   denominator, and a parse error is no longer hidden in that bucket.
 
@@ -105,15 +125,17 @@ comes back with the reason, and the 50 digit mode is the answer for it.
 
 In the order the measurement says they are worth:
 
-1. The end of the row: `where` clauses, parenthetical conditions and `cases`
-   blocks. Read them as clauses, not as a failed expression.
-2. The macros the authors define: the CLI could read the preamble and
+1. `cases` blocks, and conditions inside a probability: the largest bucket,
+   `expected )`.
+2. A script on something that is not a symbol, such as an index on an
+   operator or a call. It is readable today and left unchecked.
+3. The macros the authors define: the CLI could read the preamble and
    expand the `\newcommand`s.
-3. The unsquared norms, checked in the 50 digit mode, with the card saying
+4. Set builder bars and conditionals outside a call, `\{x : x > 0\}` and
+   `p(x | y)`.
+5. The unsquared norms, checked in the 50 digit mode, with the card saying
    "numeric".
-4. The relations inside expressions, `\leq` and `\ge`, with a counterexample
-   search for the rows that break them.
-5. Inner products, `\langle x, y \rangle`.
+6. Inner products, `\langle x, y \rangle`.
 
 Then the sample should be a thousand papers, the size the plan asks for,
 and the number published again.

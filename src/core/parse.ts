@@ -556,9 +556,9 @@ export class Parser {
           // A(B) is a product, the way the notation reads.
           const wasDivergence = this.inDivergence;
           this.inDivergence = DIVERGENCES.has(plainName(t.value));
-          const { args, conditional } = this.parseArgs();
+          const { args, unknown } = this.parseArgs();
           this.inDivergence = wasDivergence;
-          return this.makeCall(t.value, t.from, args, conditional);
+          return this.makeCall(t.value, t.from, args, unknown);
         }
         return scripted;
       }
@@ -567,6 +567,12 @@ export class Parser {
         // node replaces the whole group and not only what is inside it
         const open = this.tokens[this.pos];
         this.pos++;
+        const condition = this.groupRelation();
+        if (condition) {
+          const close = this.tokens[condition.close];
+          this.pos = condition.close + 1;
+          return { k: 'raw', text: 'a relation inside a group', span: { from: open.from, to: close.to } };
+        }
         const inner = this.parseExpression();
         const close = this.expect('rparen', ')');
         return { ...inner, span: { from: open.from, to: close.to } };
@@ -622,8 +628,43 @@ export class Parser {
     throw new ParseFailure(`unexpected ${describeToken(t)}`, { from: t.from, to: t.to });
   }
 
+  /**
+   * Finds a relation inside the group that starts at the previous token.
+   *
+   * A condition such as `(M > \sqrt{n})` or a set such as `\{x : x = 1\}`
+   * is not an expression SAMOSA can evaluate, but it is not a parse error
+   * either. The whole group becomes one named unknown.
+   */
+  private groupRelation(): { close: number } | null {
+    const open = this.tokens[this.pos - 1];
+    if (!open) return null;
+    const stack: Array<Token['type']> = [
+      open.type === 'lparen' ? 'rparen' : open.type === 'lbrack' ? 'rbrack' : 'rbrace',
+    ];
+    for (let i = this.pos; i < this.tokens.length; i++) {
+      const t = this.tokens[i];
+      if (t.type === 'lparen') stack.push('rparen');
+      else if (t.type === 'lbrack') stack.push('rbrack');
+      else if (t.type === 'lbrace') stack.push('rbrace');
+      else if (t.type === 'rparen' || t.type === 'rbrack' || t.type === 'rbrace') {
+        if (stack[stack.length - 1] !== t.type) return null;
+        stack.pop();
+        if (!stack.length) {
+          return findRelations(this.tokens.slice(this.pos, i)).length ? { close: i } : null;
+        }
+      }
+    }
+    return null;
+  }
+
   private parseGroupAsExpression(): Node {
     const open = this.expect('lbrace', '{');
+    const condition = this.groupRelation();
+    if (condition) {
+      const close = this.tokens[condition.close];
+      this.pos = condition.close + 1;
+      return { k: 'raw', text: 'a relation inside a group', span: { from: open.from, to: close.to } };
+    }
     const parts: Node[] = [this.parseExpression()];
     // a group may hold a list, such as a set or a tuple
     while (this.kind() === 'comma') {
@@ -639,6 +680,12 @@ export class Parser {
 
   private parseBareBracket(): Node {
     const open = this.expect('lbrack', '[');
+    const condition = this.groupRelation();
+    if (condition) {
+      const close = this.tokens[condition.close];
+      this.pos = condition.close + 1;
+      return { k: 'raw', text: 'a relation inside a group', span: { from: open.from, to: close.to } };
+    }
     const inner = this.parseExpression();
     const close = this.expect('rbrack', ']');
     return { ...inner, span: { from: open.from, to: close.to } };
@@ -656,13 +703,22 @@ export class Parser {
     return args.at(-1)?.span.to ?? fallback;
   }
 
-  private parseArgs(): { args: Node[]; conditional: boolean } {
+  private parseArgs(): { args: Node[]; unknown: string | null } {
     this.expect('lparen', '(');
     const args: Node[] = [];
-    let conditional = false;
+    let unknown: string | null = null;
     if (this.kind() !== 'rparen') {
       for (;;) {
         args.push(this.parseExpression());
+        // P(X \neq Y) and f(x = 1): a relation inside the arguments is a
+        // condition, not something the engine can evaluate. The call is
+        // named and left unchecked.
+        if (this.atRelation()) {
+          this.skipToCloseParen();
+          this.expect('rparen', ')');
+          unknown ??= 'a relation inside a group';
+          return { args, unknown };
+        }
         if (this.kind() === 'comma' || this.kind() === 'semi') {
           this.pos++;
           continue;
@@ -683,8 +739,13 @@ export class Parser {
         // and the call is not one the engine can evaluate.
         if (this.kind() === 'csym' && this.cur.value === '|') {
           this.pos++;
-          conditional = true;
+          unknown = 'a conditional distribution';
           args.push(this.parseExpression());
+          if (this.atRelation()) {
+            this.skipToCloseParen();
+            this.expect('rparen', ')');
+            return { args, unknown };
+          }
           if (this.kind() === 'comma' || this.kind() === 'semi') {
             this.pos++;
             continue;
@@ -695,7 +756,27 @@ export class Parser {
       }
     }
     this.expect('rparen', ')');
-    return { args, conditional };
+    return { args, unknown };
+  }
+
+  /** Is the next token a relation that the expression parser stopped at? */
+  private atRelation(): boolean {
+    const t = this.cur;
+    if (t.type === 'op' && (t.value === '=' || t.value === '<' || t.value === '>' || t.value === ':')) return true;
+    return t.type === 'cmd' && RELATION_COMMANDS[t.value] !== undefined;
+  }
+
+  /** Moves to the closing parenthesis of the argument list being read. */
+  private skipToCloseParen(): void {
+    let depth = 0;
+    for (; this.pos < this.tokens.length; this.pos++) {
+      const t = this.tokens[this.pos];
+      if (t.type === 'lparen' || t.type === 'lbrack' || t.type === 'lbrace') depth++;
+      else if (t.type === 'rparen' || t.type === 'rbrack' || t.type === 'rbrace') {
+        if (depth === 0 && t.type === 'rparen') return;
+        if (depth > 0) depth--;
+      }
+    }
   }
 
   /**
@@ -703,9 +784,9 @@ export class Parser {
    * model of a conditional distribution, so the row is read and left
    * unchecked with that reason rather than guessed at.
    */
-  private makeCall(fn: string, from: number, args: Node[], conditional: boolean): Node {
+  private makeCall(fn: string, from: number, args: Node[], unknown: string | null): Node {
     const span = { from, to: this.closingParen(from, args) };
-    if (conditional) return { k: 'raw', text: 'a conditional distribution', span };
+    if (unknown) return { k: 'raw', text: unknown, span };
     return { k: 'call', fn, args, span };
   }
 
@@ -792,8 +873,8 @@ export class Parser {
           };
         }
         if (this.kind() === 'lparen') {
-          const { args, conditional } = this.parseArgs();
-          return this.makeCall(text.toLowerCase(), t.from, args, conditional);
+          const { args, unknown } = this.parseArgs();
+          return this.makeCall(text.toLowerCase(), t.from, args, unknown);
         }
         const sym = this.makeSym([name], text, null, null, { from: t.from, to: g.span.to });
         const scripted = this.applyScripts(sym, [name], text);
@@ -841,8 +922,8 @@ export class Parser {
           return this.applyScripts(sym, [], '\\sigma');
         }
         if (this.kind() === 'lparen') {
-          const { args, conditional } = this.parseArgs();
-          return this.makeCall(name === 'sigma' ? 'sigmoid' : name, t.from, args, conditional);
+          const { args, unknown } = this.parseArgs();
+          return this.makeCall(name === 'sigma' ? 'sigmoid' : name, t.from, args, unknown);
         }
         if (this.kind() === 'lbrace') {
           const arg = this.parseGroupAsExpression();
@@ -876,8 +957,8 @@ export class Parser {
       const sym = this.makeSym([], `\\${name}`, null, null, { from: t.from, to: t.to });
       const scripted = this.applyScripts(sym, [], `\\${name}`);
       if (this.kind() === 'lparen' && scripted.k === 'sym') {
-        const { args, conditional } = this.parseArgs();
-        return this.makeCall(`\\${name}`, t.from, args, conditional);
+        const { args, unknown } = this.parseArgs();
+        return this.makeCall(`\\${name}`, t.from, args, unknown);
       }
       return scripted;
     }
@@ -889,13 +970,21 @@ export class Parser {
       if (base.k === 'sym' && this.kind() === 'lparen') {
         const density = base.name.match(/^\\mathcal([NU])$/);
         if (density) {
-          const { args, conditional } = this.parseArgs();
+          const { args, unknown } = this.parseArgs();
           return this.makeCall(
             density[1] === 'N' ? 'normalDensity' : 'uniformDensity',
             base.span.from,
             args,
-            conditional,
+            unknown,
           );
+        }
+        // an accented lowercase name with parentheses is still a call:
+        // \hat{l}(f, y) is a loss, not a product of a hat and a group.
+        // A capital name stays a matrix product.
+        const plain = base.name.startsWith(`\\${name}`) ? base.name.slice(name.length + 1) : plainName(base.name);
+        if (this.looksLikeCall(plain)) {
+          const { args, unknown } = this.parseArgs();
+          return this.makeCall(base.name, base.span.from, args, unknown);
         }
       }
       return base;
@@ -1386,10 +1475,58 @@ export function findRelations(
 }
 
 /**
+ * The clauses of one row, split at a top-level comma, semicolon or period
+ * that has a claim on both sides.
+ *
+ * A row such as `A = B, C = D` is two claims, and a comma is not an error.
+ * A trailing comma, or a comma before a clause of prose, is not a split: the
+ * row keeps its original shape, so the parser still says what it could not
+ * read instead of dropping it.
+ */
+function clauseSplits(tokens: Token[]): Array<{ start: number; end: number }> {
+  const separators: number[] = [];
+  let depth = 0;
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i];
+    if (t.type === 'lbrace' || t.type === 'lparen' || t.type === 'lbrack') {
+      depth++;
+      continue;
+    }
+    if (t.type === 'rbrace' || t.type === 'rparen' || t.type === 'rbrack') {
+      if (depth > 0) depth--;
+      continue;
+    }
+    if (depth > 0) continue;
+    if (t.type === 'comma' || t.type === 'semi' || (t.type === 'op' && t.value === '.')) {
+      separators.push(i);
+    }
+  }
+  if (!separators.length) return [];
+
+  const bounds = [-1, ...separators, tokens.length];
+  const claims = bounds.slice(0, -1).map((b, k) => findRelations(tokens.slice(b + 1, bounds[k + 1])).length > 0);
+  const splits: number[] = [];
+  for (let k = 0; k < separators.length; k++) {
+    if (claims[k] && claims[k + 1]) splits.push(separators[k]);
+  }
+  if (!splits.length) return [];
+
+  const clauses: Array<{ start: number; end: number }> = [];
+  let from = 0;
+  for (const split of splits) {
+    clauses.push({ start: from, end: split });
+    from = split + 1;
+  }
+  clauses.push({ start: from, end: tokens.length });
+  return clauses;
+}
+
+/**
  * Parses one row of text into its parts.
  *
- * A row can hold a single relation, a chain (a = b = c) or an implication
- * (A = B => C = D). Each of those becomes one or more RowParts.
+ * A row can hold a single relation, a chain (a = b = c), an implication
+ * (A = B => C = D) or two claims separated by a comma. Each of those becomes
+ * one or more RowParts.
  */
 export function parseRow(
   _src: string,
@@ -1400,11 +1537,14 @@ export function parseRow(
 ): ParsedRow {
   let tokens = tokenize(rowText);
   // A display row often ends in the punctuation of the sentence around it:
-  // "... = 0," or "... = 1;". It is not part of the claim.
-  while (tokens.length) {
-    const last = tokens[tokens.length - 1];
+  // "... = 0," or "... = 1;". It is not part of the claim. The tokenizer
+  // ends its list with an eof, so the punctuation is just before it.
+  for (;;) {
+    const at = tokens.length - 2;
+    const last = tokens[at];
+    if (!last) break;
     if (last.type === 'comma' || last.type === 'semi' || (last.type === 'op' && last.value === '.')) {
-      tokens = tokens.slice(0, -1);
+      tokens = [...tokens.slice(0, at), tokens[tokens.length - 1]];
       continue;
     }
     break;
@@ -1422,6 +1562,34 @@ export function parseRow(
       annotation,
       prose: true,
     };
+  }
+
+  // Two claims in one row, separated by a comma: read each one, and keep the
+  // parts together. If either clause cannot be read, the whole row is
+  // unchecked, so a half-read row is never checked.
+  const clauses = clauseSplits(tokens);
+  if (clauses.length > 1) {
+    const merged: RowPart[] = [];
+    for (const clause of clauses) {
+      const first = tokens[clause.start];
+      const last = tokens[clause.end - 1];
+      if (!first || !last) continue;
+      const parsed = parseRow(_src, rowText.slice(first.from, last.to), offset + first.from, index, knownFns);
+      if (parsed.prose) continue;
+      if (parsed.error) {
+        return {
+          index,
+          span: { from: offset, to: offset + rowText.length },
+          parts: [],
+          annotation,
+          error: parsed.error,
+        };
+      }
+      merged.push(...parsed.parts);
+    }
+    if (merged.length) {
+      return { index, span: { from: offset, to: offset + rowText.length }, parts: merged, annotation };
+    }
   }
 
   const parts: RowPart[] = [];
@@ -1574,35 +1742,40 @@ function blankAlignmentMarkers(tokens: Token[]): Token[] {
   });
 }
 
-function extractAnnotation(tokens: Token[]): string | undefined {
-  for (let i = tokens.length - 1; i >= 0; i--) {
-    if (tokens[i].type === 'cmd' && tokens[i].value === 'text') {
-      const next = tokens[i + 1];
-      if (next && next.type === 'lbrace') {
-        let depth = 1;
-        let j = i + 2;
-        while (j < tokens.length && depth > 0) {
-          const kind = (tokens[j] as Token).type as string;
-          if (kind === 'lbrace') depth++;
-          if (kind === 'rbrace') {
-            depth--;
-            if (depth === 0) break;
-          }
-          j++;
-        }
-        return renderTokens(tokens.slice(i + 2, j)).trim();
+/** The range of a \\text{...} group that ends the row, if there is one. */
+function trailingText(tokens: Token[]): { at: number; close: number } | null {
+  const eof = tokens.length - 1;
+  for (let i = eof; i >= 0; i--) {
+    if (tokens[i].type !== 'cmd' || tokens[i].value !== 'text') continue;
+    const next = tokens[i + 1];
+    if (!next || next.type !== 'lbrace') continue;
+    let depth = 1;
+    let j = i + 2;
+    while (j < tokens.length && depth > 0) {
+      const t = tokens[j];
+      if (t.type === 'lbrace') depth++;
+      else if (t.type === 'rbrace') {
+        depth--;
+        if (depth === 0) break;
       }
+      j++;
     }
+    if (depth !== 0) continue;
+    // only a group at the very end is a note about the row, not part of it
+    if (j !== eof - 1) continue;
+    return { at: i, close: j };
   }
-  return undefined;
+  return null;
 }
 
-/** Drops a trailing \text{...} group from the token stream. */
+function extractAnnotation(tokens: Token[]): string | undefined {
+  const range = trailingText(tokens);
+  return range ? renderTokens(tokens.slice(range.at + 2, range.close)).trim() : undefined;
+}
+
+/** Drops a trailing \\text{...} group from the token stream. */
 function stripAnnotation(tokens: Token[]): Token[] {
-  for (let i = tokens.length - 1; i >= 0; i--) {
-    if (tokens[i].type === 'cmd' && tokens[i].value === 'text') {
-      return tokens.slice(0, i);
-    }
-  }
-  return tokens;
+  const range = trailingText(tokens);
+  if (!range) return tokens;
+  return [...tokens.slice(0, range.at), tokens[tokens.length - 1]];
 }
