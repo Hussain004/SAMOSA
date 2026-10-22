@@ -42,6 +42,15 @@ export function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [headerMenu, setHeaderMenu] = useState(false);
   const [mobilePane, setMobilePane] = useState<'rendered' | 'source' | 'inspector'>('rendered');
+  const [inspectorOpen, setInspectorOpen] = useState(true);
+  const [theme, setTheme] = useState<'dark' | 'light'>(() =>
+    window.localStorage.getItem('samosa-theme') === 'light' ? 'light' : 'dark',
+  );
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    window.localStorage.setItem('samosa-theme', theme);
+  }, [theme]);
 
   useEffect(() => {
     const open = () => {
@@ -113,9 +122,14 @@ export function App() {
         run: () => (spotTheBug ? stopSpotTheBug() : nextBug()),
       },
       { id: 'presets', label: 'Presets', run: () => setShowSettings((v) => !v) },
-      { id: 'share', label: copied ? '✓ copied' : 'Share', run: share },
+      { id: 'share', label: 'Share', run: share },
+      {
+        id: 'theme',
+        label: theme === 'dark' ? 'Light' : 'Dark',
+        run: () => setTheme((value) => (value === 'dark' ? 'light' : 'dark')),
+      },
     ],
-    [copied, nextBug, share, spotTheBug, stopSpotTheBug],
+    [nextBug, share, spotTheBug, stopSpotTheBug, theme],
   );
 
   const commands = useMemo<Command[]>(
@@ -227,6 +241,18 @@ export function App() {
           {revealed && (
             <button onClick={nextBug} className={HEADER_BUTTON}>
               next bug →
+            </button>
+          )}
+          {revealed && (
+            <button
+              onClick={() =>
+                copy(
+                  `I found the bug in ${tries} ${tries === 1 ? 'try' : 'tries'} on SAMOSA. Can you? ${window.location.origin}/app/`,
+                )
+              }
+              className={HEADER_BUTTON}
+            >
+              {copied.startsWith('I found the bug') ? '✓ copied' : 'share the result'}
             </button>
           )}
           <span className="text-[var(--color-faint)]">streak {streak}</span>
@@ -383,17 +409,28 @@ export function App() {
       <section
         className={`${
           mobilePane === 'inspector' ? 'flex' : 'hidden'
-        } min-h-0 flex-1 flex-col border-t border-[var(--color-line)] md:flex md:max-h-[38vh] md:min-h-[160px] md:flex-none`}
+        } min-h-0 flex-1 flex-col border-t border-[var(--color-line)] md:flex md:flex-none ${
+          inspectorOpen ? 'md:max-h-[38vh] md:min-h-[160px]' : 'md:max-h-none md:min-h-0'
+        }`}
       >
         <div className="flex items-center justify-between px-3 py-1.5">
           <span className="pane-title">inspector</span>
-          {step && (
-            <span className="text-[10px] text-[var(--color-faint)]">
-              row {step.row} · {step.mode ?? VERDICT_LABEL[step.verdict]}
-            </span>
-          )}
+          <div className="flex items-center gap-3">
+            {step && (
+              <span className="text-[10px] text-[var(--color-faint)]">
+                row {step.row} · {step.mode ?? VERDICT_LABEL[step.verdict]}
+              </span>
+            )}
+            <button
+              onClick={() => setInspectorOpen((v) => !v)}
+              aria-label={inspectorOpen ? 'collapse the inspector' : 'expand the inspector'}
+              className="text-[10px] text-[var(--color-faint)] hover:text-[var(--color-text)]"
+            >
+              {inspectorOpen ? '▾' : '▸'}
+            </button>
+          </div>
         </div>
-        <div className="min-h-0 flex-1 overflow-auto">
+        <div className={`${inspectorOpen ? 'block' : 'hidden'} min-h-0 flex-1 overflow-auto`}>
           <Inspector
             step={step}
             report={report}

@@ -242,3 +242,33 @@ test('the whole flow works with the keyboard alone', async ({ page }) => {
   await page.keyboard.type(DERIVATION);
   await expect(page.getByText('wrong').first()).toBeVisible({ timeout: 15_000 });
 });
+
+test('the light theme is remembered', async ({ page }) => {
+  await page.goto('/app/');
+  await page.waitForSelector('.cm-content');
+  await page.getByRole('button', { name: 'Light', exact: true }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+
+  await page.reload();
+  await page.waitForSelector('.cm-content');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+});
+
+test('the typed demo can be paused, skipped and replayed', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByText('SAMOSA-SERVATIONS')).toBeVisible();
+
+  // the transcript for a screen reader is in the DOM
+  await expect(page.locator('.sr-only').getByText('Transcript of the Claude Code demo')).toBeAttached();
+
+  await page.getByRole('button', { name: 'pause the demo', exact: true }).click();
+  await expect(page.getByText('paused')).toBeVisible();
+
+  const output = page.getByTestId('demo-output');
+  await page.getByRole('button', { name: 'skip to the end' }).click();
+  await expect(output.getByText('Done. The share link is in the answer.')).toBeVisible();
+
+  await page.getByRole('button', { name: 'play the demo', exact: true }).click();
+  await page.getByRole('button', { name: 'replay the demo', exact: true }).click();
+  await expect(output.getByText('Done. The share link is in the answer.')).toBeHidden({ timeout: 5000 });
+});

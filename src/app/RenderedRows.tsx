@@ -111,11 +111,14 @@ function Row({
           ? 'border-l-[var(--color-gold)] bg-[#e8b04b12]'
           : hovered
             ? 'border-l-[var(--color-line)] bg-white/[0.03]'
-            : 'border-l-transparent'
+            : gutterClass(step)
       }`}
     >
-      <span className="mt-1 w-6 shrink-0 text-right text-[10px] tabular-nums text-[var(--color-faint)]">
-        {step.row}
+      <span
+        className="mt-1 w-6 shrink-0 text-right text-[10px] tabular-nums text-[var(--color-faint)]"
+        title={`row ${step.row}, source line ${step.line ?? '?'}`}
+      >
+        {step.line ?? step.row}
       </span>
       <div className="min-w-0 flex-1 overflow-x-auto overflow-y-hidden py-0.5">
         <div className="text-[15px] leading-8" dangerouslySetInnerHTML={{ __html: html }} />
@@ -142,6 +145,23 @@ function Row({
       </div>
     </div>
   );
+}
+
+/** The left edge says the verdict without waiting for the badge to be read. */
+function gutterClass(step: StepResult): string {
+  switch (step.verdict) {
+    case 'ok':
+      return 'border-l-[var(--color-chutney)]/50';
+    case 'wrong':
+    case 'shape':
+      return 'border-l-[var(--color-tamarind)]/70';
+    case 'unchecked':
+      return 'border-l-[var(--color-saffron)]/60';
+    case 'defined':
+      return 'border-l-[var(--color-slate)]/50';
+    default:
+      return 'border-l-transparent';
+  }
 }
 
 function badgeClass(step: StepResult): string {

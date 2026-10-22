@@ -110,9 +110,15 @@ export function Inspector({ step, report, explanation, onApplyFix, onCopy, onClo
               >
                 <div className="min-w-0">
                   <p className="text-xs">{fix.title}</p>
-                  {fix.detail && (
-                    <p className="mt-0.5 overflow-x-auto text-[11px] text-[var(--color-muted)]">{fix.detail}</p>
-                  )}
+                  {fix.detail &&
+                    (fix.kind === 'residual' ? (
+                      <Tex
+                        latex={fix.detail}
+                        className="mt-1 overflow-x-auto text-[12px] text-[var(--color-muted)]"
+                      />
+                    ) : (
+                      <p className="mt-0.5 overflow-x-auto text-[11px] text-[var(--color-muted)]">{fix.detail}</p>
+                    ))}
                 </div>
                 {fix.edit && (
                   <button

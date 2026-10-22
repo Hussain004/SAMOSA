@@ -471,15 +471,27 @@ function Divider() {
     "that's numerator layout 👀",
     '≈ is not =',
   ];
+  const states = ['crispy', 'soggy', 'burnt', 'raw'] as const;
+  const [active, setActive] = useState(0);
+
+  useEffect(() => {
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const timer = window.setInterval(() => setActive((value) => (value + 1) % bubbles.length), 4000);
+    return () => window.clearInterval(timer);
+  }, [bubbles.length]);
+
   return (
     <section className="border-y border-[var(--color-line)] bg-[var(--color-panel)]">
       <div className="mx-auto flex max-w-[1180px] flex-wrap items-center justify-center gap-6 px-6 py-12">
         <span className="text-[13px] tracking-[0.3em] text-[var(--color-faint)]">SAMOSA-SERVATIONS</span>
         {bubbles.map((bubble, i) => (
-          <div key={bubble} className="flex items-center gap-2">
-            <span className="text-2xl" aria-hidden="true">
-              {['🥟', '🥠', '🔥', '🫓'][i]}
-            </span>
+          <div
+            key={bubble}
+            className={`flex items-center gap-2 transition-opacity duration-500 ${
+              i === active ? 'opacity-100' : 'opacity-55'
+            }`}
+          >
+            <PixelSamosa state={states[i]} />
             <span className="rounded-full border border-[var(--color-line)] px-3 py-1 text-[12px] text-[var(--color-muted)]">
               {bubble}
             </span>
@@ -490,7 +502,68 @@ function Divider() {
   );
 }
 
+/**
+ * A 16 by 16 pixel samosa.
+ *
+ * The four states are the verdict states: crispy is a step that holds,
+ * soggy is one the engine could not decide, burnt is one that is wrong and
+ * raw is one that was not read. The sprite is a triangle with a crimped top,
+ * drawn as one rect per pixel so it stays crisp at any size.
+ */
+function PixelSamosa({ state }: { state: 'crispy' | 'soggy' | 'burnt' | 'raw' }) {
+  const palettes = {
+    crispy: { body: '#e8b04b', shade: '#c48a24', edge: '#8a5a12', crimp: '#f2c96a', highlight: '#f7dc94' },
+    soggy: { body: '#b9a06a', shade: '#8f7a4b', edge: '#5f4f2e', crimp: '#cbb684', highlight: '#d6c79a' },
+    burnt: { body: '#5a4632', shade: '#3b2d20', edge: '#22190f', crimp: '#6d563e', highlight: '#8a5a3a' },
+    raw: { body: '#d9c9a3', shade: '#b9a980', edge: '#8a7c58', crimp: '#e6d9b8', highlight: '#f2e8cd' },
+  };
+  const palette = palettes[state];
+  const pixels: React.ReactNode[] = [];
 
+  const put = (x: number, y: number, fill: string) => {
+    pixels.push(<rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} fill={fill} />);
+  };
+
+  // the crimped edge: a serrated band, wider than the body it sits on
+  const crimpRows: Array<[number, number[]]> = [
+    [1, [4, 6, 8, 10]],
+    [2, [3, 4, 5, 6, 7, 8, 9, 10, 11, 12]],
+    [3, [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]],
+  ];
+  for (const [y, xs] of crimpRows) {
+    for (const x of xs) put(x, y, y === 1 ? palette.crimp : palette.body);
+  }
+
+  // the body: a triangle that widens to the base
+  for (let y = 4; y <= 14; y++) {
+    const width = 4 + (y - 4);
+    const startX = Math.floor((16 - width) / 2);
+    for (let i = 0; i < width; i++) {
+      const x = startX + i;
+      const edge = i === 0 || i === width - 1 || y === 14;
+      const shade = i >= width - 3;
+      const highlight = y >= 5 && y <= 8 && i === 1;
+      put(
+        x,
+        y,
+        edge ? palette.edge : shade ? palette.shade : highlight ? palette.highlight : palette.body,
+      );
+    }
+  }
+
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      width="30"
+      height="30"
+      role="img"
+      aria-label={`a ${state} samosa`}
+      shapeRendering="crispEdges"
+    >
+      {pixels}
+    </svg>
+  );
+}
 
 function HallOfBugs() {
   return (
@@ -568,24 +641,26 @@ function DeepDives() {
           title={`${DEEP_DIVES.length} ideas, no magic`}
           body="There is no model in the loop. There is arithmetic, a finite field and a probability bound."
         />
-        <div className="mt-12 space-y-10">
+        <div className="mt-12 space-y-16">
           {DEEP_DIVES.map((dive, i) => (
-            <div
-              key={dive.n}
-              className={`grid items-start gap-6 md:grid-cols-[auto_1fr] ${i % 2 ? 'md:pl-16' : ''}`}
-            >
-              <span className="font-display text-4xl text-[var(--color-gold)]">{dive.n}</span>
-              <div>
-                <h3 className="text-lg">{dive.title}</h3>
-                <p className="mt-2 max-w-[640px] text-[14px] leading-relaxed text-[var(--color-muted)]">
+            <div key={dive.n} className="grid items-center gap-8 md:grid-cols-2">
+              <div className={i % 2 ? 'md:order-2' : ''}>
+                <span className="font-display text-[13px] tracking-[0.25em] text-[var(--color-gold)]">
+                  {dive.n}
+                </span>
+                <h3 className="mt-2 text-xl">{dive.title}</h3>
+                <p className="mt-3 max-w-[520px] text-[14px] leading-relaxed text-[var(--color-muted)]">
                   {dive.body}
                 </p>
                 <a
                   href={dive.link}
-                  className="mt-2 inline-block text-[13px] text-[var(--color-gold)] hover:underline"
+                  className="mt-3 inline-block text-[13px] text-[var(--color-gold)] hover:underline"
                 >
                   read more →
                 </a>
+              </div>
+              <div className={i % 2 ? 'md:order-1' : ''}>
+                <DiveVisual index={i} />
               </div>
             </div>
           ))}
@@ -593,6 +668,146 @@ function DeepDives() {
       </div>
     </section>
   );
+}
+
+function DiveVisual({ index }: { index: number }) {
+  const box =
+    'rounded-lg border border-[var(--color-line)] bg-black/20 p-5 font-mono text-[11px] leading-relaxed text-[var(--color-muted)]';
+  const row = 'flex items-baseline justify-between gap-4';
+
+  switch (index) {
+    case 0:
+      return (
+        <div className={box}>
+          <div className="text-[var(--color-gold)]">the guarantee card</div>
+          <div className={`${row} mt-3`}>
+            <span>sizes</span>
+            <span className="text-[var(--color-text)]">(3,2) (2,3) (4,3)</span>
+          </div>
+          <div className={row}>
+            <span>trials per size</span>
+            <span className="text-[var(--color-text)]">3</span>
+          </div>
+          <div className={row}>
+            <span>primes</span>
+            <span className="text-[var(--color-text)]">2³¹−1 · 2147483629</span>
+          </div>
+          <div className={row}>
+            <span>degree bound</span>
+            <span className="text-[var(--color-text)]">d = 9</span>
+          </div>
+          <div className={`${row} mt-2 border-t border-[var(--color-line)] pt-2`}>
+            <span>a false ✓ is at most</span>
+            <span className="text-[var(--color-chutney)]">5.4 × 10⁻⁵¹</span>
+          </div>
+        </div>
+      );
+    case 1:
+      return (
+        <div className={box}>
+          <div className="text-[var(--color-gold)]">a derivative is a pair</div>
+          <div className="mt-3 text-[var(--color-text)]">(v, v̇) ⊗ (w, ẇ)</div>
+          <div className="text-[var(--color-chutney)]">= (v w, v̇ w + v ẇ)</div>
+          <div className="mt-4 text-[var(--color-text)]">(x, 1) ⊗ (x, 1)</div>
+          <div className="text-[var(--color-chutney)]">= (x², 2x)</div>
+          <p className="mt-3 text-[var(--color-faint)]">
+            the tangent rides along, exactly, over the same field
+          </p>
+        </div>
+      );
+    case 2: {
+      const four = [
+        [2, 1, 0, 1],
+        [0, 3, 1, 0],
+        [1, 0, 2, 1],
+        [0, 1, 0, 1],
+      ];
+      return (
+        <div className={box}>
+          <div className="text-[var(--color-gold)]">shrink until a person can read it</div>
+          <div className="mt-4 flex items-center justify-center gap-6">
+            <div>
+              <div className="grid grid-cols-4 gap-1">
+                {four.flat().map((value, i) => (
+                  <span
+                    key={i}
+                    className="flex h-7 w-7 items-center justify-center rounded border border-[var(--color-line)] text-[10px] text-[var(--color-muted)]"
+                  >
+                    {value}
+                  </span>
+                ))}
+              </div>
+              <div className="mt-2 text-center text-[10px] text-[var(--color-faint)]">4 by 4</div>
+            </div>
+            <span className="text-lg text-[var(--color-gold)]">→</span>
+            <div>
+              <div className="flex h-7 w-12 items-center justify-center rounded border border-[var(--color-chutney)]/50 text-[11px] text-[var(--color-chutney)]">
+                [ 1 ]
+              </div>
+              <div className="mt-2 text-center text-[10px] text-[var(--color-faint)]">1 by 1</div>
+            </div>
+          </div>
+          <p className="mt-4 text-[var(--color-faint)]">still wrong, and now readable</p>
+        </div>
+      );
+    }
+    case 3:
+      return (
+        <div className={box}>
+          <div className="text-[var(--color-gold)]">an agent, checking its own work</div>
+          <div className="mt-3">
+            <span className="text-[var(--color-slate)]">tool</span> samosa.check_derivation
+          </div>
+          <div>
+            <span className="text-[var(--color-slate)]">args</span> kalman.tex
+          </div>
+          <div className="mt-1 text-[var(--color-tamarind)]">
+            → row 7 ✗ wrong
+          </div>
+          <div className="text-[var(--color-muted)]">  an inverse where there should be none</div>
+          <div className="mt-2 text-[var(--color-chutney)]">→ fix applied · 8/8 rows hold</div>
+        </div>
+      );
+    case 4:
+      return (
+        <div className={box}>
+          <div className="text-[var(--color-gold)]">the pull request, annotated</div>
+          <div className="mt-3 rounded border-l-2 border-[var(--color-tamarind)] bg-[var(--color-tamarind)]/10 p-3">
+            <div className="text-[var(--color-tamarind)]">
+              ::error file=paper/appendix.tex,line=132,col=18
+            </div>
+            <div className="mt-1 text-[var(--color-text)]">the two sides are not equal</div>
+            <div className="text-[var(--color-muted)]">off by exactly + K_t Q_t K_tᵀ</div>
+          </div>
+          <div className="mt-3 text-[var(--color-tamarind)]">the job failed with 1 error</div>
+        </div>
+      );
+    default:
+      return (
+        <div className={box}>
+          <div className="text-[var(--color-gold)]">39 papers, measured</div>
+          <div className="mt-3">
+            <div className={row}>
+              <span>parses</span>
+              <span className="text-[var(--color-text)]">86.8%</span>
+            </div>
+            <div className="mt-1 h-1.5 rounded bg-[var(--color-line)]">
+              <div className="h-full rounded bg-[var(--color-gold)]" style={{ width: '86.8%' }} />
+            </div>
+          </div>
+          <div className="mt-4">
+            <div className={row}>
+              <span>checkable</span>
+              <span className="text-[var(--color-text)]">50.0%</span>
+            </div>
+            <div className="mt-1 h-1.5 rounded bg-[var(--color-line)]">
+              <div className="h-full rounded bg-[var(--color-chutney)]" style={{ width: '50%' }} />
+            </div>
+          </div>
+          <p className="mt-4 text-[var(--color-faint)]">the gaps are named, and published</p>
+        </div>
+      );
+  }
 }
 
 function MenuSection() {

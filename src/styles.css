@@ -25,6 +25,7 @@
   --color-chutney: #5bc27a;
   --color-tamarind: #e0533d;
   --color-slate: #7a8594;
+  --color-wash: #ffffff06;
 
   --font-mono: 'Geist Mono Variable', ui-monospace, 'JetBrains Mono', monospace;
   --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
@@ -35,6 +36,27 @@
 :root {
   color-scheme: dark;
   --dot: #ffffff0d;
+}
+
+/* The same terminal, printed on paper. The palette is the only thing that
+   changes; every panel reads its colours from these names. */
+html[data-theme='light'] {
+  color-scheme: light;
+  --dot: #0000000d;
+  --color-ink: #fbf8f1;
+  --color-panel: #f4efe4;
+  --color-panel-2: #eae3d5;
+  --color-line: #d9d0bf;
+  --color-line-soft: #e6ded0;
+  --color-text: #221d17;
+  --color-muted: #665d50;
+  --color-faint: #8b8173;
+  --color-gold: #9a6a12;
+  --color-saffron: #a85a0d;
+  --color-chutney: #1e7a3c;
+  --color-tamarind: #b33a27;
+  --color-slate: #5a6573;
+  --color-wash: #00000008;
 }
 
 html,
@@ -96,6 +118,12 @@ body {
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--color-faint);
+}
+/* the panes are boxes, so their titles draw the corner of one */
+.pane-title::before {
+  content: '┌─';
+  margin-right: 5px;
+  color: var(--color-line);
 }
 
 kbd {
@@ -234,6 +262,25 @@ kbd {
 /* the nonzero cells of the difference, which are the ones that matter */
 .samosa-diff .katex {
   filter: drop-shadow(0 0 6px #e0533d33);
+}
+
+/* the wrong row of the typed demo breathes, so the eye finds it */
+@keyframes samosa-bad-pulse {
+  0%,
+  100% {
+    text-shadow: 0 0 0 transparent;
+  }
+  50% {
+    text-shadow: 0 0 12px #e0533d99;
+  }
+}
+.demo-bad {
+  animation: samosa-bad-pulse 2.8s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .demo-bad {
+    animation: none;
+  }
 }
 
 /* the ASCII samosa */
