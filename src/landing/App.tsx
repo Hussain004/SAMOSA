@@ -751,7 +751,7 @@ const CHANGELOG = [
   {
     date: '2026-10-21',
     title: 'The Joseph form',
-    body: 'The Kalman update of Lecture 8, with its two planted bugs.',
+    body: 'The Kalman update, with its two planted bugs.',
   },
   {
     date: '2026-10-21',

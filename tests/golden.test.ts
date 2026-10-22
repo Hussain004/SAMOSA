@@ -3,7 +3,7 @@ import { check } from '../src/core/verdict.ts';
 
 /**
  * The golden derivation: the Kalman measurement update from Mobile Robotics
- * Lecture 8, with the planted bugs of Appendix A.
+ * The Kalman measurement update, with two planted bugs.
  */
 
 const DECLS = String.raw`x_t, \bar\mu_t, \mu_t: n; z_t: m; C_t: m×n; Q_t: spd m; \bar\Sigma_t, \Sigma_t: spd n`;
