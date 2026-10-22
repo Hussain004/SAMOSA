@@ -8443,6 +8443,237 @@ function operand(node) {
   return text;
 }
 
+// src/core/numpy.ts
+var ACCENTS2 = /* @__PURE__ */ new Set([
+  "bar",
+  "hat",
+  "overline",
+  "tilde",
+  "widetilde",
+  "check",
+  "dot",
+  "ddot",
+  "vec",
+  "mathbf",
+  "boldsymbol",
+  "bm",
+  "mathcal",
+  "mathrm",
+  "mathsf",
+  "mathtt"
+]);
+function sanitizeName(name) {
+  const accents = [];
+  let rest = name;
+  while (rest.startsWith("\\")) {
+    const command = rest.slice(1).match(/^[A-Za-z]+/)?.[0] ?? "";
+    if (!command || !ACCENTS2.has(command)) break;
+    accents.push(command);
+    rest = rest.slice(1 + command.length);
+  }
+  const cut = rest.search(/[_^]/);
+  const base = (cut < 0 ? rest : rest.slice(0, cut)).replace(/[^A-Za-z0-9]/g, "") || "x";
+  const suffix = cut < 0 ? "" : rest.slice(cut);
+  return accents.length ? `${base}_${accents.join("_")}${suffix}` : `${base}${suffix}`;
+}
+function numpyNames(symbols) {
+  const map = /* @__PURE__ */ new Map();
+  const order = [];
+  const used = /* @__PURE__ */ new Set();
+  for (const symbol of symbols) {
+    let name = sanitizeName(symbol);
+    let n = 2;
+    while (used.has(name)) name = `${sanitizeName(symbol)}_${n++}`;
+    used.add(name);
+    map.set(symbol, name);
+    order.push(symbol);
+  }
+  return { map, order };
+}
+function isMatrixType(ctx, node) {
+  if (node.k === "sym") {
+    const info = ctx.symbols.get(node.name);
+    return info?.ty.t === "mat";
+  }
+  if (node.k === "num") return false;
+  if (node.k === "op") {
+    switch (node.op) {
+      case "add":
+      case "sub":
+      case "mul":
+      case "T":
+      case "inv":
+      case "invT":
+        return isMatrixType(ctx, node.args[0]);
+      default:
+        return false;
+    }
+  }
+  if (node.k === "call") {
+    if (node.fn === "det" || node.fn === "tr") return false;
+    return isMatrixType(ctx, node.args[0]);
+  }
+  return false;
+}
+function numpyExpression(node, ctx, names) {
+  switch (node.k) {
+    case "num": {
+      const v = node.value;
+      if (v.d === 1) return `Fraction(${v.n})`;
+      return `Fraction(${v.n}, ${v.d})`;
+    }
+    case "sym": {
+      const name = names.map.get(node.name);
+      return name ?? `Fraction(0)`;
+    }
+    case "op": {
+      const args = node.args.map((a) => numpyExpression(a, ctx, names));
+      switch (node.op) {
+        case "add":
+          return `(${args[0]} + ${args[1]})`;
+        case "sub":
+          return `(${args[0]} - ${args[1]})`;
+        case "neg":
+          return `(-${args[0]})`;
+        case "mul": {
+          const bothMatrices = node.args.every((a) => isMatrixType(ctx, a));
+          return bothMatrices ? `(${args[0]} @ ${args[1]})` : `(${args[0]} * ${args[1]})`;
+        }
+        case "div":
+          return `(${args[0]} / ${args[1]})`;
+        case "inv":
+          return `_inv(${args[0]})`;
+        case "invT":
+          return `_inv(${args[0]}).T`;
+        case "T":
+          return `(${args[0]}).T`;
+        case "pow":
+          return `(${args[0]}) ** ${args[1]}`;
+        case "tr":
+          return `_tr(${args[0]})`;
+        case "det":
+          return `_det(${args[0]})`;
+        case "frob":
+          return `_frob(${args[0]})`;
+        case "norm2":
+          return `(${args[0]}) * (${args[0]})`;
+        case "inner":
+          return `_inner(${args[0]}, ${args[1]})`;
+        case "diag":
+          return `_diag(${args[0]})`;
+        case "abs":
+          return `_abs(${args[0]})`;
+        case "sqrtm":
+          return `_sqrtm(${args[0]})`;
+        default:
+          return `Fraction(0)`;
+      }
+    }
+    case "call": {
+      const args = node.args.map((a) => numpyExpression(a, ctx, names));
+      if (node.fn === "tr") return `_tr(${args[0]})`;
+      if (node.fn === "det") return `_det(${args[0]})`;
+      if (node.fn === "frob") return `_frob(${args[0]})`;
+      if (node.fn === "norm2") return `(${args[0]}) * (${args[0]})`;
+      if (node.fn === "sqrtm") return `_sqrtm(${args[0]})`;
+      if (node.fn === "exp") return `(_exp(${args[0]}))`;
+      return `Fraction(0)`;
+    }
+    default:
+      return `Fraction(0)`;
+  }
+}
+function symbolsOf(node, into = /* @__PURE__ */ new Set()) {
+  if (!node) return into;
+  switch (node.k) {
+    case "sym":
+      into.add(node.name);
+      return into;
+    case "op":
+    case "call":
+      for (const arg of node.args) symbolsOf(arg, into);
+      return into;
+    case "deriv":
+      symbolsOf(node.f, into);
+      for (const w of node.wrt) symbolsOf(w, into);
+      return into;
+    case "expect":
+      for (const arg of node.args) symbolsOf(arg, into);
+      return into;
+    case "bigop":
+      symbolsOf(node.body, into);
+      return into;
+    case "block":
+      for (const row of node.rows) for (const cell of row) symbolsOf(cell, into);
+      return into;
+    default:
+      return into;
+  }
+}
+var NUMPY_PRELUDE = `from fractions import Fraction
+import numpy as np
+
+
+def _inv(a):
+    n = len(a)
+    m = [list(a[i]) + [Fraction(int(i == j)) for j in range(n)] for i in range(n)]
+    for c in range(n):
+        p = next((r for r in range(c, n) if m[r][c] != 0), None)
+        if p is None:
+            raise ZeroDivisionError("the matrix is singular")
+        m[c], m[p] = m[p], m[c]
+        d = m[c][c]
+        m[c] = [x / d for x in m[c]]
+        for r in range(n):
+            if r != c and m[r][c] != 0:
+                f = m[r][c]
+                m[r] = [x - f * y for x, y in zip(m[r], m[c])]
+    return np.array([row[n:] for row in m], dtype=object)
+
+
+def _tr(a):
+    return sum((a[i][i] for i in range(len(a))), Fraction(0))
+
+
+def _det(a):
+    n = len(a)
+    if n == 1:
+        return a[0][0]
+    if n == 2:
+        return a[0][0] * a[1][1] - a[0][1] * a[1][0]
+    total = Fraction(0)
+    for j in range(n):
+        minor = np.array([[a[i][k] for k in range(n) if k != j] for i in range(1, n)], dtype=object)
+        sign = 1 if j % 2 == 0 else -1
+        total += sign * a[0][j] * _det(minor)
+    return total
+
+
+def _frob(a):
+    return sum((x * x for row in a for x in row), Fraction(0))
+
+
+def _inner(a, b):
+    return sum((x * y for ra, rb in zip(a, b) for x, y in zip(ra, rb)), Fraction(0))
+
+
+def _diag(a):
+    n = len(a)
+    return np.array([[a[i][i] if i == j else Fraction(0) for j in range(n)] for i in range(n)], dtype=object)
+
+
+def _abs(a):
+    return abs(a)
+
+
+def _sqrtm(a):
+    return _inv(a) if len(a) == 1 else a
+
+
+def _exp(a):
+    return Fraction(0)
+`;
+
 // src/core/shrink.ts
 function shrinkCounterexample(ctx, lhs, rhs, defs, sizes, seed, budgetMs = 200) {
   const started = Date.now();
@@ -8483,7 +8714,7 @@ function shrinkCounterexample(ctx, lhs, rhs, defs, sizes, seed, budgetMs = 200) 
     const l = evalNode(field, lhs, env);
     const r = evalNode(field, rhs, env);
     if (!equal(field, l, r)) {
-      return describe(ctx, sizes, values, derivedValues(field, env, defs), (name) => ctx.symbols.get(name)?.props ?? [], l, r, field, true);
+      return describe(ctx, sizes, values, derivedValues(field, env, defs), (name) => ctx.symbols.get(name)?.props ?? [], lhs, rhs, defs, l, r, field, true);
     }
   } catch {
   }
@@ -8523,7 +8754,7 @@ function searchSmallIntegers(sh, range, seed) {
       const l = evalNode(field, sh.lhs, env);
       const r = evalNode(field, sh.rhs, env);
       if (equal(field, l, r)) continue;
-      return describe(ctx, sizes, values, derivedValues(field, env, sh.defs), sh.propOf, l, r, field, false);
+      return describe(ctx, sizes, values, derivedValues(field, env, sh.defs), sh.propOf, sh.lhs, sh.rhs, sh.defs, l, r, field, false);
     } catch {
       continue;
     }
@@ -8582,7 +8813,7 @@ function equal(field, a, b) {
   }
   return false;
 }
-function describe(ctx, sizes, values, derived, propOf, lhs, rhs, field, residue) {
+function describe(ctx, sizes, values, derived, propOf, lhsNode, rhsNode, defs, lhs, rhs, field, residue) {
   const dims = {};
   for (const [root, size] of sizes) {
     const declared = ctx.dimVars.find((d) => ctx.dims.find(d) === root);
@@ -8613,49 +8844,69 @@ function describe(ctx, sizes, values, derived, propOf, lhs, rhs, field, residue)
     lhs: lhsPlain,
     rhs: rhsPlain,
     diff: diffPlain,
-    numpy: toNumpy(plain, dims, derivedPlain)
+    numpy: toNumpy(ctx, sizes, lhsNode, rhsNode, defs, plain)
   };
 }
-function toNumpy(values, _dims, derived = {}) {
-  const lines = ["import numpy as np"];
-  const names = Object.keys(values);
-  names.forEach((name, i2) => {
-    const v = values[name];
-    const pyName = `s${i2}`;
-    if (typeof v === "number") {
-      lines.push(`${pyName} = ${v}`);
-    } else {
-      const rows = [];
-      const c = Math.max(1, Math.round(Math.sqrt(v.length)));
-      for (let i3 = 0; i3 < v.length; i3 += c) {
-        rows.push(`[${v.slice(i3, i3 + c).map((x2) => Number(x2.toFixed(6))).join(", ")}]`);
+function toNumpy(ctx, sizes, lhsNode, rhsNode, defs, values) {
+  const symbols = /* @__PURE__ */ new Set();
+  for (const name of symbolsOf(lhsNode)) symbols.add(name);
+  for (const name of symbolsOf(rhsNode)) symbols.add(name);
+  for (const name of defs.keys()) symbols.add(name);
+  for (const node of defs.values()) {
+    for (const name of symbolsOf(node)) symbols.add(name);
+  }
+  const names = numpyNames([...symbols]);
+  const lines = [NUMPY_PRELUDE, ""];
+  lines.push("# the values that break the step");
+  for (const symbol of names.order) {
+    if (defs.has(symbol)) continue;
+    const value = values[symbol];
+    if (value === void 0) {
+      const info = ctx.symbols.get(symbol);
+      if (info && info.props.includes("ident")) {
+        const size = info.ty.t === "mat" ? dimSizeOf(ctx, info.ty.r, sizes) : 1;
+        lines.push(`${names.map.get(symbol)} = np.eye(${size}, dtype=object)`);
       }
-      lines.push(`${pyName} = np.array([${rows.join(", ")}])`);
+      continue;
     }
-  });
-  const derivedNames = Object.keys(derived);
-  if (derivedNames.length) {
+    const shape = shapeOf(ctx, symbol, sizes);
+    lines.push(`${names.map.get(symbol)} = ${literal(value, shape)}`);
+  }
+  const defined = [...defs.keys()].filter((name) => names.map.has(name));
+  if (defined.length) {
     lines.push("");
-    lines.push("# the symbols the derivation defines, computed by SAMOSA from the values above");
-    derivedNames.forEach((name, i2) => {
-      const v = derived[name];
-      const pyName = `d${i2}`;
-      if (typeof v === "number") {
-        lines.push(`${pyName} = ${v}  # ${name}`);
-      } else {
-        const rows = [];
-        const c = Math.max(1, Math.round(Math.sqrt(v.length)));
-        for (let i3 = 0; i3 < v.length; i3 += c) {
-          rows.push(`[${v.slice(i3, i3 + c).map((x2) => Number(x2.toFixed(6))).join(", ")}]`);
-        }
-        lines.push(`${pyName} = np.array([${rows.join(", ")}])  # ${name}`);
-      }
-    });
+    lines.push("# the symbols the derivation defines, computed from the values above");
+    for (const name of defined) {
+      const node = defs.get(name);
+      if (!node) continue;
+      lines.push(`${names.map.get(name)} = ${numpyExpression(node, ctx, names)}`);
+    }
   }
   lines.push("");
   lines.push("# the two sides of the step, with these values");
-  lines.push("# lhs - rhs is not zero");
+  lines.push(`lhs = ${numpyExpression(lhsNode, ctx, names)}`);
+  lines.push(`rhs = ${numpyExpression(rhsNode, ctx, names)}`);
+  lines.push("print(lhs - rhs)");
+  lines.push("");
+  lines.push("# the values above are the ones SAMOSA found; the two sides differ with them");
   return lines.join("\n");
+}
+function shapeOf(ctx, symbol, sizes) {
+  const info = ctx.symbols.get(symbol);
+  if (!info || info.ty.t !== "mat") return [1, 1];
+  const r = dimSizeOf(ctx, info.ty.r, sizes);
+  const c = dimSizeOf(ctx, info.ty.c, sizes);
+  return [r, c];
+}
+function literal(value, shape) {
+  if (typeof value === "number") return `Fraction('${value}')`;
+  const [rows, cols] = shape;
+  const out = [];
+  for (let i2 = 0; i2 < rows; i2++) {
+    const row = value.slice(i2 * cols, (i2 + 1) * cols).map((x2) => `Fraction('${x2}')`);
+    out.push(`[${row.join(", ")}]`);
+  }
+  return `np.array([${out.join(", ")}], dtype=object)`;
 }
 
 // src/core/repair.ts

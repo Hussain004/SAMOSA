@@ -1,16 +1,17 @@
 import Decimal from 'decimal.js';
 import { GFpField } from './fields/gfp.ts';
 import { DecField } from './fields/dec.ts';
-import { matInv, matMul, matSub, type Mat } from './linalg.ts';
+import { type Mat } from './linalg.ts';
 import { evalNode, makeEnv } from './evaluate.ts';
 import { Sampler } from './sample.ts';
 import { rngFor } from './prng.ts';
 import type { Field } from './fields/types.ts';
 import type { Node } from './ir.ts';
-import { isMatrixVal, isScalarVal, type Val } from './value.ts';
-import type { SymbolInfo, TypeContext } from './types.ts';
+import { type Val } from './value.ts';
+import type { TypeContext } from './types.ts';
 import type { Prop } from './decl.ts';
 import { dimSizeOf } from './types.ts';
+import { NUMPY_PRELUDE, numpyExpression, numpyNames, symbolsOf } from './numpy.ts';
 
 /**
  * Counterexample shrinking.
@@ -110,7 +111,7 @@ export function shrinkCounterexample(
     const l = evalNode(field, lhs, env);
     const r = evalNode(field, rhs, env);
     if (!equal(field, l, r)) {
-      return describe(ctx, sizes, values, derivedValues(field, env, defs), (name) => ctx.symbols.get(name)?.props ?? [], l, r, field, true);
+      return describe(ctx, sizes, values, derivedValues(field, env, defs), (name) => ctx.symbols.get(name)?.props ?? [], lhs, rhs, defs, l, r, field, true);
     }
   } catch {
     // fall through, the caller keeps the original counterexample
@@ -169,7 +170,7 @@ function searchSmallIntegers(sh: ShrinkCtx, range: number, seed: number): Shrunk
       const l = evalNode(field, sh.lhs, env);
       const r = evalNode(field, sh.rhs, env);
       if (equal(field, l, r)) continue;
-      return describe(ctx, sizes, values, derivedValues(field, env, sh.defs), sh.propOf, l, r, field, false);
+      return describe(ctx, sizes, values, derivedValues(field, env, sh.defs), sh.propOf, sh.lhs, sh.rhs, sh.defs, l, r, field, false);
     } catch {
       continue;
     }
@@ -259,6 +260,9 @@ function describe<T>(
   values: Map<string, Val<T>>,
   derived: Map<string, Val<T>>,
   propOf: (name: string) => Prop[],
+  lhsNode: Node,
+  rhsNode: Node,
+  defs: Map<string, Node>,
   lhs: Val<T>,
   rhs: Val<T>,
   field: Field<T>,
@@ -307,57 +311,93 @@ function describe<T>(
     lhs: lhsPlain,
     rhs: rhsPlain,
     diff: diffPlain,
-    numpy: toNumpy(plain, dims, derivedPlain),
+    numpy: toNumpy(ctx, sizes, lhsNode, rhsNode, defs, plain),
   };
 }
 
-/** A self contained NumPy snippet that reproduces the counterexample. */
+/**
+ * A self contained NumPy snippet that reproduces the counterexample.
+ *
+ * The snippet names the symbols the way a person can type them, uses the
+ * declared shapes, computes the symbols the derivation defines, and prints
+ * the difference of the two sides. Run it, and it shows why the step fails.
+ */
 export function toNumpy(
+  ctx: TypeContext,
+  sizes: Map<string, number>,
+  lhsNode: Node,
+  rhsNode: Node,
+  defs: Map<string, Node>,
   values: Record<string, number[] | number>,
-  _dims: Record<string, number>,
-  derived: Record<string, number[] | number> = {},
 ): string {
-  const lines: string[] = ['import numpy as np'];
-  const names = Object.keys(values);
-  names.forEach((name, i) => {
-    const v = values[name];
-    const pyName = `s${i}`;
-    if (typeof v === 'number') {
-      lines.push(`${pyName} = ${v}`);
-    } else {
-      const rows: string[] = [];
-      const c = Math.max(1, Math.round(Math.sqrt(v.length)));
-      for (let i = 0; i < v.length; i += c) {
-        rows.push(`[${v.slice(i, i + c).map((x) => Number(x.toFixed(6))).join(', ')}]`);
-      }
-      lines.push(`${pyName} = np.array([${rows.join(', ')}])`);
-    }
-  });
-  const derivedNames = Object.keys(derived);
-  if (derivedNames.length) {
-    lines.push('');
-    lines.push('# the symbols the derivation defines, computed by SAMOSA from the values above');
-    derivedNames.forEach((name, i) => {
-      const v = derived[name];
-      const pyName = `d${i}`;
-      if (typeof v === 'number') {
-        lines.push(`${pyName} = ${v}  # ${name}`);
-      } else {
-        const rows: string[] = [];
-        const c = Math.max(1, Math.round(Math.sqrt(v.length)));
-        for (let i = 0; i < v.length; i += c) {
-          rows.push(`[${v.slice(i, i + c).map((x) => Number(x.toFixed(6))).join(', ')}]`);
-        }
-        lines.push(`${pyName} = np.array([${rows.join(', ')}])  # ${name}`);
-      }
-    });
+  const symbols = new Set<string>();
+  for (const name of symbolsOf(lhsNode)) symbols.add(name);
+  for (const name of symbolsOf(rhsNode)) symbols.add(name);
+  for (const name of defs.keys()) symbols.add(name);
+  // a definition is written with other symbols, and they are inputs too
+  for (const node of defs.values()) {
+    for (const name of symbolsOf(node)) symbols.add(name);
   }
+  const names = numpyNames([...symbols]);
+
+  const lines: string[] = [NUMPY_PRELUDE, ''];
+  lines.push('# the values that break the step');
+  for (const symbol of names.order) {
+    if (defs.has(symbol)) continue;
+    const value = values[symbol];
+    if (value === undefined) {
+      // the identity is not a free value, it is built
+      const info = ctx.symbols.get(symbol);
+      if (info && info.props.includes('ident')) {
+        const size = info.ty.t === 'mat' ? dimSizeOf(ctx, info.ty.r, sizes) : 1;
+        lines.push(`${names.map.get(symbol)} = np.eye(${size}, dtype=object)`);
+      }
+      continue;
+    }
+    const shape = shapeOf(ctx, symbol, sizes);
+    lines.push(`${names.map.get(symbol)} = ${literal(value, shape)}`);
+  }
+
+  const defined = [...defs.keys()].filter((name) => names.map.has(name));
+  if (defined.length) {
+    lines.push('');
+    lines.push('# the symbols the derivation defines, computed from the values above');
+    for (const name of defined) {
+      const node = defs.get(name);
+      if (!node) continue;
+      lines.push(`${names.map.get(name)} = ${numpyExpression(node, ctx, names)}`);
+    }
+  }
+
   lines.push('');
   lines.push('# the two sides of the step, with these values');
-  lines.push('# lhs - rhs is not zero');
+  lines.push(`lhs = ${numpyExpression(lhsNode, ctx, names)}`);
+  lines.push(`rhs = ${numpyExpression(rhsNode, ctx, names)}`);
+  lines.push('print(lhs - rhs)');
+  lines.push('');
+  lines.push('# the values above are the ones SAMOSA found; the two sides differ with them');
   return lines.join('\n');
 }
 
-export { matInv, matMul, matSub };
-export type { SymbolInfo };
-export { isMatrixVal, isScalarVal };
+/** The shape of a symbol, in the sizes the instance was found at. */
+function shapeOf(ctx: TypeContext, symbol: string, sizes: Map<string, number>): [number, number] {
+  const info = ctx.symbols.get(symbol);
+  if (!info || info.ty.t !== 'mat') return [1, 1];
+  const r = dimSizeOf(ctx, info.ty.r, sizes);
+  const c = dimSizeOf(ctx, info.ty.c, sizes);
+  return [r, c];
+}
+
+/** A value as Python, with the shape it has. */
+function literal(value: number[] | number, shape: [number, number]): string {
+  if (typeof value === 'number') return `Fraction('${value}')`;
+  const [rows, cols] = shape;
+  const out: string[] = [];
+  for (let i = 0; i < rows; i++) {
+    const row = value
+      .slice(i * cols, (i + 1) * cols)
+      .map((x) => `Fraction('${x}')`);
+    out.push(`[${row.join(', ')}]`);
+  }
+  return `np.array([${out.join(', ')}], dtype=object)`;
+}
