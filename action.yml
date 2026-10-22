@@ -21,22 +21,36 @@ inputs:
     description: 'The seed of the sampling, so the run is reproducible.'
     required: false
     default: '0'
+  preset:
+    description: 'The id of a Cookbook preset to check instead of a file.'
+    required: false
+    default: ''
 runs:
   using: 'composite'
   steps:
     - name: 'Check the derivation'
+      # The inputs arrive as environment variables, never interpolated into
+      # the script: an input is data, and data must not become code.
       # The pattern is quoted, so the command expands it and the shell does
       # not eat the stars. The SARIF goes in a file, because that is what the
       # upload step reads; the other formats are printed, because that is
       # what the annotations are made of.
+      env:
+        SAMOSA_PATH: ${{ inputs.path }}
+        SAMOSA_FAIL_ON: ${{ inputs.fail-on }}
+        SAMOSA_FORMAT: ${{ inputs.format }}
+        SAMOSA_SEED: ${{ inputs.seed }}
+        SAMOSA_PRESET: ${{ inputs.preset }}
       run: |
-        if [ "${{ inputs.format }}" = "sarif" ]; then
-          node $GITHUB_ACTION_PATH/pkg/dist/cli.mjs check "${{ inputs.path }}" \
-            --format sarif --fail-on "${{ inputs.fail-on }}" --seed "${{ inputs.seed }}" \
-            --output samosa.sarif
+        set -euo pipefail
+        args=(check "$SAMOSA_PATH" --format "$SAMOSA_FORMAT" --fail-on "$SAMOSA_FAIL_ON" --seed "$SAMOSA_SEED")
+        if [ -n "$SAMOSA_PRESET" ]; then
+          args+=(--preset "$SAMOSA_PRESET")
+        fi
+        if [ "$SAMOSA_FORMAT" = "sarif" ]; then
+          node "$GITHUB_ACTION_PATH/pkg/dist/cli.mjs" "${args[@]}" --output samosa.sarif
         else
-          node $GITHUB_ACTION_PATH/pkg/dist/cli.mjs check "${{ inputs.path }}" \
-            --format "${{ inputs.format }}" --fail-on "${{ inputs.fail-on }}" --seed "${{ inputs.seed }}"
+          node "$GITHUB_ACTION_PATH/pkg/dist/cli.mjs" "${args[@]}"
         fi
       shell: bash
     - name: 'Upload the results'
