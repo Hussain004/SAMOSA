@@ -67,3 +67,34 @@ describe('parseRow', () => {
     expect(row.parts[0].conclusion).toBeTruthy();
   });
 });
+
+describe('conditioning and the long delimiters', () => {
+  it('reads a conditional call, and names what it cannot check', () => {
+    const row = parseRow('', String.raw`p(x \mid y) = p(x)`, 0, 0);
+    expect(row.error).toBeUndefined();
+    expect(row.parts[0].lhs).toMatchObject({ k: 'raw', text: 'a conditional distribution' });
+  });
+
+  it('reads a conditional expectation, and names what it cannot check', () => {
+    const row = parseRow('', String.raw`\mathbb{E}[X \mid Y] = \mu`, 0, 0);
+    expect(row.error).toBeUndefined();
+    expect(row.parts[0].lhs).toMatchObject({ k: 'raw', text: 'a conditional expectation' });
+  });
+
+  it('reads the long norm delimiters', () => {
+    const row = parseRow('', String.raw`\lVert x \rVert = 1`, 0, 0);
+    expect(row.parts[0].lhs).toMatchObject({ k: 'raw', text: String.raw`the unsquared norm \|2\|` });
+  });
+
+  it('checks a squared long norm', () => {
+    const row = parseRow('', String.raw`\lVert A \rVert_F^2 = \operatorname{tr}(A^\top A)`, 0, 0);
+    expect(row.parts[0].lhs).toMatchObject({ k: 'op', op: 'frob' });
+  });
+
+  it('reads the double bar of a divergence', () => {
+    const row = parseRow('', String.raw`D(p \Vert q) \le 1`, 0, 0);
+    expect(row.parts[0].lhs).toMatchObject({ k: 'call', fn: 'D' });
+    const call = row.parts[0].lhs as { k: 'call'; args: unknown[] };
+    expect(call.args.length).toBe(2);
+  });
+});

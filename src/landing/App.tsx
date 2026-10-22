@@ -627,7 +627,7 @@ const DEEP_DIVES = [
   {
     n: '06',
     title: 'It reads real papers',
-    body: 'Of the display math of 39 recent papers, 86.8% parses and 50.0% is understood well enough to check. The number is measured, and published.',
+    body: 'Of the claim rows in the display math of 36 recent papers, 9.6% parses end to end and 3.4% is understood well enough to check. The first measurement was lenient; this one parses the whole row, and the correction is published.',
     link: '/docs/COVERAGE.md',
   },
 ];
@@ -785,26 +785,31 @@ function DiveVisual({ index }: { index: number }) {
     default:
       return (
         <div className={box}>
-          <div className="text-[var(--color-gold)]">39 papers, measured</div>
+          <div className="text-[var(--color-gold)]">36 papers, measured</div>
+          <div className={`${row} mt-2`}>
+            <span>claim rows</span>
+            <span className="text-[var(--color-text)]">1219</span>
+          </div>
+          <div className="text-[var(--color-faint)]">197 rows make no claim, and are not counted</div>
           <div className="mt-3">
             <div className={row}>
-              <span>parses</span>
-              <span className="text-[var(--color-text)]">86.8%</span>
+              <span>parses end to end</span>
+              <span className="text-[var(--color-text)]">9.6%</span>
             </div>
             <div className="mt-1 h-1.5 rounded bg-[var(--color-line)]">
-              <div className="h-full rounded bg-[var(--color-gold)]" style={{ width: '86.8%' }} />
+              <div className="h-full rounded bg-[var(--color-gold)]" style={{ width: '9.6%' }} />
             </div>
           </div>
           <div className="mt-4">
             <div className={row}>
-              <span>checkable</span>
-              <span className="text-[var(--color-text)]">50.0%</span>
+              <span>understood enough to check</span>
+              <span className="text-[var(--color-text)]">3.4%</span>
             </div>
             <div className="mt-1 h-1.5 rounded bg-[var(--color-line)]">
-              <div className="h-full rounded bg-[var(--color-chutney)]" style={{ width: '50%' }} />
+              <div className="h-full rounded bg-[var(--color-chutney)]" style={{ width: '3.4%' }} />
             </div>
           </div>
-          <p className="mt-4 text-[var(--color-faint)]">the gaps are named, and published</p>
+          <p className="mt-4 text-[var(--color-faint)]">the first number was lenient; this one parses the whole row, and the correction is published</p>
         </div>
       );
   }

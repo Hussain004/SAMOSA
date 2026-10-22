@@ -140,18 +140,21 @@ counterexample, and tells you the term you are missing.
 
 ## How much of a real paper it reads
 
-Measured, not guessed. The display math of 39 recent papers from cs.LG,
-cs.RO and stat.ML, 1498 rows:
+Measured, not guessed. The display math of 36 recent papers from cs.LG,
+cs.RO and stat.ML, 1416 rows. 197 rows make no claim and are excluded; of
+the 1219 claim rows:
 
 | | |
 | --- | --- |
-| rows SAMOSA can parse | 1300 (**86.8%**) |
-| rows SAMOSA reads with no unknown construct | 749 (**50.0%**) |
+| rows that parse end to end | 117 (**9.6%**) |
+| rows with no unknown construct | 41 (**3.4%**) |
 
-The gap is rows that parse but contain something SAMOSA does not know, such
-as a `\mid` used as a conditional bar, or a macro the authors defined in
-their own preamble. The method and the full list of what stops the rest are
-in [docs/COVERAGE.md](docs/COVERAGE.md).
+The first version of this table parsed only the first expression of each row
+and reported 86.8% and 50.0%. It was lenient, and this one replaces it. Most
+of the gap is the end of the row: a `where` clause, a parenthetical
+condition, a `cases` block, and the macros the authors define themselves.
+The method, the correction and the full list of what stops the rest are in
+[docs/COVERAGE.md](docs/COVERAGE.md).
 
 And the Cookbook: 48 identities in matrix algebra, calculus and stochastics,
 with the mistakes the catalog can make of them.

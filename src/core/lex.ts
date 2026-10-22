@@ -146,6 +146,29 @@ export function tokenize(src: string): Token[] {
           // spacing commands swallow the following space
           continue;
         }
+        // The conditional bar. It is a bar, not an absolute value, but the
+        // parser only finds out which by where it is: inside a call it
+        // separates the condition.
+        if (name === 'mid') {
+          push('csym', '|', start, i);
+          continue;
+        }
+        if (name === 'middle') {
+          if (text[i] === '|') {
+            i++;
+            push('csym', '|', start, i);
+          }
+          continue;
+        }
+        // The long forms of the norm and the absolute value delimiters.
+        if (name === 'lVert' || name === 'rVert' || name === 'Vert') {
+          push('csym', '\\|', start, i);
+          continue;
+        }
+        if (name === 'lvert' || name === 'rvert') {
+          push('csym', '|', start, i);
+          continue;
+        }
         if (DROP_COMMANDS.has(name)) {
           continue;
         }

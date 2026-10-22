@@ -38,8 +38,9 @@ The first release.
 
 ### Measured
 
-- 86.8% of the display math of 39 recent arXiv papers parses, and 50.0% is
-  understood well enough to check. The method is in
+- 9.6% of the claim rows in the display math of 36 recent arXiv papers
+  parses end to end, and 3.4% is understood well enough to check. The first
+  measurement was lenient; the correction and the method are in
   [docs/COVERAGE.md](docs/COVERAGE.md).
 
 [1.0.0]: https://github.com/Hussain004/SAMOSA/releases/tag/v1.0.0

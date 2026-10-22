@@ -36,15 +36,23 @@ async function main(): Promise<void> {
   console.log(`the sample is ${PAPER_COUNT} papers from ${CATEGORIES.join(', ')}`);
 
   const ids: string[] = [];
-  for (const category of CATEGORIES) {
-    const url = `http://export.arxiv.org/api/query?search_query=cat:${category}&max_results=${Math.ceil(
-      PAPER_COUNT / CATEGORIES.length,
-    )}&sortBy=submittedDate&sortOrder=descending`;
-    const xml = await fetchText(url);
-    for (const match of xml.matchAll(/<id>http:\/\/arxiv\.org\/abs\/([^<]+)<\/id>/g)) {
-      ids.push(match[1]);
+  const priorReport = resolve(cache, 'coverage.json');
+  if (process.env.SAMOSA_COVERAGE_OFFLINE === '1' && existsSync(priorReport)) {
+    // the same sample as the last run, so a parser change can be compared
+    const prior = JSON.parse(readFileSync(priorReport, 'utf8')) as { ids?: string[] };
+    ids.push(...(prior.ids ?? []));
+    console.log(`offline: the ${ids.length} papers of the previous measurement are the sample`);
+  } else {
+    for (const category of CATEGORIES) {
+      const url = `http://export.arxiv.org/api/query?search_query=cat:${category}&max_results=${Math.ceil(
+        PAPER_COUNT / CATEGORIES.length,
+      )}&sortBy=submittedDate&sortOrder=descending`;
+      const xml = await fetchText(url);
+      for (const match of xml.matchAll(/<id>http:\/\/arxiv\.org\/abs\/([^<]+)<\/id>/g)) {
+        ids.push(match[1]);
+      }
+      await sleep(3000);
     }
-    await sleep(3000);
   }
 
   console.log(`${ids.length} papers to fetch`);
@@ -100,11 +108,16 @@ async function main(): Promise<void> {
   // and now the measurement
   let parsed = 0;
   let readable = 0;
+  let prose = 0;
   const failures = new Map<string, number>();
   const examples = new Map<string, string>();
 
   for (const row of rows) {
     const outcome = parseRow(row.text);
+    if (outcome.prose) {
+      prose++;
+      continue;
+    }
     if (outcome.readable) readable++;
     if (outcome.ok) {
       parsed++;
@@ -115,11 +128,20 @@ async function main(): Promise<void> {
     if (!examples.has(key)) examples.set(key, `${row.file}: ${row.text.slice(0, 160)}`);
   }
 
-  const percent = rows.length ? (parsed / rows.length) * 100 : 0;
-  const lenient = rows.length ? (readable / rows.length) * 100 : 0;
+  // A row with no relation in it is a line of a paper, not a claim: a tuple,
+  // a definition of a set, a line of prose in a display block. It is counted,
+  // and it is not put in the denominator of the claim rows.
+  const claims = rows.length - prose;
+  const percent = claims ? (parsed / claims) * 100 : 0;
+  const lenient = claims ? (readable / claims) * 100 : 0;
+  const allPercent = rows.length ? (parsed / rows.length) * 100 : 0;
+  const allLenient = rows.length ? (readable / rows.length) * 100 : 0;
   console.log('');
-  console.log(`the display math rows that SAMOSA reads with no unknown construct: ${parsed} of ${rows.length} (${percent.toFixed(1)}%)`);
-  console.log(`the display math rows that SAMOSA can parse at all: ${readable} of ${rows.length} (${lenient.toFixed(1)}%)`);
+  console.log(`${rows.length} display math rows, of which ${prose} make no claim (no relation)`);
+  console.log(`${claims} claim rows`);
+  console.log(`the claim rows that SAMOSA reads with no unknown construct: ${parsed} of ${claims} (${percent.toFixed(1)}%)`);
+  console.log(`the claim rows that SAMOSA can parse at all: ${readable} of ${claims} (${lenient.toFixed(1)}%)`);
+  console.log(`of all display math rows, the checkable share: ${parsed} of ${rows.length} (${allPercent.toFixed(1)}%)`);
   console.log('');
   console.log('the failures, by the first unknown construct:');
   const sorted = [...failures.entries()].sort((a, b) => b[1] - a[1]);
@@ -135,10 +157,14 @@ async function main(): Promise<void> {
         papers: fetched,
         ids: ids.slice(0, PAPER_COUNT),
         rows: rows.length,
+        prose,
+        claims,
         parsed,
         percent: Number(percent.toFixed(1)),
         readable,
         lenient: Number(lenient.toFixed(1)),
+        allPercent: Number(allPercent.toFixed(1)),
+        allLenient: Number(allLenient.toFixed(1)),
         failures: Object.fromEntries(failures),
         when: new Date().toISOString(),
       },
@@ -151,23 +177,33 @@ async function main(): Promise<void> {
 }
 
 /** Parses one row and says what stopped it. */
-function parseRow(text: string): { ok: boolean; readable: boolean; reason: string } {
+function parseRow(text: string): { ok: boolean; readable: boolean; prose: boolean; reason: string } {
   const trimmed = text.trim();
-  if (!trimmed) return { ok: false, readable: false, reason: 'an empty row' };
+  if (!trimmed) return { ok: false, readable: false, prose: true, reason: 'an empty row' };
   try {
     // The row is parsed the way the engine parses it: by the relation in it.
     // A row that ends in a comma is a row of a paper, not a broken row.
     const parsed = engineParseRow(trimmed, trimmed, 0, 0);
+    // A failed parse also has no parts. It is not prose, and it must not be
+    // hidden in the prose bucket.
+    if (parsed.error) {
+      return { ok: false, readable: false, prose: false, reason: `a parse error: ${parsed.error.message}` };
+    }
     if (parsed.prose || !parsed.parts.length) {
-      return { ok: false, readable: false, reason: 'a row with no relation in it' };
+      return { ok: false, readable: false, prose: true, reason: 'a row with no relation in it' };
     }
     for (const part of parsed.parts) {
       const raw = (part.lhs ? firstRaw(part.lhs) : null) ?? (part.rhs ? firstRaw(part.rhs) : null);
-      if (raw) return { ok: false, readable: true, reason: `the unknown construct ${raw}` };
+      if (raw) return { ok: false, readable: true, prose: false, reason: `the unknown construct ${raw}` };
     }
-    return { ok: true, readable: true, reason: '' };
+    return { ok: true, readable: true, prose: false, reason: '' };
   } catch (error) {
-    return { ok: false, readable: false, reason: `a parse error: ${(error as Error).message}` };
+    return {
+      ok: false,
+      readable: false,
+      prose: false,
+      reason: `a parse error: ${(error as Error).message}`,
+    };
   }
 }
 

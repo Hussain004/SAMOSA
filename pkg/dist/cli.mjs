@@ -6232,6 +6232,25 @@ function tokenize(src) {
         if (SPACE_COMMANDS.has(name)) {
           continue;
         }
+        if (name === "mid") {
+          push("csym", "|", start, i);
+          continue;
+        }
+        if (name === "middle") {
+          if (text[i] === "|") {
+            i++;
+            push("csym", "|", start, i);
+          }
+          continue;
+        }
+        if (name === "lVert" || name === "rVert" || name === "Vert") {
+          push("csym", "\\|", start, i);
+          continue;
+        }
+        if (name === "lvert" || name === "rvert") {
+          push("csym", "|", start, i);
+          continue;
+        }
         if (DROP_COMMANDS.has(name)) {
           continue;
         }
@@ -6875,9 +6894,9 @@ var Parser = class _Parser {
         if (this.kind() === "lparen" && scripted.k === "sym" && this.looksLikeCall(t.value)) {
           const wasDivergence = this.inDivergence;
           this.inDivergence = DIVERGENCES.has(plainName(t.value));
-          const args = this.parseArgs();
+          const { args, conditional } = this.parseArgs();
           this.inDivergence = wasDivergence;
-          return { k: "call", fn: t.value, args, span: { from: t.from, to: this.closingParen(t.to, args) } };
+          return this.makeCall(t.value, t.from, args, conditional);
         }
         return scripted;
       }
@@ -6925,7 +6944,8 @@ var Parser = class _Parser {
           this.pos++;
           return { k: "raw", text: "line break", span: { from: t.from, to: t.to } };
         }
-        break;
+        this.pos++;
+        return { k: "raw", text: `\\${t.value}`, span: { from: t.from, to: t.to } };
       case "begin":
         return this.parseMatrixEnv();
       default:
@@ -6966,6 +6986,7 @@ var Parser = class _Parser {
   parseArgs() {
     this.expect("lparen", "(");
     const args = [];
+    let conditional = false;
     if (this.kind() !== "rparen") {
       for (; ; ) {
         args.push(this.parseExpression());
@@ -6982,11 +7003,31 @@ var Parser = class _Parser {
           }
           break;
         }
+        if (this.kind() === "csym" && this.cur.value === "|") {
+          this.pos++;
+          conditional = true;
+          args.push(this.parseExpression());
+          if (this.kind() === "comma" || this.kind() === "semi") {
+            this.pos++;
+            continue;
+          }
+          break;
+        }
         break;
       }
     }
     this.expect("rparen", ")");
-    return args;
+    return { args, conditional };
+  }
+  /**
+   * A call, unless its arguments hold a conditional bar. The engine has no
+   * model of a conditional distribution, so the row is read and left
+   * unchecked with that reason rather than guessed at.
+   */
+  makeCall(fn, from, args, conditional) {
+    const span = { from, to: this.closingParen(from, args) };
+    if (conditional) return { k: "raw", text: "a conditional distribution", span };
+    return { k: "call", fn, args, span };
   }
   parseCommand() {
     const t = this.cur;
@@ -7043,6 +7084,7 @@ var Parser = class _Parser {
       case "mathsf":
       case "mathtt": {
         this.pos++;
+        if (name === "operatorname" && this.kind() === "op" && this.cur.value === "*") this.pos++;
         const g = this.kind() === "lbrace" ? this.rawGroupText() : (() => {
           const t2 = this.cur;
           this.pos++;
@@ -7061,8 +7103,8 @@ var Parser = class _Parser {
           };
         }
         if (this.kind() === "lparen") {
-          const args = this.parseArgs();
-          return { k: "call", fn: text.toLowerCase(), args, span: { from: t.from, to: this.closingParen(t.to, args) } };
+          const { args, conditional } = this.parseArgs();
+          return this.makeCall(text.toLowerCase(), t.from, args, conditional);
         }
         const sym = this.makeSym([name], text, null, null, { from: t.from, to: g.span.to });
         const scripted = this.applyScripts(sym, [name], text);
@@ -7106,13 +7148,8 @@ var Parser = class _Parser {
           return this.applyScripts(sym2, [], "\\sigma");
         }
         if (this.kind() === "lparen") {
-          const args = this.parseArgs();
-          return {
-            k: "call",
-            fn: name === "sigma" ? "sigmoid" : name,
-            args,
-            span: { from: t.from, to: this.closingParen(t.to, args) }
-          };
+          const { args, conditional } = this.parseArgs();
+          return this.makeCall(name === "sigma" ? "sigmoid" : name, t.from, args, conditional);
         }
         if (this.kind() === "lbrace") {
           const arg2 = this.parseGroupAsExpression();
@@ -7144,13 +7181,8 @@ var Parser = class _Parser {
       const sym = this.makeSym([], `\\${name}`, null, null, { from: t.from, to: t.to });
       const scripted = this.applyScripts(sym, [], `\\${name}`);
       if (this.kind() === "lparen" && scripted.k === "sym") {
-        const args = this.parseArgs();
-        return {
-          k: "call",
-          fn: `\\${name}`,
-          args,
-          span: { from: t.from, to: this.closingParen(t.to, args) }
-        };
+        const { args, conditional } = this.parseArgs();
+        return this.makeCall(`\\${name}`, t.from, args, conditional);
       }
       return scripted;
     }
@@ -7161,13 +7193,13 @@ var Parser = class _Parser {
       if (base2.k === "sym" && this.kind() === "lparen") {
         const density = base2.name.match(/^\\mathcal([NU])$/);
         if (density) {
-          const args = this.parseArgs();
-          return {
-            k: "call",
-            fn: density[1] === "N" ? "normalDensity" : "uniformDensity",
+          const { args, conditional } = this.parseArgs();
+          return this.makeCall(
+            density[1] === "N" ? "normalDensity" : "uniformDensity",
+            base2.span.from,
             args,
-            span: { from: base2.span.from, to: args.at(-1)?.span.to ?? base2.span.to }
-          };
+            conditional
+          );
         }
       }
       return base2;
@@ -7392,6 +7424,19 @@ var Parser = class _Parser {
             this.pos++;
             continue;
           }
+          if (this.kind() === "csym" && this.cur.value === "|") {
+            this.pos++;
+            for (; ; ) {
+              args.push(this.parseExpression());
+              if (this.kind() === "comma") {
+                this.pos++;
+                continue;
+              }
+              break;
+            }
+            const close2 = this.expect("rbrack", "]");
+            return { k: "raw", text: "a conditional expectation", span: { from: span.from, to: close2.to } };
+          }
           break;
         }
       }
@@ -7547,11 +7592,11 @@ function findRelations(tokens) {
   let inText = 0;
   for (let i = 0; i < tokens.length; i++) {
     const t = tokens[i];
-    if (t.type === "lbrace") {
+    if (t.type === "lbrace" || t.type === "lparen" || t.type === "lbrack") {
       depth++;
       continue;
     }
-    if (t.type === "rbrace") {
+    if (t.type === "rbrace" || t.type === "rparen" || t.type === "rbrack") {
       depth--;
       continue;
     }
@@ -7592,6 +7637,14 @@ function findRelations(tokens) {
 }
 function parseRow(_src, rowText, offset, index2, knownFns) {
   let tokens = tokenize(rowText);
+  while (tokens.length) {
+    const last = tokens[tokens.length - 1];
+    if (last.type === "comma" || last.type === "semi" || last.type === "op" && last.value === ".") {
+      tokens = tokens.slice(0, -1);
+      continue;
+    }
+    break;
+  }
   const annotation = extractAnnotation(tokens);
   tokens = stripAnnotation(tokens);
   tokens = blankAlignmentMarkers(tokens);

@@ -4469,23 +4469,10 @@ exports[`the parser, on every row of the Menu and the Cookbook > menu/kl-gauss r
       "lhs": {
         "args": [
           {
-            "args": [
-              {
-                "args": [
-                  {
-                    "sym": "p",
-                  },
-                  {
-                    "raw": "\\Vert",
-                  },
-                ],
-                "op": "mul",
-              },
-              {
-                "sym": "q",
-              },
-            ],
-            "op": "mul",
+            "sym": "p",
+          },
+          {
+            "sym": "q",
           },
         ],
         "call": "D",

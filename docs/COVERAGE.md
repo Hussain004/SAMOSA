@@ -10,58 +10,92 @@ The method is in `scripts/coverage.ts`, the sample is in
 node_modules/.bin/vite-node scripts/coverage.ts
 ```
 
-The sample is 39 recent papers from cs.LG, cs.RO and stat.ML, and 1498
-display math rows.
+The sample is 36 recent papers from cs.LG, cs.RO and stat.ML, and 1416
+display math rows. One paper in the sample could not be opened, and it is
+not counted.
 
 ## The numbers
 
 | | |
 | --- | --- |
-| rows SAMOSA can parse | 1300 (**86.8%**) |
-| rows SAMOSA reads with no unknown construct | 749 (**50.0%**) |
+| display math rows | 1416 |
+| rows with no relation (prose, a tuple, a line of a definition) | 197 |
+| claim rows | 1219 |
+| claim rows that parse end to end | 117 (**9.6%**) |
+| claim rows with no unknown construct | 41 (**3.4%**) |
+| of all display rows, the checkable share | 41 of 1416 (**2.9%**) |
 
-**86.8%** is the parse coverage, the number the plan's gate G3 asks for.
+**9.6%** is the parse coverage: the whole row becomes a tree, so SAMOSA can
+look at it. The plan's gate G3 asks for 70%. The gate is not met.
 
-**50.0%** is the checkable coverage: the rows where every part of the row
-is something SAMOSA knows, so it can check the row rather than only read it.
-This is the second number, and it is honestly lower than the gate.
+**3.4%** is the checkable coverage: every part of the row is something
+SAMOSA knows, so it can decide whether the row is right. This is the number
+that matters, and it is lower.
 
-The measurement is the engine's own parser, on the rows the engine's own
-row splitter produces, so the number is what the app does with a paper and
-not an approximation of it.
+The first version of this page reported 86.8% and 50.0%. That measurement
+parsed only the first expression of a row and did not require the parser to
+consume the rest, so a row that began with a symbol counted as read even
+when the relation after it was never touched. It was not the number the app
+produces, and this page replaces it. The current measurement parses the
+whole row, and every part of it.
+
+The measurement is the engine's own parser on each display row. A row with
+no relation is prose, and it is counted, but it is not in the denominator of
+the claim rows.
 
 ## What stops the rest
 
-The failures, bucketed by the first unknown construct:
+The failures, bucketed by the first thing that stopped the row:
 
 | rows | the construct |
 | --- | --- |
-| 198 | a row with no relation in it, such as a definition of a tuple of sets |
-| 57 | `\mid`, the conditional bar |
-| 29 | the unsquared norm, which is not a rational function |
-| 16 | `\norm`, a macro the authors defined themselves |
-| 14 | an expectation without an argument list, `\mathbb{E}_x` |
-| 12 | `\min` and `\max` over a set |
-| 12 | a subscript on something that is not a symbol, as in `\int_A` |
-| 12 | a superscript on something that is not a symbol, as in `h_{K,b}` |
-| 12 | `\cX` and the other macros of the authors |
-| 12 | `\lVert`, the double bar norm |
-| 11 | `\abs`, a macro of the authors |
+| 390 | `unexpected ,`, a second clause after the claim |
+| 227 | `expected )`, a `cases` block or a condition inside a probability |
+| 187 | `unexpected .`, a period and a sentence after the claim |
+| 51 | `expected {`, usually a `\left\{` set the parser cannot close |
+| 39 | a script on something that is not a symbol |
+| 39 | `unexpected |`, a set builder or a conditional outside a call |
+| 39 | `expected }`, a macro of the authors that takes a block |
+| 37 | `unexpected \|`, a double bar used as a separator |
+| 37 | `expected ]`, a conditional inside a bracket |
+| 18 | `unexpected rbrace`, a macro that emits its own braces |
+| 16 | `unexpected end of input`, an unbalanced row |
+| 13 | `expected \rangle`, an inner product |
+| 13 | `unexpected sub`, a subscript on an operator |
+| 10 | a conditional distribution, `p(x \mid y)` |
+| 8 | `unexpected \\`, a row break inside a nested environment |
+| 7 | `unbalanced }`, a macro that opens a brace it does not close |
+| 5 | `\*`, a macro of the authors |
+| 5 | the unsquared norm, `\|x\|` |
 
-(The counts are from the run that produced the table above; the sample is
-listed in `.coverage/coverage.json`, and the same sample gives the same
-numbers.)
+Most of the list is not a missing piece of notation. It is the end of the
+row: a second clause, a `where` clause, a parenthetical condition, or a
+`cases` block inside a probability. The parser reads the relation and then
+meets the prose of the paper. The next work is to read those clauses as
+clauses, instead of asking the expression parser to swallow them.
 
-Three quarters of the failures are the same three things: a bar that means
-conditioning and not a norm, a macro the authors defined in their own
-preamble, and a row that is not a claim at all.
+## What this pass fixed
+
+- `\mid` and `\middle|` are read as conditioning bars. A conditional call
+  or expectation becomes a named `raw` node, so the row is readable and
+  unchecked, never guessed at.
+- `\lVert`, `\rVert` and `\Vert` are the long forms of the norm and the
+  divergence bar. A squared long norm is checkable; an unsquared one comes
+  back with the reason.
+- Trailing commas, semicolons and periods are the punctuation of the
+  sentence, not parse errors.
+- An unknown control symbol and `\operatorname*` are named rather than
+  thrown away.
+- A relation inside parentheses or brackets is not a top-level relation.
+- A row with no relation is prose. It is excluded from the claim
+  denominator, and a parse error is no longer hidden in that bucket.
 
 ## The double bar
 
-The `\|` that separates two distributions, as in `D(P\|Q)`, is now read as
-what it is: the argument separator of a divergence, and not the norm of `P`.
-The same goes for `KL`, `d_{KL}` and the chi squared divergence. A `\|`
-inside a norm is still a norm.
+The `\|` that separates two distributions, as in `D(P\|Q)`, is read as what
+it is: the argument separator of a divergence, and not the norm of `P`. The
+same goes for `KL`, `d_{KL}` and the chi squared divergence. A `\|` inside a
+norm is still a norm.
 
 The unsquared norm, `\|x\|`, is still not supported: the square root of a
 rational function is not rational, so the exact mode cannot check it. It
@@ -71,16 +105,15 @@ comes back with the reason, and the 50 digit mode is the answer for it.
 
 In the order the measurement says they are worth:
 
-1. `\mid` and `\middle|`, the conditional bar, as in
-   `\mathbb{E}[x \mid y]` and `p(x \mid y)`.
-2. The single argument angle bracket, `\langle c_1\rangle`, which is an
-   expectation.
-3. The macros the authors define: the CLI could read the preamble and
+1. The end of the row: `where` clauses, parenthetical conditions and `cases`
+   blocks. Read them as clauses, not as a failed expression.
+2. The macros the authors define: the CLI could read the preamble and
    expand the `\newcommand`s.
-4. The unsquared norms, checked in the 50 digit mode, with the card saying
+3. The unsquared norms, checked in the 50 digit mode, with the card saying
    "numeric".
-5. The relations inside expressions, `\leq` and `\ge`, with a counterexample
+4. The relations inside expressions, `\leq` and `\ge`, with a counterexample
    search for the rows that break them.
+5. Inner products, `\langle x, y \rangle`.
 
 Then the sample should be a thousand papers, the size the plan asks for,
 and the number published again.
