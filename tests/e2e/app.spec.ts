@@ -221,6 +221,10 @@ test('the phone has one pane at a time', async ({ page }) => {
   await page.getByRole('button', { name: 'rendered', exact: true }).click();
   await page.locator('[data-step-id]').first().click();
   await expect(page.getByTestId('inspector')).toBeVisible();
+
+  // the card is a bottom sheet, and it closes
+  await page.getByRole('button', { name: 'close the inspector' }).click();
+  await expect(page.getByTestId('inspector')).toBeHidden();
 });
 
 test('the command palette opens with the keyboard', async ({ page }) => {

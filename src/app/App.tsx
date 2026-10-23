@@ -41,7 +41,8 @@ export function App() {
   const [copied, setCopied] = useState('');
   const [showSettings, setShowSettings] = useState(false);
   const [headerMenu, setHeaderMenu] = useState(false);
-  const [mobilePane, setMobilePane] = useState<'rendered' | 'source' | 'inspector'>('rendered');
+  const [mobilePane, setMobilePane] = useState<'rendered' | 'source'>('rendered');
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const [theme, setTheme] = useState<'dark' | 'light'>(() =>
     window.localStorage.getItem('samosa-theme') === 'light' ? 'light' : 'dark',
@@ -266,7 +267,7 @@ export function App() {
       )}
 
       <div className="flex shrink-0 border-b border-[var(--color-line)] text-[10px] md:hidden">
-        {(['rendered', 'source', 'inspector'] as const).map((pane) => (
+        {(['rendered', 'source'] as const).map((pane) => (
           <button
             key={pane}
             onClick={() => setMobilePane(pane)}
@@ -355,11 +356,7 @@ export function App() {
         </div>
       )}
 
-      <div
-        className={`min-h-0 flex-1 grid-cols-1 grid-rows-1 md:grid md:grid-cols-2 ${
-          mobilePane === 'inspector' ? 'hidden' : 'grid'
-        }`}
-      >
+      <div className="min-h-0 flex-1 grid-cols-1 grid-rows-1 md:grid md:grid-cols-2">
         <section
           className={`${
             mobilePane === 'source' ? 'flex' : 'hidden'
@@ -393,8 +390,11 @@ export function App() {
               selectedStep={selectedStep}
               onSelectStep={(id) => {
                 select(id);
-                // on a phone the card is a pane, so a tap opens it
-                if (window.matchMedia('(max-width: 767px)').matches) setMobilePane('inspector');
+                // on a phone the card is a bottom sheet, so a tap opens it
+                if (window.matchMedia('(max-width: 767px)').matches) {
+                  setInspectorOpen(true);
+                  setSheetOpen(true);
+                }
               }}
               hoverStep={null}
               onHoverStep={() => {}}
@@ -406,10 +406,18 @@ export function App() {
         </section>
       </div>
 
+      {sheetOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/50 md:hidden"
+          onClick={() => setSheetOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
       <section
         className={`${
-          mobilePane === 'inspector' ? 'flex' : 'hidden'
-        } min-h-0 flex-1 flex-col border-t border-[var(--color-line)] md:flex md:flex-none ${
+          sheetOpen ? 'flex' : 'hidden'
+        } fixed inset-x-0 bottom-0 z-40 max-h-[70vh] min-h-0 flex-col rounded-t-xl border-t border-[var(--color-line)] bg-[var(--color-panel)] shadow-2xl md:static md:z-auto md:flex md:flex-none md:rounded-none md:bg-transparent md:shadow-none ${
           inspectorOpen ? 'md:max-h-[38vh] md:min-h-[160px]' : 'md:max-h-none md:min-h-0'
         }`}
       >
@@ -424,9 +432,16 @@ export function App() {
             <button
               onClick={() => setInspectorOpen((v) => !v)}
               aria-label={inspectorOpen ? 'collapse the inspector' : 'expand the inspector'}
-              className="text-[10px] text-[var(--color-faint)] hover:text-[var(--color-text)]"
+              className="hidden text-[10px] text-[var(--color-faint)] hover:text-[var(--color-text)] md:inline"
             >
               {inspectorOpen ? '▾' : '▸'}
+            </button>
+            <button
+              onClick={() => setSheetOpen(false)}
+              aria-label="close the inspector"
+              className="text-[13px] text-[var(--color-faint)] hover:text-[var(--color-text)] md:hidden"
+            >
+              ×
             </button>
           </div>
         </div>
@@ -445,7 +460,10 @@ export function App() {
               setSource(source.slice(0, from) + fix.edit.insert + source.slice(to));
             }}
             onCopy={copy}
-            onClose={() => select(null)}
+            onClose={() => {
+              select(null);
+              setSheetOpen(false);
+            }}
           />
         </div>
       </section>
