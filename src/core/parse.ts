@@ -1547,7 +1547,7 @@ export class Parser {
   private parseNorm(): Node {
     const open = this.cur;
     this.pos++;
-    const closeIndex = this.barClose(open, '\\|');
+    const closeIndex = this.barClose('\\|');
     if (closeIndex < 0) {
       this.pos = this.tokens.length;
       return { k: 'raw', text: 'an unbalanced norm', span: { from: open.from, to: open.to } };
@@ -1581,7 +1581,7 @@ export class Parser {
   private parseBars(): Node {
     const open = this.cur;
     this.pos++;
-    const closeIndex = this.barClose(open, '|');
+    const closeIndex = this.barClose('|');
     if (closeIndex < 0) {
       this.pos = this.tokens.length;
       return { k: 'raw', text: 'unbalanced |', span: { from: open.from, to: open.to } };
@@ -1593,7 +1593,7 @@ export class Parser {
   }
 
   /** The next bar of the same kind at the top level, or -1. */
-  private barClose(open: Token, kind: string): number {
+  private barClose(kind: string): number {
     let depth = 0;
     for (let i = this.pos; i < this.tokens.length; i++) {
       const t = this.tokens[i];

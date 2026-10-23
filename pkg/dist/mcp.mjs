@@ -5602,7 +5602,7 @@ var Parser = class _Parser {
   parseNorm() {
     const open = this.cur;
     this.pos++;
-    const closeIndex = this.barClose(open, "\\|");
+    const closeIndex = this.barClose("\\|");
     if (closeIndex < 0) {
       this.pos = this.tokens.length;
       return { k: "raw", text: "an unbalanced norm", span: { from: open.from, to: open.to } };
@@ -5635,7 +5635,7 @@ var Parser = class _Parser {
   parseBars() {
     const open = this.cur;
     this.pos++;
-    const closeIndex = this.barClose(open, "|");
+    const closeIndex = this.barClose("|");
     if (closeIndex < 0) {
       this.pos = this.tokens.length;
       return { k: "raw", text: "unbalanced |", span: { from: open.from, to: open.to } };
@@ -5646,7 +5646,7 @@ var Parser = class _Parser {
     return { k: "op", op: "abs", args: [inner2], span: { from: open.from, to: close.to } };
   }
   /** The next bar of the same kind at the top level, or -1. */
-  barClose(open, kind) {
+  barClose(kind) {
     let depth = 0;
     for (let i2 = this.pos; i2 < this.tokens.length; i2++) {
       const t = this.tokens[i2];
@@ -6875,7 +6875,7 @@ function symbolType(ctx, name, span) {
       props: [],
       source: "declared",
       guessed: false,
-      assumption: `${name} is the symbol that was defined earlier`
+      assumption: `${toDisplay(name)} is the symbol that was defined earlier`
     });
     return ty;
   }
