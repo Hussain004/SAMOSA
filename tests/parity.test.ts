@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { check } from '../src/core/index.ts';
+import { check, explain } from '../src/core/index.ts';
 import { formatPretty, formatSarif, formatGithub, summaryLine } from '../cli/format.ts';
 import { MENU } from '../corpus/menu.ts';
 
@@ -22,10 +22,16 @@ describe('the same verdict everywhere', () => {
   });
 
   it('the pretty format says the same thing', () => {
-    const text = formatPretty(report, { file: 'kalman.tex' });
+    const withFixes = check(item.bugSource!, { decls: item.decls });
+    const wrong = withFixes.steps.find((step) => step.verdict === 'wrong')!;
+    const explanation = explain(item.bugSource!, wrong.id, { decls: item.decls }, withFixes);
+    wrong.fixes = explanation.fixes;
+    const text = formatPretty(withFixes, { file: 'kalman.tex' });
     expect(text).toContain('✗ wrong');
     expect(text).toContain('samosa/not-equal');
-    expect(text).toContain(summaryLine(report));
+    expect(text).toContain('fix:');
+    expect(text).toContain(explanation.fixes[0].title);
+    expect(text).toContain(summaryLine(withFixes));
   });
 
   it('the SARIF format has one result per finding', () => {

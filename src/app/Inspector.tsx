@@ -109,16 +109,20 @@ export function Inspector({ step, report, explanation, onApplyFix, onCopy, onClo
                 className="flex items-start justify-between gap-3 rounded border border-[var(--color-line)] bg-[var(--color-panel-2)] p-2"
               >
                 <div className="min-w-0">
-                  <p className="text-xs">{fix.title}</p>
-                  {fix.detail &&
-                    (fix.kind === 'residual' ? (
-                      <Tex
-                        latex={fix.detail}
-                        className="mt-1 overflow-x-auto text-[12px] text-[var(--color-muted)]"
-                      />
-                    ) : (
-                      <p className="mt-0.5 overflow-x-auto text-[11px] text-[var(--color-muted)]">{fix.detail}</p>
-                    ))}
+                  <p className="flex flex-wrap items-center gap-2 text-xs">
+                    {fix.title}
+                    {!fix.verified && (
+                      <span className="rounded border border-[var(--color-saffron)]/50 px-1 py-0.5 text-[9px] uppercase tracking-wide text-[var(--color-saffron)]">
+                        unverified
+                      </span>
+                    )}
+                  </p>
+                  {fix.detail && (
+                    <Tex
+                      latex={fix.detail}
+                      className="mt-1 overflow-x-auto text-[12px] text-[var(--color-muted)]"
+                    />
+                  )}
                 </div>
                 {fix.edit && (
                   <button

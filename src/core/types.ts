@@ -304,7 +304,7 @@ export function symbolType(ctx: TypeContext, name: string, span: Span): Ty {
       props: [],
       source: 'declared',
       guessed: false,
-      assumption: `${name} is the symbol that was defined earlier`,
+      assumption: `${toDisplay(name)} is the symbol that was defined earlier`,
     });
     return ty;
   }

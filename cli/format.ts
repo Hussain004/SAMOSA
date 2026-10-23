@@ -33,6 +33,11 @@ export function formatPretty(report: Report, options: PrettyOptions): string {
     out.push(
       `${options.file}:${line}:${column}  ${ICONS[step.verdict]} ${pad(step.verdict)}  ${step.message}  samosa/${ruleId(step)}`,
     );
+    // The explanation is already computed by the CLI. A fix that has not
+    // been checked is labeled, so a suggestion is never read as a guarantee.
+    for (const fix of (step.fixes ?? []).slice(0, 3)) {
+      out.push(`    fix${fix.verified ? '' : ' (unverified)'}: ${fix.title}`);
+    }
   }
   out.push(summaryLine(report));
   return out.join('\n');
