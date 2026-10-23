@@ -114,7 +114,7 @@ const PHRASES = [
 function Hero() {
   return (
     <section className="dotted relative">
-      <div className="mx-auto grid max-w-[1180px] items-center gap-10 px-6 py-16 md:grid-cols-[1fr_1.15fr] md:py-24">
+      <div className="mx-auto grid max-w-[1180px] items-start gap-10 px-6 py-16 md:grid-cols-[1fr_1.15fr] md:py-24">
         <div className="order-2 md:order-1">
           <h1 className="font-display text-[clamp(34px,4.6vw,70px)] leading-[1.02]">
             <span className="whitespace-nowrap">Derive more.</span>
