@@ -183,3 +183,86 @@ describe('the end of the row and the shape of a clause', () => {
     expect(JSON.stringify(parsed.parts[0].lhs)).toContain('a relation inside a group');
   });
 });
+
+describe('the constructs of a real paper', () => {
+  it('keeps a full stop after a whole number out of the number', () => {
+    const parsed = parseRow('', 'x = 0.', 0, 0);
+    expect(parsed.error).toBeUndefined();
+    expect(parsed.parts[0].rhs).toMatchObject({ k: 'num' });
+  });
+
+  it('reads a sum whose upper limit has no braces', () => {
+    const parsed = parseRow('', String.raw`\sum_{k=1}^K x_k = 0`, 0, 0);
+    expect(parsed.error).toBeUndefined();
+    expect(parsed.parts[0].lhs).toMatchObject({ k: 'bigop', kind: 'sum' });
+  });
+
+  it('reads a cases block whose cells are conditions', () => {
+    const parsed = parseRow(
+      '',
+      String.raw`f(x) = \begin{cases} x^2 & x > 0 \\ 0 & x \le 0 \end{cases}`,
+      0,
+      0,
+    );
+    expect(parsed.error).toBeUndefined();
+    expect(parsed.parts[0].rhs).toMatchObject({ k: 'block' });
+  });
+
+  it('reads a visible left brace closed by an invisible right delimiter', () => {
+    const parsed = parseRow(
+      '',
+      String.raw`A = \left\{ \begin{array}{ll} 1 & x > 0 \\ 0 & x \le 0 \end{array} \right.`,
+      0,
+      0,
+    );
+    expect(parsed.error).toBeUndefined();
+    expect(parsed.parts.length).toBe(1);
+  });
+
+  it('reads a norm on the right of a product', () => {
+    const parsed = parseRow('', String.raw`x = 2\lVert v \rVert^2`, 0, 0);
+    expect(parsed.error).toBeUndefined();
+    expect(parsed.parts[0].rhs).toMatchObject({ k: 'op', op: 'mul' });
+  });
+
+  it('reads a probability with a condition', () => {
+    const parsed = parseRow('', String.raw`\Pr(A \mid B) = 0`, 0, 0);
+    expect(parsed.error).toBeUndefined();
+    expect(parsed.parts[0].lhs).toMatchObject({ k: 'raw', text: 'a conditional distribution' });
+  });
+
+  it('reads two adjacent matrices as a product', () => {
+    const parsed = parseRow(
+      '',
+      String.raw`A = \begin{pmatrix} 1 & 0 \\ 0 & 1 \end{pmatrix} \begin{pmatrix} 1 \\ 0 \end{pmatrix}`,
+      0,
+      0,
+    );
+    expect(parsed.error).toBeUndefined();
+    expect(parsed.parts[0].rhs).toMatchObject({ k: 'op', op: 'mul' });
+  });
+
+  it('names an indexed symbol instead of treating it as a scalar', () => {
+    const parsed = parseRow('', 'p_i = 0', 0, 0);
+    expect(parsed.error).toBeUndefined();
+    expect(parsed.parts[0].lhs).toMatchObject({ k: 'raw', text: 'an indexed symbol p_i' });
+  });
+
+  it('reads an ellipsis in a list', () => {
+    const parsed = parseRow('', 'x = (a, ..., b)', 0, 0);
+    expect(parsed.error).toBeUndefined();
+    expect(parsed.parts[0].rhs).toMatchObject({ k: 'raw', text: 'a list' });
+  });
+
+  it('does not let a text group hide the claim after it', () => {
+    const parsed = parseRow('', String.raw`x = 1, \text{ and } y \indep z`, 0, 0);
+    expect(parsed.error).toBeUndefined();
+    expect(parsed.parts.length).toBe(2);
+  });
+
+  it('reads an inner product', () => {
+    const parsed = parseRow('', String.raw`\langle a, b \rangle = 0`, 0, 0);
+    expect(parsed.error).toBeUndefined();
+    expect(parsed.parts[0].lhs).toMatchObject({ k: 'op', op: 'inner' });
+  });
+});

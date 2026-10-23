@@ -119,6 +119,12 @@ export function tokenize(src: string): Token[] {
       continue;
     }
 
+    // ~ is a nonbreaking space in math, not an operator
+    if (ch === '~') {
+      i++;
+      continue;
+    }
+
     // backslash commands
     if (ch === '\\') {
       const start = i;
@@ -271,7 +277,9 @@ export function tokenize(src: string): Token[] {
     if (/[0-9]/.test(ch) || (ch === '.' && /[0-9]/.test(text[i + 1] ?? ''))) {
       let j = i;
       while (j < n && /[0-9]/.test(text[j])) j++;
-      if (text[j] === '.') {
+      // A full stop after a whole number is punctuation, not a decimal
+      // point: rows in a paper end with "= 0." all the time.
+      if (text[j] === '.' && /[0-9]/.test(text[j + 1] ?? '')) {
         j++;
         while (j < n && /[0-9]/.test(text[j])) j++;
       }

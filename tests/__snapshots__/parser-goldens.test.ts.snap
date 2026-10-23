@@ -2355,8 +2355,102 @@ exports[`the parser, on every row of the Menu and the Cookbook > cookbook/riccat
 
 exports[`the parser, on every row of the Menu and the Cookbook > cookbook/ridge-gradient row 1 1`] = `
 {
-  "error": "unexpected \`\\|\` at column 18",
-  "parts": [],
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "sym": "J",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": ":=",
+      "rhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "args": [
+                  {
+                    "num": "1/1",
+                  },
+                  {
+                    "num": "2/1",
+                  },
+                ],
+                "op": "div",
+              },
+              {
+                "args": [
+                  {
+                    "args": [
+                      {
+                        "sym": "y",
+                      },
+                      {
+                        "args": [
+                          {
+                            "sym": "X",
+                          },
+                          {
+                            "sym": "\\beta",
+                          },
+                        ],
+                        "op": "mul",
+                      },
+                    ],
+                    "op": "sub",
+                  },
+                ],
+                "op": "norm2",
+              },
+            ],
+            "op": "mul",
+          },
+          {
+            "args": [
+              {
+                "args": [
+                  {
+                    "args": [
+                      {
+                        "args": [
+                          {
+                            "sym": "\\lambda",
+                          },
+                          {
+                            "num": "2/1",
+                          },
+                        ],
+                        "op": "div",
+                      },
+                      {
+                        "args": [
+                          {
+                            "sym": "\\beta",
+                          },
+                        ],
+                        "op": "T",
+                      },
+                    ],
+                    "op": "mul",
+                  },
+                  {
+                    "sym": "\\Sigma",
+                  },
+                ],
+                "op": "mul",
+              },
+              {
+                "sym": "\\beta",
+              },
+            ],
+            "op": "mul",
+          },
+        ],
+        "op": "add",
+      },
+    },
+  ],
 }
 `;
 
@@ -2638,15 +2732,128 @@ exports[`the parser, on every row of the Menu and the Cookbook > cookbook/sherma
 
 exports[`the parser, on every row of the Menu and the Cookbook > cookbook/softmax row 1 1`] = `
 {
-  "error": "expected {",
-  "parts": [],
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "sym": "J",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": ":=",
+      "rhs": {
+        "args": [
+          {
+            "bigop": "sum",
+            "body": {
+              "args": [
+                {
+                  "raw": "an indexed symbol p_i",
+                },
+                {
+                  "args": [
+                    {
+                      "args": [
+                        {
+                          "args": [
+                            {
+                              "raw": "an indexed symbol z_i",
+                            },
+                          ],
+                          "call": "exp",
+                        },
+                        {
+                          "bigop": "sum",
+                          "body": {
+                            "args": [
+                              {
+                                "raw": "an indexed symbol z_j",
+                              },
+                            ],
+                            "call": "exp",
+                          },
+                          "hi": null,
+                          "idx": "i",
+                          "lo": null,
+                        },
+                      ],
+                      "op": "div",
+                    },
+                  ],
+                  "call": "log",
+                },
+              ],
+              "op": "mul",
+            },
+            "hi": null,
+            "idx": "i",
+            "lo": null,
+          },
+        ],
+        "op": "neg",
+      },
+    },
+  ],
 }
 `;
 
 exports[`the parser, on every row of the Menu and the Cookbook > cookbook/softmax row 2 1`] = `
 {
-  "error": "expected {",
-  "parts": [],
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "deriv": {
+          "sym": "J",
+        },
+        "form": "grad",
+        "order": 1,
+        "wrt": [
+          {
+            "sym": "z",
+          },
+        ],
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "args": [
+                  {
+                    "sym": "z",
+                  },
+                ],
+                "call": "exp",
+              },
+              {
+                "bigop": "sum",
+                "body": {
+                  "args": [
+                    {
+                      "raw": "an indexed symbol z_j",
+                    },
+                  ],
+                  "call": "exp",
+                },
+                "hi": null,
+                "idx": "i",
+                "lo": null,
+              },
+            ],
+            "op": "div",
+          },
+          {
+            "sym": "p",
+          },
+        ],
+        "op": "sub",
+      },
+    },
+  ],
 }
 `;
 

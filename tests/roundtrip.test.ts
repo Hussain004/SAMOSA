@@ -58,9 +58,18 @@ function shape(expression: string): string | null {
 /** Does the tree have a piece of unknown notation in it? */
 function hasRaw(node: unknown): boolean {
   if (!node || typeof node !== 'object') return false;
-  const any = node as { k?: string; args?: unknown[]; f?: unknown; wrt?: unknown[] };
+  const any = node as {
+    k?: string;
+    args?: unknown[];
+    f?: unknown;
+    wrt?: unknown[];
+    body?: unknown;
+    rows?: unknown[][];
+  };
   if (any.k === 'raw') return true;
   if (any.k === 'deriv') return hasRaw(any.f) || (any.wrt ?? []).some(hasRaw);
+  if (any.k === 'bigop') return hasRaw(any.body);
+  if (any.k === 'block') return (any.rows ?? []).some((row) => row.some(hasRaw));
   for (const arg of any.args ?? []) if (hasRaw(arg)) return true;
   return false;
 }

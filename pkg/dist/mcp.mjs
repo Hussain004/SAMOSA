@@ -4049,6 +4049,10 @@ function tokenize(src) {
       while (i2 < n && text[i2] !== "\n") i2++;
       continue;
     }
+    if (ch === "~") {
+      i2++;
+      continue;
+    }
     if (ch === "\\") {
       const start = i2;
       i2++;
@@ -4186,7 +4190,7 @@ function tokenize(src) {
     if (/[0-9]/.test(ch) || ch === "." && /[0-9]/.test(text[i2 + 1] ?? "")) {
       let j = i2;
       while (j < n && /[0-9]/.test(text[j])) j++;
-      if (text[j] === ".") {
+      if (text[j] === "." && /[0-9]/.test(text[j + 1] ?? "")) {
         j++;
         while (j < n && /[0-9]/.test(text[j])) j++;
       }
@@ -4298,6 +4302,7 @@ var SYMBOL_COMMANDS = /* @__PURE__ */ new Set([
   "hbar",
   "Re",
   "Im",
+  "Pr",
   "varnothing",
   "aleph",
   "wp"
@@ -4329,7 +4334,9 @@ var RELATION_COMMANDS = {
   subseteq: "other",
   supset: "other",
   supseteq: "other",
-  models: "other"
+  models: "other",
+  indep: "other",
+  independent: "other"
 };
 var NON_OPERAND_COMMANDS = /* @__PURE__ */ new Set([
   ...Object.keys(RELATION_COMMANDS),
@@ -4339,7 +4346,8 @@ var NON_OPERAND_COMMANDS = /* @__PURE__ */ new Set([
   "label",
   "tag",
   "hline",
-  "cline"
+  "cline",
+  "rangle"
 ]);
 var EOF_TOKEN = { type: "eof", value: "", from: 0, to: 0 };
 var DIVERGENCES = /* @__PURE__ */ new Set(["d", "kl", "d_kl", "dkl", "div", "chi"]);
@@ -4353,6 +4361,8 @@ var Parser = class _Parser {
   firstFactor = false;
   /** is the parser inside the arguments of a divergence? */
   inDivergence = false;
+  /** stop a product at a bar, so a call can read a condition */
+  stopAtBar = false;
   tokens;
   opts;
   constructor(tokens, _src, opts = {}) {
@@ -4527,7 +4537,12 @@ var Parser = class _Parser {
     }
     let node = base;
     if (node.k === "sym") {
-      node = this.makeSym(accents, baseLatex, sub2, labelSup, {
+      const indexNotation = sub2 !== null && /^[ijk]$/.test(sub2.trim()) && /^[A-Za-z]$/.test(baseLatex);
+      node = indexNotation ? {
+        k: "raw",
+        text: `an indexed symbol ${baseLatex}_${sub2}`,
+        span: { from: node.span.from, to: spanEnd }
+      } : this.makeSym(accents, baseLatex, sub2, labelSup, {
         from: node.span.from,
         to: spanEnd
       });
@@ -4626,14 +4641,38 @@ var Parser = class _Parser {
       case "lbrace":
       case "lparen":
       case "lbrack":
+      case "begin":
         return true;
       case "cmd":
         return !NON_OPERAND_COMMANDS.has(t.value) && !["left", "right"].includes(t.value) && t.value !== "nonumber";
+      // A bar can start a norm or an absolute value. The parser finds the
+      // matching bar before it parses what is inside, so the closing bar is
+      // never mistaken for the start of another factor. In a call, the bar
+      // is a condition and has to be left for parseArgs.
+      case "op":
+        return t.value === "." && this.tokens[this.pos + 1]?.value === "." && this.tokens[this.pos + 2]?.value === ".";
       case "csym":
-        return t.value !== "'" && t.value !== "|" && t.value !== "\\|";
+        if (this.stopAtBar && (t.value === "|" || t.value === "\\|")) {
+          return this.barAhead(t.value);
+        }
+        return t.value !== "'";
       default:
         return false;
     }
+  }
+  /** Is there a matching bar ahead, so this bar opens a norm or an absolute value? */
+  barAhead(kind) {
+    let depth = 0;
+    for (let i2 = this.pos + 1; i2 < this.tokens.length; i2++) {
+      const t = this.tokens[i2];
+      if (t.type === "lparen" || t.type === "lbrack" || t.type === "lbrace") depth++;
+      else if (t.type === "rparen" || t.type === "rbrack" || t.type === "rbrace") {
+        if (depth > 0) depth--;
+      } else if (depth === 0 && t.type === "csym" && t.value === kind) {
+        return true;
+      }
+    }
+    return false;
   }
   parseUnary() {
     const t = this.cur;
@@ -4745,19 +4784,8 @@ var Parser = class _Parser {
         }
         return scripted;
       }
-      case "lparen": {
-        const open = this.tokens[this.pos];
-        this.pos++;
-        const condition = this.groupRelation();
-        if (condition) {
-          const close2 = this.tokens[condition.close];
-          this.pos = condition.close + 1;
-          return { k: "raw", text: "a relation inside a group", span: { from: open.from, to: close2.to } };
-        }
-        const inner2 = this.parseExpression();
-        const close = this.expect("rparen", ")");
-        return { ...inner2, span: { from: open.from, to: close.to } };
-      }
+      case "lparen":
+        return this.parseParenthesized();
       case "lbrace": {
         return this.parseGroupAsExpression();
       }
@@ -4778,6 +4806,11 @@ var Parser = class _Parser {
             ],
             span: { from: t.from, to: right.span.to }
           };
+        }
+        if (t.value === "." && this.tokens[this.pos + 1]?.type === "op" && this.tokens[this.pos + 1]?.value === "." && this.tokens[this.pos + 2]?.type === "op" && this.tokens[this.pos + 2]?.value === ".") {
+          const last = this.tokens[this.pos + 2];
+          this.pos += 3;
+          return { k: "raw", text: "an ellipsis", span: { from: t.from, to: last.to } };
         }
         if (t.value === ".") {
           this.pos++;
@@ -4803,6 +4836,71 @@ var Parser = class _Parser {
         break;
     }
     throw new ParseFailure(`unexpected ${describeToken(t)}`, { from: t.from, to: t.to });
+  }
+  /** A parenthesised expression, a tuple, or a condition. */
+  parseParenthesized() {
+    const open = this.expect("lparen", "(");
+    return this.parseDelimited(open, "rparen", ")");
+  }
+  /** A bracketed expression, a tuple, or an expectation argument. */
+  parseBracketed() {
+    const open = this.expect("lbrack", "[");
+    return this.parseDelimited(open, "rbrack", "]");
+  }
+  /** One expression inside a group, stopped before a conditional bar. */
+  parseGroupExpression() {
+    const was = this.stopAtBar;
+    this.stopAtBar = true;
+    try {
+      return this.parseExpression();
+    } finally {
+      this.stopAtBar = was;
+    }
+  }
+  /**
+   * Reads a delimited group.
+   *
+   * A group can hold a list, `(a, b)`, or a condition, `(x \mid y)`. Neither
+   * is an expression of its own, so both become one named unknown instead of
+   * a parse error.
+   */
+  parseDelimited(open, closeType, closeText) {
+    const condition = this.groupRelation();
+    if (condition) {
+      const close2 = this.tokens[condition.close];
+      this.pos = condition.close + 1;
+      return { k: "raw", text: "a relation inside a group", span: { from: open.from, to: close2.to } };
+    }
+    const parts = [];
+    if (this.kind() !== closeType) {
+      parts.push(this.parseGroupExpression());
+      while (this.kind() === "comma" || this.kind() === "semi") {
+        this.pos++;
+        parts.push(this.parseGroupExpression());
+      }
+      if (this.kind() === "csym" && (this.cur.value === "|" || this.cur.value === "\\|")) {
+        this.pos++;
+        this.skipToClose(closeType);
+        if (this.kind() === closeType) {
+          const close2 = this.cur;
+          this.pos++;
+          return { k: "raw", text: "a relation inside a group", span: { from: open.from, to: close2.to } };
+        }
+        return { k: "raw", text: "an unclosed group", span: { from: open.from, to: open.to } };
+      }
+    }
+    if (this.kind() === "eof" || this.kind() === "end") {
+      const last = this.tokens[Math.max(0, this.pos - 1)] ?? open;
+      return { k: "raw", text: "an unclosed group", span: { from: open.from, to: last.to } };
+    }
+    const close = this.expect(closeType, closeText);
+    if (parts.length > 1) {
+      return { k: "raw", text: "a list", span: { from: open.from, to: close.to } };
+    }
+    if (!parts.length) {
+      return { k: "raw", text: "an empty group", span: { from: open.from, to: close.to } };
+    }
+    return { ...parts[0], span: { from: open.from, to: close.to } };
   }
   /**
    * Finds a relation inside the group that starts at the previous token.
@@ -4834,34 +4932,10 @@ var Parser = class _Parser {
   }
   parseGroupAsExpression() {
     const open = this.expect("lbrace", "{");
-    const condition = this.groupRelation();
-    if (condition) {
-      const close2 = this.tokens[condition.close];
-      this.pos = condition.close + 1;
-      return { k: "raw", text: "a relation inside a group", span: { from: open.from, to: close2.to } };
-    }
-    const parts = [this.parseExpression()];
-    while (this.kind() === "comma") {
-      this.pos++;
-      parts.push(this.parseExpression());
-    }
-    const close = this.expect("rbrace", "}");
-    if (parts.length > 1) {
-      return { k: "raw", text: "a list", span: { from: open.from, to: close.to } };
-    }
-    return { ...parts[0], span: { from: open.from, to: close.to } };
+    return this.parseDelimited(open, "rbrace", "}");
   }
   parseBareBracket() {
-    const open = this.expect("lbrack", "[");
-    const condition = this.groupRelation();
-    if (condition) {
-      const close2 = this.tokens[condition.close];
-      this.pos = condition.close + 1;
-      return { k: "raw", text: "a relation inside a group", span: { from: open.from, to: close2.to } };
-    }
-    const inner2 = this.parseExpression();
-    const close = this.expect("rbrack", "]");
-    return { ...inner2, span: { from: open.from, to: close.to } };
+    return this.parseBracketed();
   }
   /**
    * The end of a call.
@@ -4880,7 +4954,7 @@ var Parser = class _Parser {
     let unknown = null;
     if (this.kind() !== "rparen") {
       for (; ; ) {
-        args.push(this.parseExpression());
+        args.push(this.parseArgExpression());
         if (this.atRelation()) {
           this.skipToCloseParen();
           this.expect("rparen", ")");
@@ -4893,7 +4967,7 @@ var Parser = class _Parser {
         }
         if (this.kind() === "csym" && this.cur.value === "\\|" && this.inDivergence) {
           this.pos++;
-          args.push(this.parseExpression());
+          args.push(this.parseArgExpression());
           if (this.kind() === "comma" || this.kind() === "semi") {
             this.pos++;
             continue;
@@ -4903,7 +4977,7 @@ var Parser = class _Parser {
         if (this.kind() === "csym" && this.cur.value === "|") {
           this.pos++;
           unknown = "a conditional distribution";
-          args.push(this.parseExpression());
+          args.push(this.parseArgExpression());
           if (this.atRelation()) {
             this.skipToCloseParen();
             this.expect("rparen", ")");
@@ -4920,6 +4994,21 @@ var Parser = class _Parser {
     }
     this.expect("rparen", ")");
     return { args, unknown };
+  }
+  /**
+   * One argument of a call.
+   *
+   * The bar is the separator of a conditional, so the product rule must not
+   * swallow it as the start of another absolute value.
+   */
+  parseArgExpression() {
+    const was = this.stopAtBar;
+    this.stopAtBar = true;
+    try {
+      return this.parseExpression();
+    } finally {
+      this.stopAtBar = was;
+    }
   }
   /** Is the next token a relation that the expression parser stopped at? */
   atRelation() {
@@ -5050,6 +5139,10 @@ var Parser = class _Parser {
         const sym = this.makeSym(["mathbb"], base, null, null, { from: t.from, to: g.span.to });
         if (base === "E" || base === "V") {
           return this.finishExpectation({ from: t.from, to: g.span.to }, base === "E" ? "E" : "Var");
+        }
+        if (base === "P" && this.kind() === "lparen") {
+          const { args, unknown } = this.parseArgs();
+          return this.makeCall("P", t.from, args, unknown);
         }
         return this.applyScripts(sym, ["mathbb"], base);
       }
@@ -5351,7 +5444,7 @@ var Parser = class _Parser {
       const args = [];
       if (this.kind() !== "rbrack") {
         for (; ; ) {
-          args.push(this.parseExpression());
+          args.push(this.parseArgExpression());
           if (this.atRelation()) {
             this.skipToClose("rbrack");
             const close2 = this.expect("rbrack", "]");
@@ -5364,7 +5457,7 @@ var Parser = class _Parser {
           if (this.kind() === "csym" && this.cur.value === "|") {
             this.pos++;
             for (; ; ) {
-              args.push(this.parseExpression());
+              args.push(this.parseArgExpression());
               if (this.atRelation()) {
                 this.skipToClose("rbrack");
                 const close3 = this.expect("rbrack", "]");
@@ -5393,7 +5486,7 @@ var Parser = class _Parser {
     let hi = null;
     if (this.kind() === "sub") {
       this.pos++;
-      const g = this.rawGroupText();
+      const g = this.readGroupOrToken();
       const m = g.text.match(/^\s*([A-Za-z]+)\s*=\s*(.*)$/);
       if (m) {
         idx = m[1];
@@ -5410,7 +5503,7 @@ var Parser = class _Parser {
     }
     if (this.kind() === "sup") {
       this.pos++;
-      const g = this.rawGroupText();
+      const g = this.readGroupOrToken();
       const p = new _Parser(tokenize(g.text), g.text, this.opts);
       try {
         hi = p.parseExpression();
@@ -5433,6 +5526,9 @@ var Parser = class _Parser {
     const t = this.cur;
     this.pos++;
     const env = t.value;
+    if ((env === "array" || env === "alignedat") && this.kind() === "lbrace") {
+      this.rawGroupText();
+    }
     const rows = [];
     let row = [];
     while (this.kind() !== "end" && this.kind() !== "eof") {
@@ -5446,9 +5542,21 @@ var Parser = class _Parser {
         row = [];
         continue;
       }
+      if (this.startsRelation()) {
+        row.push(this.skipCell());
+        continue;
+      }
       row.push(this.parseExpression());
       if (this.kind() === "amp" || this.kind() === "nl") continue;
       if (this.kind() === "end" || this.kind() === "eof") break;
+      if (this.startsRelation()) {
+        row.push(this.skipCell());
+        continue;
+      }
+      if (this.kind() === "comma" || this.kind() === "semi") {
+        this.pos++;
+        continue;
+      }
       break;
     }
     if (row.length) rows.push(row);
@@ -5458,48 +5566,109 @@ var Parser = class _Parser {
     void env;
     return { k: "block", rows, span };
   }
+  /** Does the current token begin a relation or a condition? */
+  startsRelation() {
+    const t = this.cur;
+    if (t.type === "op" && ["=", "<", ">", "!", ":"].includes(t.value)) return true;
+    return t.type === "cmd" && RELATION_COMMANDS[t.value] !== void 0;
+  }
+  /** Consumes the rest of a cases cell, up to `&`, `\\\\` or the end. */
+  skipCell() {
+    const first = this.cur;
+    let depth = 0;
+    let last = first;
+    while (this.pos < this.tokens.length) {
+      const t = this.cur;
+      if (depth === 0 && (t.type === "amp" || t.type === "nl" || t.type === "end" || t.type === "eof")) break;
+      if (t.type === "lparen" || t.type === "lbrack" || t.type === "lbrace") depth++;
+      else if (t.type === "rparen" || t.type === "rbrack" || t.type === "rbrace") {
+        if (depth > 0) depth--;
+      }
+      last = t;
+      this.pos++;
+    }
+    return { k: "raw", text: "a relation inside a group", span: { from: first.from, to: last.to } };
+  }
   /**
    * A norm: \|x\| and \|A\|_F.
    *
    * A squared norm is a sum of squares, so it is exact. The unsquared ones
    * are not rational, so they are left unsupported rather than approximated.
+   *
+   * The matching bar is found before the inside is parsed. Otherwise the
+   * product rule sees the closing bar and starts another norm, and a norm on
+   * the right of a product, as in `2\|x\|`, is never read.
    */
   parseNorm() {
     const open = this.cur;
     this.pos++;
-    const inner2 = this.parseExpression();
-    const close = this.cur;
-    if (close.type === "csym" && close.value === "\\|") {
-      this.pos++;
-      let kind = "2";
-      let squared = false;
-      if (this.kind() === "sub") {
-        this.pos++;
-        kind = this.readSubscript().text;
-      }
-      if (this.kind() === "sup") {
-        this.pos++;
-        squared = this.readSuperscript().text === "2";
-      }
-      const span = { from: open.from, to: close.to };
-      if (squared) {
-        if (kind === "F" || kind === "f") return { k: "op", op: "frob", args: [inner2], span };
-        return { k: "op", op: "norm2", args: [inner2], span };
-      }
-      return { k: "raw", text: `the unsquared norm \\|${kind}\\|`, span };
+    const closeIndex = this.barClose(open, "\\|");
+    if (closeIndex < 0) {
+      this.pos = this.tokens.length;
+      return { k: "raw", text: "an unbalanced norm", span: { from: open.from, to: open.to } };
     }
-    return { k: "raw", text: "an unbalanced norm", span: { from: open.from, to: inner2.span.to } };
+    const inner2 = this.parseInside(open, closeIndex);
+    const close = this.tokens[closeIndex];
+    this.pos = closeIndex + 1;
+    let kind = "2";
+    let squared = false;
+    let scriptEnd = close.to;
+    if (this.kind() === "sub") {
+      this.pos++;
+      const sub2 = this.readSubscript();
+      kind = sub2.text;
+      scriptEnd = sub2.span.to;
+    }
+    if (this.kind() === "sup") {
+      this.pos++;
+      const sup = this.readSuperscript();
+      squared = sup.text === "2";
+      scriptEnd = sup.span.to;
+    }
+    const span = { from: open.from, to: scriptEnd };
+    if (squared) {
+      if (kind === "F" || kind === "f") return { k: "op", op: "frob", args: [inner2], span };
+      return { k: "op", op: "norm2", args: [inner2], span };
+    }
+    return { k: "raw", text: `the unsquared norm \\|${kind}\\|`, span: { from: open.from, to: scriptEnd } };
   }
   parseBars() {
     const open = this.cur;
     this.pos++;
-    const inner2 = this.parseExpression();
-    const close = this.cur;
-    if (close.type === "csym" && close.value === "|") {
-      this.pos++;
-      return { k: "op", op: "abs", args: [inner2], span: { from: open.from, to: close.to } };
+    const closeIndex = this.barClose(open, "|");
+    if (closeIndex < 0) {
+      this.pos = this.tokens.length;
+      return { k: "raw", text: "unbalanced |", span: { from: open.from, to: open.to } };
     }
-    return { k: "raw", text: "unbalanced |", span: { from: open.from, to: inner2.span.to } };
+    const inner2 = this.parseInside(open, closeIndex);
+    const close = this.tokens[closeIndex];
+    this.pos = closeIndex + 1;
+    return { k: "op", op: "abs", args: [inner2], span: { from: open.from, to: close.to } };
+  }
+  /** The next bar of the same kind at the top level, or -1. */
+  barClose(open, kind) {
+    let depth = 0;
+    for (let i2 = this.pos; i2 < this.tokens.length; i2++) {
+      const t = this.tokens[i2];
+      if (t.type === "lparen" || t.type === "lbrack" || t.type === "lbrace") depth++;
+      else if (t.type === "rparen" || t.type === "rbrack" || t.type === "rbrace") {
+        if (depth > 0) depth--;
+      } else if (depth === 0 && t.type === "csym" && t.value === kind) {
+        return i2;
+      }
+    }
+    return -1;
+  }
+  /** Parses the tokens between an opening delimiter and its match. */
+  parseInside(open, closeIndex) {
+    const inner2 = this.tokens.slice(this.pos, closeIndex);
+    const parser = new _Parser(inner2, "", this.opts);
+    try {
+      return parser.parseExpression();
+    } catch {
+      const last = inner2.at(-1) ?? open;
+      return { k: "raw", text: "an unreadable group", span: { from: open.to, to: last.to } };
+    }
   }
 };
 function describeToken(t) {
@@ -5528,28 +5697,57 @@ function classifySuperscript(text) {
   if (/^\d+$/.test(s)) return { kind: "power", powerText: s };
   return { kind: "label" };
 }
+function hasRelationInEnv(tokens) {
+  let inEnv = 0;
+  for (const t of tokens) {
+    if (t.type === "begin") {
+      inEnv++;
+      continue;
+    }
+    if (t.type === "end") {
+      if (inEnv > 0) inEnv--;
+      continue;
+    }
+    if (inEnv === 0) continue;
+    if (t.type === "op" && ["=", "<", ">"].includes(t.value)) return true;
+    if (t.type === "cmd" && RELATION_COMMANDS[t.value] !== void 0) return true;
+  }
+  return false;
+}
 function findRelations(tokens) {
   const out = [];
   let depth = 0;
-  let inText = 0;
+  let inEnv = 0;
   for (let i2 = 0; i2 < tokens.length; i2++) {
     const t = tokens[i2];
+    if (t.type === "begin") {
+      inEnv++;
+      continue;
+    }
+    if (t.type === "end") {
+      if (inEnv > 0) inEnv--;
+      continue;
+    }
+    if (inEnv > 0) continue;
+    if (t.type === "cmd" && t.value === "text") {
+      let braces = 0;
+      let j = i2;
+      for (; j < tokens.length; j++) {
+        if (tokens[j].type === "lbrace") braces++;
+        else if (tokens[j].type === "rbrace") {
+          braces--;
+          if (braces === 0) break;
+        }
+      }
+      i2 = j;
+      continue;
+    }
     if (t.type === "lbrace" || t.type === "lparen" || t.type === "lbrack") {
       depth++;
       continue;
     }
     if (t.type === "rbrace" || t.type === "rparen" || t.type === "rbrack") {
       depth--;
-      continue;
-    }
-    if (t.type === "cmd" && t.value === "text") {
-      inText = 1;
-      continue;
-    }
-    if (inText) {
-      const kind = t.type;
-      if (kind === "lbrace") inText++;
-      else if (kind === "rbrace") inText--;
       continue;
     }
     if (depth > 0) continue;
@@ -5580,8 +5778,18 @@ function findRelations(tokens) {
 function clauseSplits(tokens) {
   const separators = [];
   let depth = 0;
+  let inEnv = 0;
   for (let i2 = 0; i2 < tokens.length; i2++) {
     const t = tokens[i2];
+    if (t.type === "begin") {
+      inEnv++;
+      continue;
+    }
+    if (t.type === "end") {
+      if (inEnv > 0) inEnv--;
+      continue;
+    }
+    if (inEnv > 0) continue;
     if (t.type === "lbrace" || t.type === "lparen" || t.type === "lbrack") {
       depth++;
       continue;
@@ -5629,6 +5837,18 @@ function parseRow(_src, rowText, offset, index, knownFns) {
   tokens = blankAlignmentMarkers(tokens);
   const rels = findRelations(tokens);
   if (rels.length === 0) {
+    if (hasRelationInEnv(tokens)) {
+      return {
+        index,
+        span: { from: offset, to: offset + rowText.length },
+        parts: [],
+        annotation,
+        error: new ParseFailure("a relation inside an environment", {
+          from: offset,
+          to: offset + rowText.length
+        })
+      };
+    }
     return {
       index,
       span: { from: offset, to: offset + rowText.length },
