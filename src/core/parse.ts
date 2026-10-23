@@ -550,7 +550,11 @@ export class Parser {
         }
         const sym = this.makeSym([], t.value, null, null, { from: t.from, to: t.to });
         const scripted = this.applyScripts(sym, [], t.value);
-        if (this.kind() === 'lparen' && scripted.k === 'sym' && this.looksLikeCall(t.value)) {
+        // d^2(f, g) is a function with a square on its name, not a product
+        // of d squared and a group. The same shape reads H^2(...)
+        const power =
+          scripted.k === 'op' && scripted.op === 'pow' && scripted.args[0]?.k === 'sym' ? scripted : null;
+        if (this.kind() === 'lparen' && (scripted.k === 'sym' || power) && this.looksLikeCall(t.value)) {
           // A lowercase name with parentheses is a function call, even when
           // SAMOSA does not know the function. A capital name is a matrix, so
           // A(B) is a product, the way the notation reads.
@@ -558,7 +562,10 @@ export class Parser {
           this.inDivergence = DIVERGENCES.has(plainName(t.value));
           const { args, unknown } = this.parseArgs();
           this.inDivergence = wasDivergence;
-          return this.makeCall(t.value, t.from, args, unknown);
+          const call = this.makeCall(t.value, t.from, args, unknown);
+          const exponent = power?.args[1];
+          if (!exponent) return call;
+          return { k: 'op', op: 'pow', args: [call, exponent], span: { from: call.span.from, to: call.span.to } };
         }
         return scripted;
       }
@@ -766,17 +773,21 @@ export class Parser {
     return t.type === 'cmd' && RELATION_COMMANDS[t.value] !== undefined;
   }
 
-  /** Moves to the closing parenthesis of the argument list being read. */
-  private skipToCloseParen(): void {
+  /** Moves to the closing delimiter of the group being read. */
+  private skipToClose(close: 'rparen' | 'rbrack'): void {
     let depth = 0;
     for (; this.pos < this.tokens.length; this.pos++) {
       const t = this.tokens[this.pos];
       if (t.type === 'lparen' || t.type === 'lbrack' || t.type === 'lbrace') depth++;
       else if (t.type === 'rparen' || t.type === 'rbrack' || t.type === 'rbrace') {
-        if (depth === 0 && t.type === 'rparen') return;
+        if (depth === 0 && t.type === close) return;
         if (depth > 0) depth--;
       }
     }
+  }
+
+  private skipToCloseParen(): void {
+    this.skipToClose('rparen');
   }
 
   /**
@@ -956,9 +967,14 @@ export class Parser {
       this.pos++;
       const sym = this.makeSym([], `\\${name}`, null, null, { from: t.from, to: t.to });
       const scripted = this.applyScripts(sym, [], `\\${name}`);
-      if (this.kind() === 'lparen' && scripted.k === 'sym') {
+      const power =
+        scripted.k === 'op' && scripted.op === 'pow' && scripted.args[0]?.k === 'sym' ? scripted : null;
+      if (this.kind() === 'lparen' && (scripted.k === 'sym' || power)) {
         const { args, unknown } = this.parseArgs();
-        return this.makeCall(`\\${name}`, t.from, args, unknown);
+        const call = this.makeCall(`\\${name}`, t.from, args, unknown);
+        const exponent = power?.args[1];
+        if (!exponent) return call;
+        return { k: 'op', op: 'pow', args: [call, exponent], span: { from: call.span.from, to: call.span.to } };
       }
       return scripted;
     }
@@ -1234,6 +1250,11 @@ export class Parser {
       if (this.kind() !== 'rbrack') {
         for (;;) {
           args.push(this.parseExpression());
+          if (this.atRelation()) {
+            this.skipToClose('rbrack');
+            const close = this.expect('rbrack', ']');
+            return { k: 'raw', text: 'a relation inside a group', span: { from: span.from, to: close.to } };
+          }
           if (this.kind() === 'comma') {
             this.pos++;
             continue;
@@ -1244,6 +1265,11 @@ export class Parser {
             this.pos++;
             for (;;) {
               args.push(this.parseExpression());
+              if (this.atRelation()) {
+                this.skipToClose('rbrack');
+                const close = this.expect('rbrack', ']');
+                return { k: 'raw', text: 'a conditional expectation', span: { from: span.from, to: close.to } };
+              }
               if (this.kind() === 'comma') {
                 this.pos++;
                 continue;

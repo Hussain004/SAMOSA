@@ -38,9 +38,9 @@ The first release.
 
 ### Measured
 
-- 54.8% of the claim rows in the display math of 36 recent arXiv papers
-  parses end to end, and 24.6% is read with no named unknown construct. That
-  is 21.2% of all display rows. The first measurement was lenient; the
+- 56.3% of the claim rows in the display math of 36 recent arXiv papers
+  parses end to end, and 24.9% is read with no named unknown construct. That
+  is 21.5% of all display rows. The first measurement was lenient; the
   correction and the method are in
   [docs/COVERAGE.md](docs/COVERAGE.md).
 

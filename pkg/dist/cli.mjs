@@ -6891,12 +6891,16 @@ var Parser = class _Parser {
         }
         const sym = this.makeSym([], t.value, null, null, { from: t.from, to: t.to });
         const scripted = this.applyScripts(sym, [], t.value);
-        if (this.kind() === "lparen" && scripted.k === "sym" && this.looksLikeCall(t.value)) {
+        const power = scripted.k === "op" && scripted.op === "pow" && scripted.args[0]?.k === "sym" ? scripted : null;
+        if (this.kind() === "lparen" && (scripted.k === "sym" || power) && this.looksLikeCall(t.value)) {
           const wasDivergence = this.inDivergence;
           this.inDivergence = DIVERGENCES.has(plainName(t.value));
           const { args, unknown } = this.parseArgs();
           this.inDivergence = wasDivergence;
-          return this.makeCall(t.value, t.from, args, unknown);
+          const call = this.makeCall(t.value, t.from, args, unknown);
+          const exponent = power?.args[1];
+          if (!exponent) return call;
+          return { k: "op", op: "pow", args: [call, exponent], span: { from: call.span.from, to: call.span.to } };
         }
         return scripted;
       }
@@ -7082,17 +7086,20 @@ var Parser = class _Parser {
     if (t.type === "op" && (t.value === "=" || t.value === "<" || t.value === ">" || t.value === ":")) return true;
     return t.type === "cmd" && RELATION_COMMANDS[t.value] !== void 0;
   }
-  /** Moves to the closing parenthesis of the argument list being read. */
-  skipToCloseParen() {
+  /** Moves to the closing delimiter of the group being read. */
+  skipToClose(close) {
     let depth = 0;
     for (; this.pos < this.tokens.length; this.pos++) {
       const t = this.tokens[this.pos];
       if (t.type === "lparen" || t.type === "lbrack" || t.type === "lbrace") depth++;
       else if (t.type === "rparen" || t.type === "rbrack" || t.type === "rbrace") {
-        if (depth === 0 && t.type === "rparen") return;
+        if (depth === 0 && t.type === close) return;
         if (depth > 0) depth--;
       }
     }
+  }
+  skipToCloseParen() {
+    this.skipToClose("rparen");
   }
   /**
    * A call, unless its arguments hold a conditional bar. The engine has no
@@ -7255,9 +7262,13 @@ var Parser = class _Parser {
       this.pos++;
       const sym = this.makeSym([], `\\${name}`, null, null, { from: t.from, to: t.to });
       const scripted = this.applyScripts(sym, [], `\\${name}`);
-      if (this.kind() === "lparen" && scripted.k === "sym") {
+      const power = scripted.k === "op" && scripted.op === "pow" && scripted.args[0]?.k === "sym" ? scripted : null;
+      if (this.kind() === "lparen" && (scripted.k === "sym" || power)) {
         const { args, unknown } = this.parseArgs();
-        return this.makeCall(`\\${name}`, t.from, args, unknown);
+        const call = this.makeCall(`\\${name}`, t.from, args, unknown);
+        const exponent = power?.args[1];
+        if (!exponent) return call;
+        return { k: "op", op: "pow", args: [call, exponent], span: { from: call.span.from, to: call.span.to } };
       }
       return scripted;
     }
@@ -7500,6 +7511,11 @@ var Parser = class _Parser {
       if (this.kind() !== "rbrack") {
         for (; ; ) {
           args.push(this.parseExpression());
+          if (this.atRelation()) {
+            this.skipToClose("rbrack");
+            const close2 = this.expect("rbrack", "]");
+            return { k: "raw", text: "a relation inside a group", span: { from: span.from, to: close2.to } };
+          }
           if (this.kind() === "comma") {
             this.pos++;
             continue;
@@ -7508,6 +7524,11 @@ var Parser = class _Parser {
             this.pos++;
             for (; ; ) {
               args.push(this.parseExpression());
+              if (this.atRelation()) {
+                this.skipToClose("rbrack");
+                const close3 = this.expect("rbrack", "]");
+                return { k: "raw", text: "a conditional expectation", span: { from: span.from, to: close3.to } };
+              }
               if (this.kind() === "comma") {
                 this.pos++;
                 continue;

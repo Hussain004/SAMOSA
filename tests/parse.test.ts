@@ -170,4 +170,16 @@ describe('the end of the row and the shape of a clause', () => {
     expect(parsed.error).toBeUndefined();
     expect(parsed.parts[0].lhs).toMatchObject({ k: 'op', op: 'mul' });
   });
+
+  it('reads a conditional expectation whose condition has a relation', () => {
+    const parsed = parseRow('', String.raw`\mathbb{E}[X \mid Y = 1] = 2`, 0, 0);
+    expect(parsed.error).toBeUndefined();
+    expect(parsed.parts[0].lhs).toMatchObject({ k: 'raw', text: 'a conditional expectation' });
+  });
+
+  it('reads an expectation of a condition, and leaves it unchecked', () => {
+    const parsed = parseRow('', String.raw`\mathbb{E}[X = 1] = 0.5`, 0, 0);
+    expect(parsed.error).toBeUndefined();
+    expect(JSON.stringify(parsed.parts[0].lhs)).toContain('a relation inside a group');
+  });
 });

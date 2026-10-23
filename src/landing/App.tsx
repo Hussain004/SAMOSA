@@ -627,7 +627,7 @@ const DEEP_DIVES = [
   {
     n: '06',
     title: 'It reads real papers',
-    body: 'Of the claim rows in the display math of 36 recent papers, 54.8% parses end to end and 24.6% is read with no named unknown construct. The first measurement was lenient; this one parses the whole row, and the correction is published.',
+    body: 'Of the claim rows in the display math of 36 recent papers, 56.3% parses end to end and 24.9% is read with no named unknown construct. The first measurement was lenient; this one parses the whole row, and the correction is published.',
     link: '/docs/COVERAGE.md',
   },
 ];
@@ -794,19 +794,19 @@ function DiveVisual({ index }: { index: number }) {
           <div className="mt-3">
             <div className={row}>
               <span>parses end to end</span>
-              <span className="text-[var(--color-text)]">54.8%</span>
+              <span className="text-[var(--color-text)]">56.3%</span>
             </div>
             <div className="mt-1 h-1.5 rounded bg-[var(--color-line)]">
-              <div className="h-full rounded bg-[var(--color-gold)]" style={{ width: '54.8%' }} />
+              <div className="h-full rounded bg-[var(--color-gold)]" style={{ width: '56.3%' }} />
             </div>
           </div>
           <div className="mt-4">
             <div className={row}>
               <span>no unknown construct</span>
-              <span className="text-[var(--color-text)]">24.6%</span>
+              <span className="text-[var(--color-text)]">24.9%</span>
             </div>
             <div className="mt-1 h-1.5 rounded bg-[var(--color-line)]">
-              <div className="h-full rounded bg-[var(--color-chutney)]" style={{ width: '24.6%' }} />
+              <div className="h-full rounded bg-[var(--color-chutney)]" style={{ width: '24.9%' }} />
             </div>
           </div>
           <p className="mt-4 text-[var(--color-faint)]">the first number was lenient; this one parses the whole row. the second is an upper bound, because the run does not read the preamble</p>

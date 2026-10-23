@@ -21,14 +21,14 @@ not counted.
 | display math rows | 1416 |
 | rows with no relation (prose, a tuple, a line of a definition) | 197 |
 | claim rows | 1219 |
-| claim rows that parse end to end | 668 (**54.8%**) |
-| claim rows with no unknown construct | 300 (**24.6%**) |
-| of all display rows, the share with no unknown construct | 300 of 1416 (**21.2%**) |
+| claim rows that parse end to end | 686 (**56.3%**) |
+| claim rows with no unknown construct | 304 (**24.9%**) |
+| of all display rows, the share with no unknown construct | 304 of 1416 (**21.5%**) |
 
-**54.8%** is the parse coverage: the whole row becomes a tree, so SAMOSA can
+**56.3%** is the parse coverage: the whole row becomes a tree, so SAMOSA can
 look at it. The plan's gate G3 asks for 70%. The gate is not met.
 
-**24.6%** is the share with no named unknown construct: every part of the
+**24.9%** is the share with no named unknown construct: every part of the
 row is something the parser has a rule for. This is an upper bound on the
 checkable share. The run parses each row on its own and does not read the
 paper's preamble, so a function the paper declares counts as a call here,
@@ -52,13 +52,13 @@ The failures, bucketed by the first thing that stopped the row:
 
 | rows | the construct |
 | --- | --- |
-| 178 | `expected )`, a `cases` block or a condition inside a probability |
-| 126 | a script on something that is not a symbol |
-| 58 | `expected {`, usually a `\left\{` set the parser cannot close |
+| 158 | `expected )`, a `cases` block or a condition inside a probability |
+| 133 | a script on something that is not a symbol |
+| 61 | `expected {`, usually a `\left\{` set the parser cannot close |
 | 52 | `unexpected ,`, a second clause with no claim of its own |
-| 46 | `expected ]`, a conditional inside a bracket |
 | 46 | a conditional distribution, `p(x \mid y)` |
-| 42 | `unexpected |`, a set builder or a conditional outside a call |
+| 43 | `unexpected |`, a set builder or a conditional outside a call |
+| 42 | `expected ]`, a conditional inside a bracket |
 | 39 | `unexpected \|`, a double bar used as a separator |
 | 23 | a relation inside a group, named and left unchecked |
 | 22 | `unexpected rbrace`, a macro that emits its own braces |
@@ -69,7 +69,7 @@ The failures, bucketed by the first thing that stopped the row:
 | 13 | `\norm`, a macro of the authors |
 | 13 | `expected \rangle`, an inner product |
 | 13 | `unexpected sub`, a subscript on an operator |
-| 10 | `unexpected \\`, a row break inside a nested environment |
+| 12 | `unexpected \\`, a row break inside a nested environment |
 | 8 | `expected }`, a macro of the authors that takes a block |
 | 9 | an expectation without an argument list |
 
@@ -96,6 +96,10 @@ The next ones are below.
 - An accented lowercase name followed by parentheses is a call:
   `\hat{l}(f, y)` is a loss, not a product of a hat and a group. A capital
   name in a product is still a matrix product.
+- A function with a power, `d^2(f, g)` or `\chi^2(p, q)`, is a call under a
+  power, not a product of the power and a group.
+- A condition inside an expectation, `\mathbb{E}[X \mid Y = 1]`, becomes a
+  named `raw` node, so the row is readable and unchecked.
 - `\mid` and `\middle|` are read as conditioning bars. A conditional call
   or expectation becomes a named `raw` node, so the row is readable and
   unchecked, never guessed at.

@@ -146,10 +146,10 @@ the 1219 claim rows:
 
 | | |
 | --- | --- |
-| rows that parse end to end | 668 (**54.8%**) |
-| rows with no unknown construct | 300 (**24.6%**) |
+| rows that parse end to end | 686 (**56.3%**) |
+| rows with no unknown construct | 304 (**24.9%**) |
 
-That is 21.2% of all 1416 display rows. The first version of this table
+That is 21.5% of all 1416 display rows. The first version of this table
 parsed only the first expression of each row and reported 86.8% and 50.0%.
 It was lenient, and this one replaces it. What stops the rest is a `cases`
 block inside a probability, a script on something that is not a symbol, a
