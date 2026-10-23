@@ -9,9 +9,21 @@
       content="SAMOSA checks every step of a matrix derivation, exactly, in your browser."
     />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <script>
+      (function () {
+        var light = false;
+        try { light = window.localStorage.getItem('samosa-theme') === 'light'; } catch (e) {}
+        document.documentElement.dataset.theme = light ? 'light' : 'dark';
+        var bg = light ? '#fbf8f1' : '#0b0a08';
+        var fg = light ? '#221d17' : '#ede6da';
+        var style = document.createElement('style');
+        style.textContent = 'html,body,#root{height:100%;margin:0;background-color:' + bg + ';color:' + fg + ';font-family:ui-monospace,monospace}';
+        document.head.appendChild(style);
+      })();
+    </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root" style="opacity:0;transition:opacity .15s ease"></div>
     <script type="module" src="/src/app/main.tsx"></script>
   </body>
 </html>
