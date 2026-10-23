@@ -1,6 +1,6 @@
 {
   "name": "samosa-math",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A step auditor for matrix algebra, stochastics and algebra. Checks every step of a derivation, exactly, with counterexamples and fixes.",
   "license": "MIT",
   "type": "module",
@@ -29,6 +29,9 @@
     "url": "git+https://github.com/Hussain004/SAMOSA.git"
   },
   "homepage": "https://samosa-math.vercel.app",
+  "bugs": {
+    "url": "https://github.com/Hussain004/SAMOSA/issues"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.1",
     "decimal.js": "^10.6.0",

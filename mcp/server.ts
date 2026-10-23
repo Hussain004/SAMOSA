@@ -13,7 +13,7 @@ import { shareLink } from '../src/core/share.ts';
  * the share link a human can open to see the same thing.
  */
 
-const VERSION = '1.0.0';
+const VERSION = '1.0.1';
 
 const server = new McpServer({ name: 'samosa', version: VERSION });
 

@@ -7174,7 +7174,7 @@ function collectDimVarsFor(ctx, lhs, rhs, defs) {
 }
 
 // src/core/verdict.ts
-var ENGINE_VERSION = "1.0.0";
+var ENGINE_VERSION = "1.0.1";
 var DEFAULT_SEED = 5910618;
 function collectSymbols(node, into) {
   if (!node) return;
@@ -10389,7 +10389,7 @@ function bytesToBase64Url(bytes) {
 }
 
 // mcp/server.ts
-var VERSION = "1.0.0";
+var VERSION = "1.0.1";
 var server = new McpServer({ name: "samosa", version: VERSION });
 var stepSchema = z.object({
   row: z.number(),

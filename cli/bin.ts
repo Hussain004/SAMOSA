@@ -14,7 +14,28 @@ import { formatGithub, formatPretty, formatSarif } from './format.ts';
  * caller asked for.
  */
 
-const VERSION = '1.0.0';
+const VERSION = '1.0.1';
+
+/**
+ * The flags that stand alone, before a command.
+ *
+ * `samosa --version` has no command, so the loop below would see the flag as
+ * the command and reject it. These are answered here instead.
+ */
+function topLevel(argv: string[]): void {
+  switch (argv[0]) {
+    case '--version':
+    case '-v':
+      print(`samosa ${VERSION}`);
+      process.exit(0);
+      break;
+    case '--help':
+    case '-h':
+      print(usage());
+      process.exit(0);
+      break;
+  }
+}
 
 interface Args {
   command: string;
@@ -30,6 +51,8 @@ interface Args {
 }
 
 function parseArgs(argv: string[]): Args {
+  topLevel(argv);
+
   const args: Args = {
     command: argv[0] ?? 'check',
     files: [],

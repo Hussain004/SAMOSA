@@ -40,7 +40,7 @@ import type { Dim } from './decl.ts';
  * non-commutativity, structure and shape all come for free.
  */
 
-export const ENGINE_VERSION = '1.0.0';
+export const ENGINE_VERSION = '1.0.1';
 export const DEFAULT_SEED = 0x5a305a;
 
 export type Verdict = 'ok' | 'wrong' | 'shape' | 'inconclusive' | 'unchecked' | 'defined';

@@ -9333,7 +9333,7 @@ function collectDimVarsFor(ctx, lhs, rhs, defs) {
 }
 
 // src/core/verdict.ts
-var ENGINE_VERSION = "1.0.0";
+var ENGINE_VERSION = "1.0.1";
 var DEFAULT_SEED = 5910618;
 function collectSymbols(node, into) {
   if (!node) return;
@@ -34748,8 +34748,23 @@ function formatGithub(reports) {
 }
 
 // cli/bin.ts
-var VERSION = "1.0.0";
+var VERSION = "1.0.1";
+function topLevel(argv) {
+  switch (argv[0]) {
+    case "--version":
+    case "-v":
+      print(`samosa ${VERSION}`);
+      process.exit(0);
+      break;
+    case "--help":
+    case "-h":
+      print(usage());
+      process.exit(0);
+      break;
+  }
+}
 function parseArgs(argv) {
+  topLevel(argv);
   const args = {
     command: argv[0] ?? "check",
     files: [],

@@ -13,7 +13,7 @@
 [![React](https://img.shields.io/badge/React-19-61dafb.svg)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-8-646cff.svg)](https://vite.dev/)
 [![npm](https://img.shields.io/npm/v/samosa-math.svg)](https://www.npmjs.com/package/samosa-math)
-[![Version](https://img.shields.io/badge/version-1.0.0-3b82f6.svg)](https://github.com/Hussain004/SAMOSA/releases)
+[![Version](https://img.shields.io/badge/version-1.0.1-3b82f6.svg)](https://github.com/Hussain004/SAMOSA/releases)
 
 [**→ Live demo**](https://samosa-math.vercel.app/app) · [Report a bug](https://github.com/Hussain004/SAMOSA/issues) · [Request a feature](https://github.com/Hussain004/SAMOSA/issues)
 

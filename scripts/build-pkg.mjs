@@ -62,6 +62,7 @@ writeFileSync(
       keywords: ['math', 'linear-algebra', 'matrix-calculus', 'latex', 'linter', 'kalman-filter', 'mcp', 'agent-skills'],
       repository: { type: 'git', url: 'git+https://github.com/Hussain004/SAMOSA.git' },
       homepage: 'https://samosa-math.vercel.app',
+      bugs: { url: 'https://github.com/Hussain004/SAMOSA/issues' },
       dependencies: {
         // the MCP server needs these; the CLI has everything inside it
         '@modelcontextprotocol/sdk': '^1.32.1',

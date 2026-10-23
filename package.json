@@ -1,7 +1,7 @@
 {
   "name": "samosa-math",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "description": "SAMOSA: a step auditor for matrix algebra, stochastics and algebra. Checks every step of a derivation, exactly, in your browser.",
   "license": "MIT",

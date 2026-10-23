@@ -1,4 +1,4 @@
-import type { Report } from '../core/index.ts';
+import { ENGINE_VERSION, type Report } from '../core/index.ts';
 import type { Settings } from './store.ts';
 
 /** The exports: JSON for the agents, Markdown for a person, LaTeX for a paper. */
@@ -7,7 +7,7 @@ export function exportJson(report: Report | null, source: string, settings: Sett
   return JSON.stringify(
     {
       tool: 'samosa',
-      version: report?.version ?? '1.0.0',
+      version: report?.version ?? ENGINE_VERSION,
       seed: settings.seed,
       source,
       settings: {
