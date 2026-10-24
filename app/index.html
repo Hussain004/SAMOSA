@@ -9,17 +9,26 @@
       content="SAMOSA checks every step of a matrix derivation, exactly, in your browser."
     />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-  <script>
-      (function () {
-        var light = false;
-        try { light = window.localStorage.getItem('samosa-theme') === 'light'; } catch (e) {}
-        document.documentElement.dataset.theme = light ? 'light' : 'dark';
-        var bg = light ? '#fbf8f1' : '#0b0a08';
-        var fg = light ? '#221d17' : '#ede6da';
-        var style = document.createElement('style');
-        style.textContent = 'html,body,#root{height:100%;margin:0;background-color:' + bg + ';color:' + fg + ';font-family:ui-monospace,monospace}';
-        document.head.appendChild(style);
-      })();
+    <script>
+        (function () {
+          var light = false;
+          try { light = window.localStorage.getItem('samosa-theme') === 'light'; } catch (e) {}
+          document.documentElement.dataset.theme = light ? 'light' : 'dark';
+          var bg = light ? '#fbf8f1' : '#0b0a08';
+          var fg = light ? '#221d17' : '#ede6da';
+          var style = document.createElement('style');
+          style.textContent = 'html,body,#root{height:100%;margin:0;background-color:' + bg + ';color:' + fg + ';font-family:ui-monospace,monospace}';
+          document.head.appendChild(style);
+          try {
+            if (window.sessionStorage.getItem('samosa:opening') === '1') {
+              window.sessionStorage.removeItem('samosa:opening');
+              document.documentElement.classList.add('samosa-from-open');
+              window.setTimeout(function () {
+                document.documentElement.classList.remove('samosa-from-open');
+              }, 1000);
+            }
+          } catch (e) {}
+        })();
     </script>
   </head>
   <body>
