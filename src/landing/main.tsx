@@ -18,5 +18,4 @@ if (root) {
       <Landing />
     </StrictMode>,
   );
-  root.style.opacity = '1';
 }

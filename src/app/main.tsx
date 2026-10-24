@@ -11,5 +11,4 @@ if (root) {
       <App />
     </StrictMode>,
   );
-  root.style.opacity = '1';
 }

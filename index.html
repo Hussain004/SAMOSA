@@ -28,49 +28,7 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   </head>
   <body style="margin:0;background:#0b0a08;color:#ede6da;font-family:ui-monospace,monospace">
-    <!-- the header and the hero, so the page is not blank before the script runs -->
-    <div id="root" style="opacity:0;transition:opacity .15s ease">
-      <header
-        style="
-          display: flex;
-          align-items: center;
-          gap: 1rem;
-          padding: 1rem 1.5rem;
-          border-bottom: 1px solid #2a251e;
-          color: #ede6da;
-          font-family: ui-monospace, monospace;
-        "
-      >
-        <span style="color: #e8b04b">∇</span>
-        <span style="letter-spacing: 0.2em">SAMOSA</span>
-        <span style="color: #5c554a; font-size: 0.75rem">step auditor for matrix math</span>
-      </header>
-      <section style="padding: 4rem 1.5rem; color: #ede6da; font-family: ui-monospace, monospace">
-        <h1 style="margin: 0; font-size: clamp(2rem, 5vw, 4rem); line-height: 1.05">
-          Derive more.<br />
-          <span style="color: #8c8273">Doubt less.</span>
-        </h1>
-        <p style="margin: 1.5rem 0 0; color: #8c8273; max-width: 40rem; line-height: 1.6">
-          A step auditor for matrix algebra, stochastics and algebra. Every step is checked
-          exactly, over finite fields, and a wrong step comes with a counterexample you can read
-          and a fix you can apply.
-        </p>
-        <a
-          href="/app"
-          style="
-            display: inline-block;
-            margin-top: 2rem;
-            padding: 0.75rem 1.25rem;
-            border-radius: 0.25rem;
-            background: #e8b04b;
-            color: #0b0a08;
-            text-decoration: none;
-            font-weight: 500;
-          "
-          >Open SAMOSA →</a
-        >
-      </section>
-    </div>
+    <div id="root"></div>
     <script type="module" src="/src/landing/main.tsx"></script>
   </body>
 </html>
