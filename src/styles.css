@@ -454,3 +454,8 @@ html.samosa-from-open body::after {
     display: none;
   }
 }
+
+/* the term a fix adds, in the feature card of the landing page */
+.fix-add {
+  color: var(--color-chutney);
+}

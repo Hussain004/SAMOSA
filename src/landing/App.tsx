@@ -60,7 +60,7 @@ function Header() {
 
   return (
     <header className="sticky top-0 z-30 border-b border-[var(--color-line)] bg-[#0b0a08cc] backdrop-blur-md">
-      <div className="mx-auto flex max-w-[1180px] items-center gap-4 overflow-x-auto px-6 py-4 sm:gap-6">
+      <div className="mx-auto flex max-w-[1560px] items-center gap-4 px-6 lg:px-10 py-4 sm:gap-6">
         <a href="/" className="flex items-center gap-2 text-[var(--color-gold)]">
           <span className="text-lg leading-none">∇</span>
           <span className="text-sm tracking-[0.2em]">SAMOSA</span>
@@ -116,7 +116,7 @@ const PHRASES = [
 function Hero() {
   return (
     <section className="dotted relative">
-      <div className="mx-auto grid max-w-[1180px] items-start gap-10 px-6 py-16 md:grid-cols-[1fr_1.15fr] md:py-24">
+      <div className="mx-auto grid max-w-[1560px] items-start gap-10 px-6 lg:px-10 py-16 md:grid-cols-[1fr_1.15fr] md:py-24">
         <div className="order-2 md:order-1">
           <h1 className="font-display text-[clamp(34px,4.6vw,70px)] leading-[1.02]">
             <span className="whitespace-nowrap">Derive more.</span>
@@ -187,7 +187,7 @@ function CopyChip({ text }: { text: string }) {
 function Intro() {
   return (
     <section className="border-y border-[var(--color-line)] bg-[var(--color-panel)]">
-      <div className="mx-auto max-w-[1180px] px-6 py-10">
+      <div className="mx-auto max-w-[1560px] px-6 lg:px-10 py-10">
         <p className="max-w-[900px] text-[17px] leading-relaxed tracking-wide text-[var(--color-text)]">
           SAMOSA checks every step of your derivation by evaluating it on random matrices: exactly,
           over finite fields. Wrong steps come with the smallest counterexample and a fix.
@@ -200,7 +200,7 @@ function Intro() {
 function AgentDemo() {
   return (
     <section className="dotted">
-      <div className="mx-auto max-w-[1180px] px-6 py-20">
+      <div className="mx-auto max-w-[1560px] px-6 lg:px-10 py-20">
         <SectionHead
           eyebrow="the agent session"
           title="Your agent can check its own math"
@@ -240,7 +240,7 @@ function AgentDemo() {
 function Tour() {
   return (
     <section className="border-y border-[var(--color-line)] bg-[var(--color-panel)]">
-      <div className="mx-auto max-w-[1180px] px-6 py-16">
+      <div className="mx-auto max-w-[1560px] px-6 lg:px-10 py-16">
         <SectionHead
           eyebrow="nineteen seconds"
           title="The line nobody checks"
@@ -323,7 +323,7 @@ const FEATURES = [
 function Features() {
   return (
     <section className="border-y border-[var(--color-line)] bg-[var(--color-panel)]">
-      <div className="mx-auto max-w-[1180px] px-6 py-20">
+      <div className="mx-auto max-w-[1560px] px-6 lg:px-10 py-20">
         <SectionHead
           eyebrow="what it does"
           title={`${FEATURES.length} things, all of them useful`}
@@ -352,7 +352,7 @@ function CounterexampleMock() {
       <MockLine tone="bad">
         ✗ row {MOCKS.counterexample.row} · the two sides are not equal
       </MockLine>
-      <pre className="mt-2 overflow-x-auto text-[11px] leading-relaxed text-[var(--color-muted)]">
+      <pre className="mt-2 whitespace-pre-wrap break-words text-[11px] leading-relaxed text-[var(--color-muted)]">
         {formatValues(MOCKS.counterexample.values, MOCKS.counterexample.derived)}
       </pre>
     </Mock>
@@ -384,10 +384,14 @@ function formatValues(
 function FixMock() {
   return (
     <Mock>
-      <MockLine tone="plain">{MOCKS.fix.title}</MockLine>
-      <pre className="mt-2 overflow-x-auto text-[11px] leading-relaxed text-[var(--color-muted)]">
-        {MOCKS.fix.edit}
-      </pre>
+      <MockLine tone="plain">
+        this step is off by exactly{' '}
+        <span className="text-[13px]" dangerouslySetInnerHTML={{ __html: RENDERED.fix.term }} />
+      </MockLine>
+      <div className="mt-3 text-[13px] text-[var(--color-muted)]">
+        <div className="text-[10px] uppercase tracking-widest text-[var(--color-faint)]">change the right side to</div>
+        <div className="mt-1 max-w-full overflow-hidden" dangerouslySetInnerHTML={{ __html: RENDERED.fix.edit }} />
+      </div>
     </Mock>
   );
 }
@@ -398,7 +402,7 @@ function ShapeMock() {
       <MockLine tone="bad">
         ⊘ row {MOCKS.shape.row} · {MOCKS.shape.message}
       </MockLine>
-      <pre className="mt-2 overflow-x-auto text-[11px] leading-relaxed text-[var(--color-muted)]">
+      <pre className="mt-2 whitespace-pre-wrap break-words text-[11px] leading-relaxed text-[var(--color-muted)]">
         {`C_t is m by n
 the inner sizes do not match
 
@@ -412,7 +416,7 @@ function GradientMock() {
   return (
     <Mock>
       <MockLine tone="bad">✗ row {MOCKS.layout.row} · the numerator layout</MockLine>
-      <pre className="mt-2 overflow-x-auto text-[11px] leading-relaxed text-[var(--color-muted)]">
+      <pre className="mt-2 whitespace-pre-wrap break-words text-[11px] leading-relaxed text-[var(--color-muted)]">
         {`the gradient has the shape
 of the variable it is taken with
 respect to. Transpose it.`}
@@ -425,7 +429,7 @@ function GuaranteeMock() {
   return (
     <Mock>
       <MockLine tone="ok">✓ row 11 · holds at every size tested</MockLine>
-      <pre className="mt-2 overflow-x-auto text-[11px] leading-relaxed text-[var(--color-muted)]">
+      <pre className="mt-2 whitespace-pre-wrap break-words text-[11px] leading-relaxed text-[var(--color-muted)]">
         {`sizes (3,2) (2,3) (4,3)
 6 trials each · 2 primes
 d ≤ 43 · false-✓ ≤ 1e-46`}
@@ -485,7 +489,7 @@ function Divider() {
 
   return (
     <section className="border-y border-[var(--color-line)] bg-[var(--color-panel)]">
-      <div className="mx-auto flex max-w-[1180px] flex-wrap items-center justify-center gap-6 px-6 py-12">
+      <div className="mx-auto flex max-w-[1560px] flex-wrap items-center justify-center gap-6 px-6 lg:px-10 py-12">
         <span className="text-[13px] tracking-[0.3em] text-[var(--color-faint)]">SAMOSA-SERVATIONS</span>
         {bubbles.map((bubble, i) => (
           <div
@@ -571,7 +575,7 @@ function PixelSamosa({ state }: { state: 'crispy' | 'soggy' | 'burnt' | 'raw' })
 function HallOfBugs() {
   return (
     <section className="overflow-hidden border-b border-[var(--color-line)] py-16">
-      <div className="mx-auto max-w-[1180px] px-6">
+      <div className="mx-auto max-w-[1560px] px-6 lg:px-10">
         <SectionHead
           eyebrow="the hall of bugs"
           title="Real mistakes, caught by a machine"
@@ -638,7 +642,7 @@ const DEEP_DIVES = [
 function DeepDives() {
   return (
     <section className="dotted" id="how">
-      <div className="mx-auto max-w-[1180px] px-6 py-20">
+      <div className="mx-auto max-w-[1560px] px-6 lg:px-10 py-20">
         <SectionHead
           eyebrow="how it works"
           title={`${DEEP_DIVES.length} ideas, no magic`}
@@ -821,7 +825,7 @@ function DiveVisual({ index }: { index: number }) {
 function MenuSection() {
   return (
     <section className="border-y border-[var(--color-line)] bg-[var(--color-panel)]" id="menu">
-      <div className="mx-auto max-w-[1180px] px-6 py-20">
+      <div className="mx-auto max-w-[1560px] px-6 lg:px-10 py-20">
         <SectionHead
           eyebrow="the menu"
           title={`${MENU.length} derivations to try`}
@@ -836,7 +840,7 @@ function MenuSection() {
             >
               <h3 className="text-[14px] font-medium">{item.title}</h3>
               <p className="mt-1 text-[12px] leading-relaxed text-[var(--color-faint)]">{item.blurb}</p>
-              <div className="mt-3 max-w-full overflow-x-auto text-[14px]" dangerouslySetInnerHTML={{ __html: RENDERED.menu[item.id] ?? '' }} />
+              <div className="mt-3 max-w-full overflow-hidden text-[14px]" dangerouslySetInnerHTML={{ __html: RENDERED.menu[item.id] ?? '' }} />
               <p className="mt-2 text-[11px] text-[var(--color-faint)]">spot the bug →</p>
             </a>
           ))}
@@ -897,7 +901,7 @@ function Install() {
   const [tab, setTab] = useState(0);
   return (
     <section className="dotted" id="install">
-      <div className="mx-auto max-w-[1180px] px-6 py-20">
+      <div className="mx-auto max-w-[1560px] px-6 lg:px-10 py-20">
         <SectionHead
           eyebrow="install"
           title="One click, or one line"
@@ -987,7 +991,7 @@ const CHANGELOG = [
 function Changelog() {
   return (
     <section className="border-t border-[var(--color-line)]">
-      <div className="mx-auto max-w-[1180px] px-6 py-16">
+      <div className="mx-auto max-w-[1560px] px-6 lg:px-10 py-16">
         <h2 className="text-sm tracking-[0.2em] text-[var(--color-faint)]">ANNOUNCEMENTS</h2>
         <div className="mt-6 grid gap-4 md:grid-cols-3">
           {CHANGELOG.map((entry) => (
@@ -1006,7 +1010,7 @@ function Changelog() {
 function Footer() {
   return (
     <footer className="border-t border-[var(--color-line)] bg-[var(--color-panel)]">
-      <div className="mx-auto grid max-w-[1180px] gap-8 px-6 py-14 md:grid-cols-4">
+      <div className="mx-auto grid max-w-[1560px] gap-8 px-6 lg:px-10 py-14 md:grid-cols-4">
         <div>
           <div className="flex items-center gap-2 text-[var(--color-gold)]">
             <span className="text-lg leading-none">∇</span>
@@ -1045,7 +1049,7 @@ function Footer() {
           ]}
         />
       </div>
-      <div className="border-t border-[var(--color-line)] px-6 py-6 text-center text-[11px] text-[var(--color-faint)]">
+      <div className="border-t border-[var(--color-line)] px-6 lg:px-10 py-6 text-center text-[11px] text-[var(--color-faint)]">
         ∇ SAMOSA · a ∇ is just a samosa with filling
       </div>
     </footer>
@@ -1080,7 +1084,7 @@ function SectionHead({ eyebrow, title, body }: { eyebrow: string; title: string;
 }
 
 /** The rendered math of the landing page, made at build time. */
-const RENDERED = TEX as { bugs: string[]; menu: Record<string, string> };
+const RENDERED = TEX as { bugs: string[]; menu: Record<string, string>; fix: { term: string; edit: string } };
 
 /** The section that reveals itself when it scrolls into view. */
 export function useReveal(): void {
