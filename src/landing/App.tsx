@@ -66,7 +66,7 @@ function Header() {
           <span className="text-lg leading-none">∇</span>
           <span className="text-sm tracking-[0.2em]">SAMOSA</span>
         </a>
-        <span className="hidden text-xs text-[var(--color-faint)] xl:inline">
+        <span className="hidden whitespace-nowrap text-xs text-[var(--color-faint)] 2xl:inline">
           step auditor for matrix math
         </span>
         <nav className="ml-auto flex items-center gap-4 whitespace-nowrap text-[0.8125rem] text-[var(--color-muted)] lg:gap-5">

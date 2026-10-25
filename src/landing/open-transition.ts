@@ -4,11 +4,17 @@ import { createSamosa } from './ascii-samosa.ts';
 /**
  * The way into the app.
  *
- * A ring leaves the button that was pressed, and the page behind it goes
- * soft. The samosa decodes out of noise, spins up, and the camera dives
- * into it until all that is left is its glow. The app opens on the same
- * glow and comes into focus from it, so the two pages read as one movement
- * and not as a page load.
+ * A ring leaves the button that was pressed and the page behind it dims.
+ * The samosa decodes out of noise and spins up, then it opens into a warm
+ * glow. The app opens on the same glow and fades out of it, so the two pages
+ * read as one movement and not as a page load.
+ *
+ * It is made to be cheap. Every layer moves with a transform or an opacity
+ * and nothing else, so the compositor does the work. No filter, no blur, and
+ * no layer larger than the screen: an earlier version scaled the samosa
+ * fifteen times with a drop shadow, which asked the GPU for a surface of
+ * twenty thousand pixels and froze a laptop. A watchdog also gives up on the
+ * show, and goes straight to the app, if the frames are slow.
  */
 
 const OPENING_KEY = 'samosa:opening';
@@ -19,8 +25,8 @@ const NOISE = '.:-=+*#%@∂∇~·';
 /** the moments of the movement, in ms from the press */
 const DECODED = 380;
 const DIVE = 460;
-const FLASH = 900;
-const LEAVE = 1180;
+const FLASH = 780;
+const LEAVE = 1020;
 
 // A page restored from the back/forward cache keeps the gate that was open
 // when it left. Take it down before the page can be used again.
@@ -108,28 +114,14 @@ function playOpen(href: string, x: number, y: number): void {
   document.body.classList.add('samosa-gate-open');
 
   const small = innerWidth < 700;
-  const samosa = createSamosa({ w: small ? 64 : 96, h: small ? 30 : 44, aspect: 0.55 });
+  const samosa = createSamosa({ w: small ? 56 : 80, h: small ? 26 : 38, aspect: 0.55 });
   const started = performance.now();
   let frameId = 0;
+  let left = false;
 
-  // The first frame has to be painted before the transition starts, or the
-  // browser has nothing to animate from.
-  void gate.offsetWidth;
-  requestAnimationFrame(() => gate.classList.add('is-live'));
-
-  const draw = (now: number) => {
-    const t = now - started;
-    // the spin starts slow and ends in a blur
-    samosa.state.yaw += 0.02 + Math.pow(Math.min(1, t / FLASH), 2.2) * 0.34;
-    const frame = samosa.render(now / 1000, { steam: t < DIVE });
-    pre.textContent = scramble(frame, Math.min(1, t / DECODED), now);
-    if (t < LEAVE) frameId = requestAnimationFrame(draw);
-  };
-  frameId = requestAnimationFrame(draw);
-
-  window.setTimeout(() => gate.classList.add('is-diving'), DIVE);
-  window.setTimeout(() => gate.classList.add('is-flash'), FLASH);
-  window.setTimeout(() => {
+  const leave = () => {
+    if (left) return;
+    left = true;
     cancelAnimationFrame(frameId);
     try {
       sessionStorage.setItem(OPENING_KEY, '1');
@@ -137,5 +129,46 @@ function playOpen(href: string, x: number, y: number): void {
       // A private window can refuse storage. The app still opens.
     }
     window.location.assign(href);
-  }, LEAVE);
+  };
+
+  // The first frame has to be painted before the transition starts, or the
+  // browser has nothing to animate from.
+  void gate.offsetWidth;
+  requestAnimationFrame(() => gate.classList.add('is-live'));
+
+  // The watchdog: a machine that cannot draw this in time does not get the
+  // show, it gets the app.
+  let last = started;
+  let slow = 0;
+  const draw = (now: number) => {
+    if (left) return;
+    const t = now - started;
+    slow = now - last > 80 ? slow + 1 : 0;
+    last = now;
+    if (slow >= 3 && t > 150) {
+      leave();
+      return;
+    }
+    // once the samosa opens into the glow it is a still picture
+    if (t < DIVE) {
+      samosa.state.yaw += 0.03 + Math.pow(t / DIVE, 2) * 0.22;
+      const frame = samosa.render(now / 1000, { steam: true });
+      pre.textContent = scramble(frame, Math.min(1, t / DECODED), now);
+    }
+    frameId = requestAnimationFrame(draw);
+  };
+  frameId = requestAnimationFrame(draw);
+
+  window.setTimeout(() => gate.classList.add('is-diving'), DIVE);
+  window.setTimeout(() => gate.classList.add('is-flash'), FLASH);
+  window.setTimeout(leave, LEAVE);
+  // if the page is still here after this, something went wrong, and the
+  // page must not stay under a veil
+  window.setTimeout(() => {
+    if (!left) leave();
+  }, LEAVE + 600);
+  window.setTimeout(() => {
+    gate.remove();
+    document.body.classList.remove('samosa-gate-open');
+  }, 4000);
 }

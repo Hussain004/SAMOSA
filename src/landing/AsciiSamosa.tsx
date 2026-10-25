@@ -80,7 +80,8 @@ export function AsciiSamosa({ className }: { className?: string }) {
     let frame = 0;
     const loop = (now: number) => {
       frame = requestAnimationFrame(loop);
-      if (!visible || document.hidden) return;
+      // the way into the app draws its own samosa, and needs the frames
+      if (!visible || document.hidden || document.body.classList.contains('samosa-gate-open')) return;
       if (average > 12 && now - last < 50) return;
       const dt = Math.min(0.1, (now - (last || now)) / 1000);
       last = now;
@@ -91,7 +92,6 @@ export function AsciiSamosa({ className }: { className?: string }) {
       if (snack) out = out.replace(/^(.*)$/m, (line) => `${line.slice(0, -10)}  ✓ crispy`);
       element.textContent = out;
       average = average * 0.9 + (performance.now() - started) * 0.1;
-      if (++frame % 30 === 0) frame = 0;
     };
     frame = requestAnimationFrame(loop);
 
