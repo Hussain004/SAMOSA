@@ -324,7 +324,8 @@ kbd {
 
 /* on paper the samosa is baked darker, and the glow goes */
 html[data-theme='light'] .samosa {
-  background-image: linear-gradient(180deg, #8a5a0a 0%, #a8680c 35%, #b8570b 70%, #6e3410 100%);
+  background-image: linear-gradient(180deg, #7a4a06 0%, #8f5208 35%, #8a3f08 70%, #4a2208 100%);
+  font-weight: 600;
   filter: none;
 }
 

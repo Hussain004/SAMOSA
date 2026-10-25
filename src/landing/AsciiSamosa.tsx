@@ -27,9 +27,21 @@ export function AsciiSamosa({ className }: { className?: string }) {
     };
     window.addEventListener('resize', onResize);
 
+    // on paper the samosa is drawn the other way round, so it has to follow
+    // the theme the visitor picks
+    const onPaper = () => document.documentElement.dataset.theme === 'light';
+
     if (reduce) {
-      element.textContent = samosa.render(0, { steam: false });
-      return () => window.removeEventListener('resize', onResize);
+      const still = () => {
+        element.textContent = samosa.render(0, { steam: false, ink: onPaper() });
+      };
+      still();
+      const watch = new MutationObserver(still);
+      watch.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+      return () => {
+        window.removeEventListener('resize', onResize);
+        watch.disconnect();
+      };
     }
 
     // drag to spin, with inertia
@@ -88,7 +100,7 @@ export function AsciiSamosa({ className }: { className?: string }) {
       samosa.state.vyaw *= 0.94;
       samosa.state.yaw += dt * 0.5 + samosa.state.vyaw;
       const started = performance.now();
-      let out = samosa.render(now / 1000, { light });
+      let out = samosa.render(now / 1000, { light, ink: onPaper() });
       if (snack) out = out.replace(/^(.*)$/m, (line) => `${line.slice(0, -10)}  ✓ crispy`);
       element.textContent = out;
       average = average * 0.9 + (performance.now() - started) * 0.1;

@@ -99,7 +99,7 @@ export interface SamosaState {
 
 export interface Samosa {
   state: SamosaState;
-  render: (t: number, opts?: { light?: Vec; steam?: boolean }) => string;
+  render: (t: number, opts?: { light?: Vec; steam?: boolean; ink?: boolean }) => string;
   resize: (w: number, h: number) => void;
 }
 
@@ -130,7 +130,7 @@ function render(
   st: SamosaState,
   rand: () => number,
   t: number,
-  { light = [-0.45, 0.55, -0.75], steam = true }: { light?: Vec; steam?: boolean } = {},
+  { light = [-0.45, 0.55, -0.75], steam = true, ink = false }: { light?: Vec; steam?: boolean; ink?: boolean } = {},
 ): string {
   const { w, h, aspect } = st;
   const cw = 2.7 / w;
@@ -188,7 +188,12 @@ function render(
       const spec = Math.pow(Math.max(0, dot(n, H)), 24);
       const rim = Math.pow(1 - Math.abs(n[2]), 3);
       const lum = Math.min(0.999, 0.14 + 0.7 * diff + 0.5 * spec + 0.25 * rim);
-      row += RAMP[Math.floor(lum * RAMP.length)];
+      // On a dark page light is made of ink: the lit side is dense. On paper
+      // it is the other way round, the shadow is where the ink is, and a
+      // lit cell keeps at least a dot so the outline never breaks.
+      row += ink
+        ? RAMP[Math.min(RAMP.length - 2, Math.max(2, Math.floor((1 - lum) * RAMP.length)))]
+        : RAMP[Math.floor(lum * RAMP.length)];
     }
     rows.push(row);
   }
