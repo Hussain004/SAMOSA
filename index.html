@@ -26,8 +26,21 @@
     />
     <meta name="twitter:image" content="https://samosa-math.vercel.app/og.png" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <script>
+      // the theme is chosen before the first paint, so a light page never
+      // flashes dark. The key is the one of the app, so the choice follows.
+      (function () {
+        var light = false;
+        try { light = window.localStorage.getItem('samosa-theme') === 'light'; } catch (e) {}
+        document.documentElement.dataset.theme = light ? 'light' : 'dark';
+        var style = document.createElement('style');
+        style.id = 'samosa-boot';
+        style.textContent = 'html,body{margin:0;background-color:' + (light ? '#fbf8f1' : '#0b0a08') + ';color:' + (light ? '#221d17' : '#ede6da') + ';font-family:ui-monospace,monospace}';
+        document.head.appendChild(style);
+      })();
+    </script>
   </head>
-  <body style="margin:0;background:#0b0a08;color:#ede6da;font-family:ui-monospace,monospace">
+  <body>
     <div id="root"></div>
     <script type="module" src="/src/landing/main.tsx"></script>
   </body>

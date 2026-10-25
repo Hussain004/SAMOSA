@@ -89,7 +89,7 @@ export function generateTex(): GeneratedTex {
   return {
     bugs: BUGS.map(tex),
     menu,
-    fix: { term: tex(term), edit: edit ? katex.renderToString(edit, { throwOnError: false, trust: true, output: 'html' }) : '' },
+    fix: { term: tex(term), edit: edit ? katex.renderToString(edit, { throwOnError: false, trust: true, strict: 'ignore', output: 'html' }) : '' },
   };
 }
 

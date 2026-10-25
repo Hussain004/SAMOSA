@@ -139,7 +139,7 @@ export function TypedDemo() {
   }, [script, run]);
 
   return (
-    <div className="panel scanlines relative overflow-hidden">
+    <div className="panel theme-dark scanlines relative overflow-hidden">
       <div className="flex flex-wrap items-center gap-2 border-b border-[var(--color-line)] px-3 py-2">
         <span className="h-2.5 w-2.5 rounded-full bg-[#e0533d66]" />
         <span className="h-2.5 w-2.5 rounded-full bg-[#f28c2666]" />

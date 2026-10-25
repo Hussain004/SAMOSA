@@ -59,7 +59,7 @@ function Header() {
   }, []);
 
   return (
-    <header className="sticky top-0 z-30 border-b border-[var(--color-line)] bg-[#0b0a08cc] backdrop-blur-md">
+    <header className="sticky top-0 z-30 border-b border-[var(--color-line)] bg-[var(--color-bar)] backdrop-blur-md">
       <div className="mx-auto flex max-w-[1560px] items-center gap-4 px-6 lg:px-10 py-4 sm:gap-6">
         <a href="/" className="flex items-center gap-2 text-[var(--color-gold)]">
           <span className="text-lg leading-none">∇</span>
@@ -92,6 +92,7 @@ function Header() {
           >
             ★ GitHub{stars && stars >= 50 ? ` ${stars}` : ''}
           </a>
+          <ThemeToggle />
           <a
             href="/app"
             onClick={openApp}
@@ -102,6 +103,38 @@ function Header() {
         </nav>
       </div>
     </header>
+  );
+}
+
+/** The paper and the ink: the choice is kept, and the app reads it too. */
+function ThemeToggle() {
+  const [light, setLight] = useState(() => document.documentElement.dataset.theme === 'light');
+  // the page is dressed by the stylesheet now, so the colours of the first
+  // paint can go
+  useEffect(() => {
+    document.getElementById('samosa-boot')?.remove();
+  }, []);
+  const flip = () => {
+    const next = !light;
+    setLight(next);
+    document.documentElement.dataset.theme = next ? 'light' : 'dark';
+    document.documentElement.style.colorScheme = next ? 'light' : 'dark';
+    try {
+      localStorage.setItem('samosa-theme', next ? 'light' : 'dark');
+    } catch {
+      // a private window can refuse storage; the page still changes
+    }
+  };
+  return (
+    <button
+      type="button"
+      onClick={flip}
+      aria-label={light ? 'Switch to the dark theme' : 'Switch to the light theme'}
+      title={light ? 'Dark theme' : 'Light theme'}
+      className="rounded border border-[var(--color-line)] px-2 py-1 leading-none text-[var(--color-muted)] transition-colors hover:border-[var(--color-gold)] hover:text-[var(--color-text)]"
+    >
+      <span aria-hidden="true">{light ? '☾' : '☀'}</span>
+    </button>
   );
 }
 
@@ -452,7 +485,7 @@ function TerminalMock() {
 }
 
 function Mock({ children }: { children: React.ReactNode }) {
-  return <div className="rounded border border-[var(--color-line)] bg-black/25 p-3">{children}</div>;
+  return <div className="rounded border border-[var(--color-line)] bg-[var(--color-inset)] p-3">{children}</div>;
 }
 
 function MockLine({ children, tone }: { children: React.ReactNode; tone: 'ok' | 'bad' | 'plain' }) {
@@ -679,7 +712,7 @@ function DeepDives() {
 
 function DiveVisual({ index }: { index: number }) {
   const box =
-    'rounded-lg border border-[var(--color-line)] bg-black/20 p-5 font-mono text-[11px] leading-relaxed text-[var(--color-muted)]';
+    'rounded-lg border border-[var(--color-line)] bg-[var(--color-inset)] p-5 font-mono text-[11px] leading-relaxed text-[var(--color-muted)]';
   const row = 'flex items-baseline justify-between gap-4';
 
   switch (index) {
