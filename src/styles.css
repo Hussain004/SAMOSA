@@ -362,17 +362,7 @@ html[data-theme='light'] .theme-dark {
   transform: none;
 }
 
-/*
- * The way into the app.
- *
- * The landing page ends in a warm glow, and the app begins in the same one,
- * so the two pages are one movement. The glow is the same gradient on both
- * sides: change one, change the other.
- *
- * Only transform and opacity move, and nothing is bigger than the screen.
- * Do not add a filter, a blur or a backdrop-filter here: on a laptop they
- * are the difference between a fade and a frozen browser.
- */
+/* the samosa gate that opens into the app */
 .samosa-gate {
   position: fixed;
   inset: 0;
@@ -380,136 +370,129 @@ html[data-theme='light'] .theme-dark {
   display: grid;
   place-items: center;
   overflow: hidden;
-  background: var(--color-ink);
+  background:
+    radial-gradient(circle at 50% 46%, #e8b04b24 0%, #e8b04b0a 28%, transparent 56%),
+    #0b0a08;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 260ms ease-out;
+  transition: opacity 180ms ease-out;
 }
 
 .samosa-gate.is-live {
-  opacity: 0.94;
-}
-
-/* the ring that leaves the button that was pressed: a disc with a thin
-   edge, scaled, so the edge is drawn once and never stretched */
-.samosa-gate-ring {
-  position: absolute;
-  left: var(--x, 50%);
-  top: var(--y, 50%);
-  width: 240vmax;
-  height: 240vmax;
-  margin: -120vmax 0 0 -120vmax;
-  border-radius: 50%;
-  background: radial-gradient(
-    circle,
-    transparent 0,
-    transparent 49.2%,
-    #e8b04bcc 49.7%,
-    #e8b04b33 50.4%,
-    transparent 51.5%
-  );
-  opacity: 0;
-  transform: scale(0.004);
-}
-
-.samosa-gate.is-live .samosa-gate-ring {
-  animation: samosa-ring 820ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
-}
-
-@keyframes samosa-ring {
-  0% {
-    opacity: 1;
-    transform: scale(0.004);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(0.3);
-  }
+  opacity: 1;
 }
 
 .samosa-gate-art {
+  position: relative;
   display: grid;
   place-items: center;
-  transform: scale(0.8);
-  opacity: 0;
+  transform: scale(0.32) rotate(-8deg);
+  filter: blur(1px);
   transition:
-    transform 460ms cubic-bezier(0.16, 1, 0.3, 1),
-    opacity 240ms ease-out;
+    transform 620ms cubic-bezier(0.16, 1, 0.3, 1),
+    filter 620ms ease-out;
 }
 
 .samosa-gate.is-live .samosa-gate-art {
-  transform: scale(1);
-  opacity: 1;
+  transform: scale(0.95) rotate(0deg);
+  filter: blur(0) drop-shadow(0 0 34px #e8b04b66);
 }
 
-/* the opening: the samosa grows a little and gives way to the glow */
-.samosa-gate.is-diving .samosa-gate-art {
-  transform: scale(1.9);
-  opacity: 0.2;
+.samosa-gate.is-opening .samosa-gate-art {
+  transform: scale(1.12) rotate(0deg);
+  filter: blur(0) drop-shadow(0 0 52px #e8b04b99);
+}
+
+.samosa-gate-half {
+  grid-area: 1 / 1;
+  will-change: transform, opacity;
   transition:
-    transform 560ms cubic-bezier(0.5, 0, 0.9, 0.5),
-    opacity 560ms ease-in;
+    transform 520ms cubic-bezier(0.7, 0, 0.3, 1),
+    opacity 400ms ease-out;
 }
 
-.samosa-gate-pre {
-  font-size: clamp(8px, 1.1vw, 14px);
+.samosa-gate-left {
+  clip-path: inset(0 50% 0 0);
 }
 
-/* the glow that the opening ends in, and the app begins in */
-.samosa-gate-glow {
-  position: absolute;
-  inset: 0;
+.samosa-gate-right {
+  clip-path: inset(0 0 0 50%);
+}
+
+.samosa-gate.is-opening .samosa-gate-left {
+  transform: translateX(-72vw) rotate(-14deg);
   opacity: 0;
-  background: radial-gradient(circle at 50% 50%, #fff2c8 0%, #e8b04b 22%, #8a5410 52%, #0b0a08 100%);
-  transition: opacity 240ms ease-in;
 }
 
-.samosa-gate.is-flash .samosa-gate-glow {
-  opacity: 1;
+.samosa-gate.is-opening .samosa-gate-right {
+  transform: translateX(72vw) rotate(14deg);
+  opacity: 0;
 }
 
-/* nothing else on the page should be drawing while the gate is up */
+.samosa-gate-seam {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 1px;
+  height: 0;
+  background: linear-gradient(180deg, transparent, #e8b04bcc 22%, #fff2c8 50%, #e8b04bcc 78%, transparent);
+  box-shadow: 0 0 18px #e8b04b88;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  transition:
+    height 320ms ease-out,
+    opacity 260ms ease-out;
+}
+
+.samosa-gate.is-live .samosa-gate-seam {
+  height: 58vmin;
+  opacity: 0.85;
+}
+
+.samosa-gate.is-opening .samosa-gate-seam {
+  opacity: 0;
+}
+
 body.samosa-gate-open {
   overflow: hidden;
 }
 
-body.samosa-gate-open *:not(.samosa-gate):not(.samosa-gate *) {
-  animation-play-state: paused !important;
-}
-
-/* the app arrives from the glow */
-@keyframes samosa-glow-out {
-  0% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
+/* the app receives the same opening from its side */
+@keyframes samosa-curtain-left {
+  to {
+    transform: translateX(-100%);
   }
 }
 
-@keyframes samosa-arrive {
-  0% {
-    opacity: 0;
-    transform: scale(1.015);
+@keyframes samosa-curtain-right {
+  to {
+    transform: translateX(100%);
   }
-  100% {
-    opacity: 1;
-    transform: none;
-  }
+}
+
+html.samosa-from-open body::before,
+html.samosa-from-open body::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  z-index: 9999;
+  width: 50.2vw;
+  background: #0b0a08;
+  pointer-events: none;
+  will-change: transform;
 }
 
 html.samosa-from-open body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  pointer-events: none;
-  background: radial-gradient(circle at 50% 50%, #fff2c8 0%, #e8b04b 22%, #8a5410 52%, #0b0a08 100%);
-  animation: samosa-glow-out 700ms ease-out 40ms both;
+  left: 0;
+  box-shadow: inset -1px 0 0 #e8b04b99;
+  animation: samosa-curtain-left 640ms cubic-bezier(0.7, 0, 0.3, 1) 90ms forwards;
 }
 
-html.samosa-from-open #root {
-  animation: samosa-arrive 700ms ease-out 40ms both;
+html.samosa-from-open body::after {
+  right: 0;
+  box-shadow: inset 1px 0 0 #e8b04b99;
+  animation: samosa-curtain-right 640ms cubic-bezier(0.7, 0, 0.3, 1) 90ms forwards;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -517,12 +500,9 @@ html.samosa-from-open #root {
     display: none;
   }
 
-  html.samosa-from-open body::before {
+  html.samosa-from-open body::before,
+  html.samosa-from-open body::after {
     display: none;
-  }
-
-  html.samosa-from-open #root {
-    animation: none;
   }
 }
 
