@@ -144,8 +144,8 @@ export function TypedDemo() {
         <span className="h-2.5 w-2.5 rounded-full bg-[#e0533d66]" />
         <span className="h-2.5 w-2.5 rounded-full bg-[#f28c2666]" />
         <span className="h-2.5 w-2.5 rounded-full bg-[#5bc27a66]" />
-        <span className="ml-2 text-[11px] text-[var(--color-faint)]">{script.title}</span>
-        <div className="ml-auto flex items-center gap-1">
+        <span className="ml-2 text-[0.6875rem] text-[var(--color-faint)]">{script.title}</span>
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-1">
           {DEMO_SCRIPTS.map((item, index) => (
             <button
               key={item.id}
@@ -153,7 +153,7 @@ export function TypedDemo() {
                 skipRef.current = false;
                 setTab(index);
               }}
-              className={`rounded px-2 py-0.5 text-[10px] ${
+              className={`rounded px-2 py-0.5 text-[0.625rem] ${
                 index === tab
                   ? 'border border-[var(--color-gold)]/60 text-[var(--color-gold)]'
                   : 'text-[var(--color-faint)] hover:text-[var(--color-muted)]'
@@ -167,7 +167,7 @@ export function TypedDemo() {
             onClick={() => setManualPaused((value) => !value)}
             aria-label={manualPaused ? 'play the demo' : 'pause the demo'}
             title={manualPaused ? 'play' : 'pause'}
-            className="rounded px-1.5 py-0.5 text-[11px] text-[var(--color-faint)] hover:text-[var(--color-text)]"
+            className="rounded px-1.5 py-0.5 text-[0.6875rem] text-[var(--color-faint)] hover:text-[var(--color-text)]"
           >
             {manualPaused ? '▶' : '❚❚'}
           </button>
@@ -175,7 +175,7 @@ export function TypedDemo() {
             onClick={replay}
             aria-label="replay the demo"
             title="replay"
-            className="rounded px-1.5 py-0.5 text-[11px] text-[var(--color-faint)] hover:text-[var(--color-text)]"
+            className="rounded px-1.5 py-0.5 text-[0.6875rem] text-[var(--color-faint)] hover:text-[var(--color-text)]"
           >
             ↻
           </button>
@@ -183,7 +183,7 @@ export function TypedDemo() {
             onClick={skip}
             aria-label="skip to the end"
             title="skip"
-            className="rounded px-1.5 py-0.5 text-[11px] text-[var(--color-faint)] hover:text-[var(--color-text)]"
+            className="rounded px-1.5 py-0.5 text-[0.6875rem] text-[var(--color-faint)] hover:text-[var(--color-text)]"
           >
             ⏭
           </button>
@@ -192,7 +192,7 @@ export function TypedDemo() {
 
       <div
         data-testid="demo-output"
-        className="min-h-[280px] p-4 text-[13px] leading-relaxed"
+        className="min-h-[280px] p-4 text-[0.8125rem] leading-relaxed"
         onMouseEnter={() => setHoverPaused(true)}
         onMouseLeave={() => setHoverPaused(false)}
       >
@@ -210,7 +210,7 @@ export function TypedDemo() {
         {lines.length === 0 && <div className="text-[var(--color-faint)]">$ samosa</div>}
       </div>
 
-      <div className="flex items-center justify-between border-t border-[var(--color-line)] px-3 py-1.5 text-[10px] text-[var(--color-faint)]">
+      <div className="flex items-center justify-between border-t border-[var(--color-line)] px-3 py-1.5 text-[0.625rem] text-[var(--color-faint)]">
         <span>exact · seed 5A305A · ✓ 12/12</span>
         <span>{paused ? 'paused' : 'the demo loops'}</span>
       </div>
@@ -247,13 +247,13 @@ function Annotation({ text }: { text: string }) {
   const fields = command.replace(/^::\w+\s*/, '').split(',').filter(Boolean);
   return (
     <span className="inline-flex flex-wrap items-center gap-1">
-      <span className="rounded bg-[var(--color-tamarind)]/15 px-1 text-[10px] uppercase tracking-wider text-[var(--color-tamarind)]">
+      <span className="rounded bg-[var(--color-tamarind)]/15 px-1 text-[0.625rem] uppercase tracking-wider text-[var(--color-tamarind)]">
         error
       </span>
       {fields.map((field) => (
         <span
           key={field}
-          className="rounded border border-[var(--color-line)] px-1 text-[10px] text-[var(--color-muted)]"
+          className="rounded border border-[var(--color-line)] px-1 text-[0.625rem] text-[var(--color-muted)]"
         >
           {field}
         </span>

@@ -4,6 +4,7 @@ import { TypedDemo } from './typed-demo.tsx';
 import { MENU } from '../../corpus/menu.ts';
 import { MOCKS } from './demo-scripts.ts';
 import { openApp } from './open-transition.ts';
+import { FontSizeControl } from '../font-size.tsx';
 import TEX from './generated-tex.json';
 
 /**
@@ -65,33 +66,34 @@ function Header() {
           <span className="text-lg leading-none">∇</span>
           <span className="text-sm tracking-[0.2em]">SAMOSA</span>
         </a>
-        <span className="hidden text-xs text-[var(--color-faint)] md:inline">
+        <span className="hidden text-xs text-[var(--color-faint)] xl:inline">
           step auditor for matrix math
         </span>
-        <nav className="ml-auto flex items-center gap-5 text-[13px] text-[var(--color-muted)]">
-          <a href="#how" className="hidden hover:text-[var(--color-text)] sm:inline">
+        <nav className="ml-auto flex items-center gap-4 whitespace-nowrap text-[0.8125rem] text-[var(--color-muted)] lg:gap-5">
+          <a href="#how" className="hidden hover:text-[var(--color-text)] md:inline">
             How it works
           </a>
-          <a href="#menu" className="hidden hover:text-[var(--color-text)] sm:inline">
+          <a href="#menu" className="hidden hover:text-[var(--color-text)] md:inline">
             Menu
           </a>
-          <a href="#install" className="hidden hover:text-[var(--color-text)] sm:inline">
+          <a href="#install" className="hidden hover:text-[var(--color-text)] md:inline">
             Install
           </a>
-          <a href="/docs/HOW_IT_WORKS.md" className="hidden hover:text-[var(--color-text)] md:inline">
+          <a href="/docs/HOW_IT_WORKS.md" className="hidden hover:text-[var(--color-text)] xl:inline">
             Docs
           </a>
-          <a href="/docs/CHANGELOG.md" className="hidden hover:text-[var(--color-text)] md:inline">
+          <a href="/docs/CHANGELOG.md" className="hidden hover:text-[var(--color-text)] xl:inline">
             Changelog
           </a>
           <a
             href="https://github.com/Hussain004/SAMOSA"
             target="_blank"
             rel="noreferrer"
-            className="whitespace-nowrap hover:text-[var(--color-text)]"
+            className="hidden whitespace-nowrap hover:text-[var(--color-text)] sm:inline"
           >
             ★ GitHub{stars && stars >= 50 ? ` ${stars}` : ''}
           </a>
+          <FontSizeControl className="hidden sm:flex" />
           <ThemeToggle />
           <a
             href="/app"
@@ -190,7 +192,7 @@ function PhraseList() {
     return () => timers.forEach((t) => window.clearTimeout(t));
   }, []);
   return (
-    <ul className="mt-8 space-y-1 text-[15px] text-[var(--color-muted)]" aria-label="What SAMOSA does">
+    <ul className="mt-8 space-y-1 text-[0.9375rem] text-[var(--color-muted)]" aria-label="What SAMOSA does">
       {PHRASES.slice(0, count).map((phrase) => (
         <li key={phrase} className="reveal in">
           <span className="mr-1 text-[var(--color-chutney)]">›</span>
@@ -210,7 +212,7 @@ function CopyChip({ text }: { text: string }) {
         setCopied(true);
         window.setTimeout(() => setCopied(false), 1200);
       }}
-      className="rounded border border-[var(--color-line)] bg-[var(--color-panel)] px-4 py-3 text-[13px] text-[var(--color-text)] transition-colors hover:border-[var(--color-gold)]"
+      className="rounded border border-[var(--color-line)] bg-[var(--color-panel)] px-4 py-3 text-[0.8125rem] text-[var(--color-text)] transition-colors hover:border-[var(--color-gold)]"
     >
       {copied ? '✓ copied' : text}
     </button>
@@ -221,7 +223,7 @@ function Intro() {
   return (
     <section className="border-y border-[var(--color-line)] bg-[var(--color-panel)]">
       <div className="mx-auto max-w-[1560px] px-6 lg:px-10 py-10">
-        <p className="max-w-[900px] text-[17px] leading-relaxed tracking-wide text-[var(--color-text)]">
+        <p className="max-w-[900px] text-[1.0625rem] leading-relaxed tracking-wide text-[var(--color-text)]">
           SAMOSA checks every step of your derivation by evaluating it on random matrices: exactly,
           over finite fields. Wrong steps come with the smallest counterexample and a fix.
         </p>
@@ -241,7 +243,7 @@ function AgentDemo() {
         />
         <div className="mt-10 grid gap-8 lg:grid-cols-[1.5fr_1fr]">
           <TypedDemo />
-          <ul className="space-y-4 text-[13px] text-[var(--color-muted)]">
+          <ul className="space-y-4 text-[0.8125rem] text-[var(--color-muted)]">
             <li className="flex gap-3">
               <span className="text-[var(--color-chutney)]">›</span>
               <span>
@@ -368,8 +370,8 @@ function Features() {
               key={feature.title}
               className="group min-w-0 rounded border border-[var(--color-line)] bg-[var(--color-ink)] p-5 transition-colors hover:border-[var(--color-gold)]/50"
             >
-              <h3 className="text-[15px] font-medium">{feature.title}</h3>
-              <p className="mt-2 text-[13px] leading-relaxed text-[var(--color-muted)]">{feature.body}</p>
+              <h3 className="text-[0.9375rem] font-medium">{feature.title}</h3>
+              <p className="mt-2 text-[0.8125rem] leading-relaxed text-[var(--color-muted)]">{feature.body}</p>
               <div className="mt-4">{feature.mock}</div>
             </div>
           ))}
@@ -385,7 +387,7 @@ function CounterexampleMock() {
       <MockLine tone="bad">
         ✗ row {MOCKS.counterexample.row} · the two sides are not equal
       </MockLine>
-      <pre className="mt-2 whitespace-pre-wrap break-words text-[11px] leading-relaxed text-[var(--color-muted)]">
+      <pre className="mt-2 whitespace-pre-wrap break-words text-[0.6875rem] leading-relaxed text-[var(--color-muted)]">
         {formatValues(MOCKS.counterexample.values, MOCKS.counterexample.derived)}
       </pre>
     </Mock>
@@ -419,10 +421,10 @@ function FixMock() {
     <Mock>
       <MockLine tone="plain">
         this step is off by exactly{' '}
-        <span className="text-[13px]" dangerouslySetInnerHTML={{ __html: RENDERED.fix.term }} />
+        <span className="text-[0.8125rem]" dangerouslySetInnerHTML={{ __html: RENDERED.fix.term }} />
       </MockLine>
-      <div className="mt-3 text-[13px] text-[var(--color-muted)]">
-        <div className="text-[10px] uppercase tracking-widest text-[var(--color-faint)]">change the right side to</div>
+      <div className="mt-3 text-[0.8125rem] text-[var(--color-muted)]">
+        <div className="text-[0.625rem] uppercase tracking-widest text-[var(--color-faint)]">change the right side to</div>
         <div className="mt-1 max-w-full overflow-hidden" dangerouslySetInnerHTML={{ __html: RENDERED.fix.edit }} />
       </div>
     </Mock>
@@ -435,7 +437,7 @@ function ShapeMock() {
       <MockLine tone="bad">
         ⊘ row {MOCKS.shape.row} · {MOCKS.shape.message}
       </MockLine>
-      <pre className="mt-2 whitespace-pre-wrap break-words text-[11px] leading-relaxed text-[var(--color-muted)]">
+      <pre className="mt-2 whitespace-pre-wrap break-words text-[0.6875rem] leading-relaxed text-[var(--color-muted)]">
         {`C_t is m by n
 the inner sizes do not match
 
@@ -449,7 +451,7 @@ function GradientMock() {
   return (
     <Mock>
       <MockLine tone="bad">✗ row {MOCKS.layout.row} · the numerator layout</MockLine>
-      <pre className="mt-2 whitespace-pre-wrap break-words text-[11px] leading-relaxed text-[var(--color-muted)]">
+      <pre className="mt-2 whitespace-pre-wrap break-words text-[0.6875rem] leading-relaxed text-[var(--color-muted)]">
         {`the gradient has the shape
 of the variable it is taken with
 respect to. Transpose it.`}
@@ -462,7 +464,7 @@ function GuaranteeMock() {
   return (
     <Mock>
       <MockLine tone="ok">✓ row 11 · holds at every size tested</MockLine>
-      <pre className="mt-2 whitespace-pre-wrap break-words text-[11px] leading-relaxed text-[var(--color-muted)]">
+      <pre className="mt-2 whitespace-pre-wrap break-words text-[0.6875rem] leading-relaxed text-[var(--color-muted)]">
         {`sizes (3,2) (2,3) (4,3)
 6 trials each · 2 primes
 d ≤ 43 · false-✓ ≤ 1e-46`}
@@ -474,7 +476,7 @@ d ≤ 43 · false-✓ ≤ 1e-46`}
 function TerminalMock() {
   return (
     <Mock>
-      <pre className="text-[11px] leading-relaxed text-[var(--color-muted)]">
+      <pre className="text-[0.6875rem] leading-relaxed text-[var(--color-muted)]">
         {`$ npx samosa-math check paper.tex
   132:18  ✗ wrong  not equal
   141:5   ⊘ shape  n ≠ m
@@ -491,7 +493,7 @@ function Mock({ children }: { children: React.ReactNode }) {
 function MockLine({ children, tone }: { children: React.ReactNode; tone: 'ok' | 'bad' | 'plain' }) {
   return (
     <div
-      className={`text-[11px] ${
+      className={`text-[0.6875rem] ${
         tone === 'ok'
           ? 'text-[var(--color-chutney)]'
           : tone === 'bad'
@@ -523,7 +525,7 @@ function Divider() {
   return (
     <section className="border-y border-[var(--color-line)] bg-[var(--color-panel)]">
       <div className="mx-auto flex max-w-[1560px] flex-wrap items-center justify-center gap-6 px-6 lg:px-10 py-12">
-        <span className="text-[13px] tracking-[0.3em] text-[var(--color-faint)]">SAMOSA-SERVATIONS</span>
+        <span className="text-[0.8125rem] tracking-[0.3em] text-[var(--color-faint)]">SAMOSA-SERVATIONS</span>
         {bubbles.map((bubble, i) => (
           <div
             key={bubble}
@@ -532,7 +534,7 @@ function Divider() {
             }`}
           >
             <PixelSamosa state={states[i]} />
-            <span className="rounded-full border border-[var(--color-line)] px-3 py-1 text-[12px] text-[var(--color-muted)]">
+            <span className="rounded-full border border-[var(--color-line)] px-3 py-1 text-[0.75rem] text-[var(--color-muted)]">
               {bubble}
             </span>
           </div>
@@ -623,7 +625,7 @@ function HallOfBugs() {
               className="flex shrink-0 items-center gap-3 rounded border border-[var(--color-line)] bg-[var(--color-panel)] px-5 py-4"
             >
               <span className="text-[var(--color-tamarind)]">✗</span>
-              <span className="text-[15px]" dangerouslySetInnerHTML={{ __html: bug }} />
+              <span className="text-[0.9375rem]" dangerouslySetInnerHTML={{ __html: bug }} />
             </div>
           ))}
         </div>
@@ -684,22 +686,22 @@ function DeepDives() {
         <div className="mt-12 space-y-16">
           {DEEP_DIVES.map((dive, i) => (
             <div key={dive.n} className="grid items-center gap-8 md:grid-cols-2">
-              <div className={i % 2 ? 'md:order-2' : ''}>
-                <span className="font-display text-[13px] tracking-[0.25em] text-[var(--color-gold)]">
+              <div className={`min-w-0 ${i % 2 ? 'md:order-2' : ''}`}>
+                <span className="font-display text-[0.8125rem] tracking-[0.25em] text-[var(--color-gold)]">
                   {dive.n}
                 </span>
                 <h3 className="mt-2 text-xl">{dive.title}</h3>
-                <p className="mt-3 max-w-[520px] text-[14px] leading-relaxed text-[var(--color-muted)]">
+                <p className="mt-3 max-w-[520px] text-[0.875rem] leading-relaxed text-[var(--color-muted)]">
                   {dive.body}
                 </p>
                 <a
                   href={dive.link}
-                  className="mt-3 inline-block text-[13px] text-[var(--color-gold)] hover:underline"
+                  className="mt-3 inline-block text-[0.8125rem] text-[var(--color-gold)] hover:underline"
                 >
                   read more →
                 </a>
               </div>
-              <div className={i % 2 ? 'md:order-1' : ''}>
+              <div className={`min-w-0 ${i % 2 ? 'md:order-1' : ''}`}>
                 <DiveVisual index={i} />
               </div>
             </div>
@@ -712,7 +714,7 @@ function DeepDives() {
 
 function DiveVisual({ index }: { index: number }) {
   const box =
-    'rounded-lg border border-[var(--color-line)] bg-[var(--color-inset)] p-5 font-mono text-[11px] leading-relaxed text-[var(--color-muted)]';
+    'rounded-lg border border-[var(--color-line)] bg-[var(--color-inset)] p-5 font-mono text-[0.6875rem] leading-relaxed text-[var(--color-muted)]';
   const row = 'flex items-baseline justify-between gap-4';
 
   switch (index) {
@@ -771,20 +773,20 @@ function DiveVisual({ index }: { index: number }) {
                 {four.flat().map((value, i) => (
                   <span
                     key={i}
-                    className="flex h-7 w-7 items-center justify-center rounded border border-[var(--color-line)] text-[10px] text-[var(--color-muted)]"
+                    className="flex h-7 w-7 items-center justify-center rounded border border-[var(--color-line)] text-[0.625rem] text-[var(--color-muted)]"
                   >
                     {value}
                   </span>
                 ))}
               </div>
-              <div className="mt-2 text-center text-[10px] text-[var(--color-faint)]">4 by 4</div>
+              <div className="mt-2 text-center text-[0.625rem] text-[var(--color-faint)]">4 by 4</div>
             </div>
             <span className="text-lg text-[var(--color-gold)]">→</span>
             <div>
-              <div className="flex h-7 w-12 items-center justify-center rounded border border-[var(--color-chutney)]/50 text-[11px] text-[var(--color-chutney)]">
+              <div className="flex h-7 w-12 items-center justify-center rounded border border-[var(--color-chutney)]/50 text-[0.6875rem] text-[var(--color-chutney)]">
                 [ 1 ]
               </div>
-              <div className="mt-2 text-center text-[10px] text-[var(--color-faint)]">1 by 1</div>
+              <div className="mt-2 text-center text-[0.625rem] text-[var(--color-faint)]">1 by 1</div>
             </div>
           </div>
           <p className="mt-4 text-[var(--color-faint)]">still wrong, and now readable</p>
@@ -871,10 +873,10 @@ function MenuSection() {
               href={`/app#menu=${item.id}`}
               className="block min-w-0 max-w-full overflow-hidden rounded border border-[var(--color-line)] bg-[var(--color-ink)] p-4 transition-colors hover:border-[var(--color-gold)]/60"
             >
-              <h3 className="text-[14px] font-medium">{item.title}</h3>
-              <p className="mt-1 text-[12px] leading-relaxed text-[var(--color-faint)]">{item.blurb}</p>
-              <div className="mt-3 max-w-full overflow-hidden text-[14px]" dangerouslySetInnerHTML={{ __html: RENDERED.menu[item.id] ?? '' }} />
-              <p className="mt-2 text-[11px] text-[var(--color-faint)]">spot the bug →</p>
+              <h3 className="text-[0.875rem] font-medium">{item.title}</h3>
+              <p className="mt-1 text-[0.75rem] leading-relaxed text-[var(--color-faint)]">{item.blurb}</p>
+              <div className="mt-3 max-w-full overflow-hidden text-[0.875rem]" dangerouslySetInnerHTML={{ __html: RENDERED.menu[item.id] ?? '' }} />
+              <p className="mt-2 text-[0.6875rem] text-[var(--color-faint)]">spot the bug →</p>
             </a>
           ))}
         </div>
@@ -943,21 +945,21 @@ function Install() {
         <div className="mt-10 grid gap-6 md:grid-cols-2">
           <div className="panel p-5">
             <h3 className="text-sm">In your browser</h3>
-            <p className="mt-2 text-[13px] leading-relaxed text-[var(--color-muted)]">
+            <p className="mt-2 text-[0.8125rem] leading-relaxed text-[var(--color-muted)]">
               No account, no upload, no server. The engine runs in a worker, in the tab, and the
               derivation never leaves the device.
             </p>
             <a
               href="/app"
               onClick={openApp}
-              className="mt-4 inline-block rounded bg-[var(--color-gold)] px-4 py-2 text-[13px] font-medium text-[var(--color-ink)]"
+              className="mt-4 inline-block rounded bg-[var(--color-gold)] px-4 py-2 text-[0.8125rem] font-medium text-[var(--color-ink)]"
             >
               Open the app
             </a>
           </div>
           <div className="panel p-5">
             <h3 className="text-sm">In your agent and your CI</h3>
-            <p className="mt-2 text-[13px] leading-relaxed text-[var(--color-muted)]">
+            <p className="mt-2 text-[0.8125rem] leading-relaxed text-[var(--color-muted)]">
               The npm package carries the CLI, the MCP server and the GitHub Action. The same engine
               gives the same verdicts everywhere.
             </p>
@@ -966,7 +968,7 @@ function Install() {
                 (line) => (
                   <span
                     key={line}
-                    className="rounded border border-[var(--color-line)] px-2 py-1 text-[10px] text-[var(--color-faint)]"
+                    className="rounded border border-[var(--color-line)] px-2 py-1 text-[0.625rem] text-[var(--color-faint)]"
                   >
                     {line}
                   </span>
@@ -981,7 +983,7 @@ function Install() {
             <button
               key={t.id}
               onClick={() => setTab(i)}
-              className={`rounded px-3 py-1.5 text-[12px] ${
+              className={`rounded px-3 py-1.5 text-[0.75rem] ${
                 i === tab
                   ? 'bg-[var(--color-gold)] text-[var(--color-ink)]'
                   : 'border border-[var(--color-line)] text-[var(--color-muted)] hover:border-[var(--color-gold)]'
@@ -991,7 +993,7 @@ function Install() {
             </button>
           ))}
         </div>
-        <p className="mt-4 max-w-[640px] text-[13px] leading-relaxed text-[var(--color-muted)]">
+        <p className="mt-4 max-w-[640px] text-[0.8125rem] leading-relaxed text-[var(--color-muted)]">
           {TABS[tab].body}
         </p>
         <div className="mt-3">
@@ -1029,9 +1031,9 @@ function Changelog() {
         <div className="mt-6 grid gap-4 md:grid-cols-3">
           {CHANGELOG.map((entry) => (
             <div key={entry.title} className="rounded border border-[var(--color-line)] bg-[var(--color-panel)] p-4">
-              <span className="text-[11px] text-[var(--color-faint)]">{entry.date}</span>
-              <h3 className="mt-1 text-[14px]">{entry.title}</h3>
-              <p className="mt-1 text-[12px] leading-relaxed text-[var(--color-muted)]">{entry.body}</p>
+              <span className="text-[0.6875rem] text-[var(--color-faint)]">{entry.date}</span>
+              <h3 className="mt-1 text-[0.875rem]">{entry.title}</h3>
+              <p className="mt-1 text-[0.75rem] leading-relaxed text-[var(--color-muted)]">{entry.body}</p>
             </div>
           ))}
         </div>
@@ -1049,10 +1051,10 @@ function Footer() {
             <span className="text-lg leading-none">∇</span>
             <span className="text-sm tracking-[0.2em]">SAMOSA</span>
           </div>
-          <p className="mt-3 text-[12px] leading-relaxed text-[var(--color-muted)]">
+          <p className="mt-3 text-[0.75rem] leading-relaxed text-[var(--color-muted)]">
             A step auditor for matrix algebra, stochastics and algebra. MIT licensed.
           </p>
-          <p className="mt-3 inline-flex items-center gap-2 text-[12px] text-[var(--color-chutney)]">
+          <p className="mt-3 inline-flex items-center gap-2 text-[0.75rem] text-[var(--color-chutney)]">
             <span>●</span> all checks local, nothing uploaded
           </p>
         </div>
@@ -1082,7 +1084,7 @@ function Footer() {
           ]}
         />
       </div>
-      <div className="border-t border-[var(--color-line)] px-6 lg:px-10 py-6 text-center text-[11px] text-[var(--color-faint)]">
+      <div className="border-t border-[var(--color-line)] px-6 lg:px-10 py-6 text-center text-[0.6875rem] text-[var(--color-faint)]">
         ∇ SAMOSA · a ∇ is just a samosa with filling
       </div>
     </footer>
@@ -1093,7 +1095,7 @@ function FooterColumn({ title, links }: { title: string; links: Array<[string, s
   return (
     <div>
       <h3 className="pane-title">{title}</h3>
-      <ul className="mt-3 space-y-1.5 text-[13px] text-[var(--color-muted)]">
+      <ul className="mt-3 space-y-1.5 text-[0.8125rem] text-[var(--color-muted)]">
         {links.map(([label, href]) => (
           <li key={label}>
             <a href={href} className="hover:text-[var(--color-text)]">
@@ -1109,9 +1111,9 @@ function FooterColumn({ title, links }: { title: string; links: Array<[string, s
 function SectionHead({ eyebrow, title, body }: { eyebrow: string; title: string; body: string }) {
   return (
     <div>
-      <span className="text-[11px] tracking-[0.3em] text-[var(--color-faint)]">{eyebrow.toUpperCase()}</span>
+      <span className="text-[0.6875rem] tracking-[0.3em] text-[var(--color-faint)]">{eyebrow.toUpperCase()}</span>
       <h2 className="font-display mt-2 text-[clamp(28px,4vw,46px)] leading-tight">{title}</h2>
-      <p className="mt-3 max-w-[680px] text-[14px] leading-relaxed text-[var(--color-muted)]">{body}</p>
+      <p className="mt-3 max-w-[680px] text-[0.875rem] leading-relaxed text-[var(--color-muted)]">{body}</p>
     </div>
   );
 }

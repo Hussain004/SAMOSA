@@ -16,7 +16,7 @@ export function Menu({ onPick, onClose, onSpotTheBug }: MenuProps) {
         <h2 className="text-sm">The menu</h2>
         <button
           onClick={onClose}
-          className="rounded border border-[var(--color-line)] px-2 py-1 text-[10px] text-[var(--color-muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-text)]"
+          className="rounded border border-[var(--color-line)] px-2 py-1 text-[0.625rem] text-[var(--color-muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-text)]"
         >
           close
         </button>
@@ -31,12 +31,12 @@ export function Menu({ onPick, onClose, onSpotTheBug }: MenuProps) {
             className="group rounded border border-[var(--color-line)] bg-[var(--color-panel-2)] p-3 transition-colors hover:border-[var(--color-gold)]/60"
           >
             <h3 className="text-xs font-medium">{item.title}</h3>
-            <p className="mt-1 text-[11px] leading-relaxed text-[var(--color-muted)]">{item.blurb}</p>
+            <p className="mt-1 text-[0.6875rem] leading-relaxed text-[var(--color-muted)]">{item.blurb}</p>
             <div className="mt-2 flex gap-2">
               <button
                 data-menu-item={item.id}
                 onClick={() => onPick(item.source, item.decls)}
-                className="rounded border border-[var(--color-line)] px-2 py-1 text-[10px] hover:border-[var(--color-gold)] hover:text-[var(--color-text)]"
+                className="rounded border border-[var(--color-line)] px-2 py-1 text-[0.625rem] hover:border-[var(--color-gold)] hover:text-[var(--color-text)]"
               >
                 open
               </button>
@@ -44,7 +44,7 @@ export function Menu({ onPick, onClose, onSpotTheBug }: MenuProps) {
                 <button
                   data-testid={`spot-${item.id}`}
                   onClick={() => onSpotTheBug(item.bugSource!, item.decls, item.id)}
-                  className="rounded border border-[var(--color-line)] px-2 py-1 text-[10px] hover:border-[var(--color-tamarind)] hover:text-[var(--color-text)]"
+                  className="rounded border border-[var(--color-line)] px-2 py-1 text-[0.625rem] hover:border-[var(--color-tamarind)] hover:text-[var(--color-text)]"
                 >
                   spot the bug
                 </button>
@@ -152,7 +152,7 @@ export function CommandPalette({
               }`}
             >
               <span>{command.label}</span>
-              {command.hint && <span className="text-[10px] text-[var(--color-faint)]">{command.hint}</span>}
+              {command.hint && <span className="text-[0.625rem] text-[var(--color-faint)]">{command.hint}</span>}
             </button>
           </li>
         ))}
@@ -171,7 +171,7 @@ export function PresetList({ onPick }: { onPick: (id: string) => void }) {
           key={preset.id}
           title={preset.hint}
           onClick={() => onPick(preset.id)}
-          className="rounded border border-[var(--color-line)] px-2 py-1 text-[10px] text-[var(--color-muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-text)]"
+          className="rounded border border-[var(--color-line)] px-2 py-1 text-[0.625rem] text-[var(--color-muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-text)]"
         >
           {preset.label}
         </button>

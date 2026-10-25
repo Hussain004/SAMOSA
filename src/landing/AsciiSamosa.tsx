@@ -116,7 +116,7 @@ export function AsciiSamosa({ className }: { className?: string }) {
       <p className="sr-only">
         An ASCII art samosa shaped like the nabla symbol, turning slowly in the dark.
       </p>
-      <span className="pointer-events-none absolute -bottom-5 text-[11px] text-[var(--color-faint)]">
+      <span className="pointer-events-none absolute -bottom-5 text-[0.6875rem] text-[var(--color-faint)]">
         drag to spin · click for snack mode
       </span>
     </div>

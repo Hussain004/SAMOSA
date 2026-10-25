@@ -7,9 +7,10 @@ import { CommandPalette, Menu, PresetList, type Command } from './Menu.tsx';
 import { exportJson, exportMarkdown, exportLatex } from './export.ts';
 import { MENU } from '../../corpus/menu.ts';
 import { VERDICT_LABEL } from './verdicts.ts';
+import { FontSizeControl, applyFontScale, readFontScale, stepFontScale } from '../font-size.tsx';
 
 const HEADER_BUTTON =
-  'rounded border border-[var(--color-line)] px-2 py-1 text-[11px] text-[var(--color-muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-text)]';
+  'rounded border border-[var(--color-line)] px-2 py-1 text-[0.6875rem] text-[var(--color-muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-text)]';
 
 export function App() {
   const {
@@ -156,6 +157,18 @@ export function App() {
         run: () =>
           setSettings({ layout: settings.layout === 'denominator' ? 'numerator' : 'denominator' }),
       },
+      {
+        id: 'bigger',
+        label: 'Larger text',
+        hint: 'the whole page',
+        run: () => applyFontScale(stepFontScale(readFontScale(), 1)),
+      },
+      {
+        id: 'smaller',
+        label: 'Smaller text',
+        hint: 'the whole page',
+        run: () => applyFontScale(stepFontScale(readFontScale(), -1)),
+      },
       { id: 'reset', label: 'Start over', run: () => setSource(DEFAULT_SOURCE) },
     ],
     [copy, report, reroll, setSettings, setSource, settings, source],
@@ -199,11 +212,12 @@ export function App() {
           ⋯
         </button>
         {spotTheBug && (
-          <span className="rounded border border-[var(--color-saffron)]/60 px-2 py-1 text-[11px] text-[var(--color-saffron)]">
+          <span className="rounded border border-[var(--color-saffron)]/60 px-2 py-1 text-[0.6875rem] text-[var(--color-saffron)]">
             spot the bug
           </span>
         )}
-        <div className="ml-auto hidden items-center gap-2 text-[11px] text-[var(--color-faint)] sm:flex">
+        <FontSizeControl className="ml-auto hidden text-[0.6875rem] sm:flex" />
+        <div className="hidden items-center gap-2 text-[0.6875rem] text-[var(--color-faint)] lg:flex">
           <kbd>ctrl</kbd>
           <kbd>K</kbd>
           <span>for the commands</span>
@@ -225,11 +239,12 @@ export function App() {
           >
             ★ GitHub
           </a>
+          <FontSizeControl className="text-[0.6875rem]" />
         </div>
       )}
 
       {spotTheBug && (
-        <div className="flex flex-wrap items-center gap-3 border-b border-[var(--color-line)] bg-[var(--color-panel)] px-4 py-2 text-[11px]">
+        <div className="flex flex-wrap items-center gap-3 border-b border-[var(--color-line)] bg-[var(--color-panel)] px-4 py-2 text-[0.6875rem]">
           {revealed ? (
             <span className="text-[var(--color-chutney)]">
               ✓ found it in {tries} {tries === 1 ? 'try' : 'tries'}
@@ -259,14 +274,14 @@ export function App() {
           <span className="text-[var(--color-faint)]">streak {streak}</span>
           <button
             onClick={stopSpotTheBug}
-            className="ml-auto text-[10px] text-[var(--color-faint)] hover:text-[var(--color-text)]"
+            className="ml-auto text-[0.625rem] text-[var(--color-faint)] hover:text-[var(--color-text)]"
           >
             leave the game
           </button>
         </div>
       )}
 
-      <div className="flex shrink-0 border-b border-[var(--color-line)] text-[10px] md:hidden">
+      <div className="flex shrink-0 border-b border-[var(--color-line)] text-[0.625rem] md:hidden">
         {(['rendered', 'source'] as const).map((pane) => (
           <button
             key={pane}
@@ -293,7 +308,7 @@ export function App() {
             spellCheck={false}
             className="mt-2 h-20 w-full resize-y rounded border border-[var(--color-line)] bg-black/40 p-2 font-mono text-xs outline-none focus:border-[var(--color-gold)]"
           />
-          <div className="mt-3 flex flex-wrap items-center gap-4 text-[11px] text-[var(--color-muted)]">
+          <div className="mt-3 flex flex-wrap items-center gap-4 text-[0.6875rem] text-[var(--color-muted)]">
             <label className="flex items-center gap-2">
               seed
               <input
@@ -364,7 +379,7 @@ export function App() {
         >
           <div className="flex items-center justify-between px-3 py-1.5">
             <span className="pane-title">source</span>
-            <span className="text-[10px] text-[var(--color-faint)]">{source.length} characters</span>
+            <span className="text-[0.625rem] text-[var(--color-faint)]">{source.length} characters</span>
           </div>
           <div className="min-h-0 flex-1">
             <SourceEditor
@@ -381,7 +396,7 @@ export function App() {
         <section className={`${mobilePane === 'rendered' ? 'flex' : 'hidden'} min-h-0 flex-col md:flex`}>
           <div className="flex items-center justify-between px-3 py-1.5">
             <span className="pane-title">rendered</span>
-            {busy && <span className="text-[10px] text-[var(--color-saffron)]">checking…</span>}
+            {busy && <span className="text-[0.625rem] text-[var(--color-saffron)]">checking…</span>}
           </div>
           <div className="min-h-0 flex-1">
             <RenderedRows
@@ -425,21 +440,21 @@ export function App() {
           <span className="pane-title">inspector</span>
           <div className="flex items-center gap-3">
             {step && (
-              <span className="text-[10px] text-[var(--color-faint)]">
+              <span className="text-[0.625rem] text-[var(--color-faint)]">
                 row {step.row} · {step.mode ?? VERDICT_LABEL[step.verdict]}
               </span>
             )}
             <button
               onClick={() => setInspectorOpen((v) => !v)}
               aria-label={inspectorOpen ? 'collapse the inspector' : 'expand the inspector'}
-              className="hidden text-[10px] text-[var(--color-faint)] hover:text-[var(--color-text)] md:inline"
+              className="hidden text-[0.625rem] text-[var(--color-faint)] hover:text-[var(--color-text)] md:inline"
             >
               {inspectorOpen ? '▾' : '▸'}
             </button>
             <button
               onClick={() => setSheetOpen(false)}
               aria-label="close the inspector"
-              className="text-[13px] text-[var(--color-faint)] hover:text-[var(--color-text)] md:hidden"
+              className="text-[0.8125rem] text-[var(--color-faint)] hover:text-[var(--color-text)] md:hidden"
             >
               ×
             </button>
@@ -468,7 +483,7 @@ export function App() {
         </div>
       </section>
 
-      <footer className="flex shrink-0 items-center gap-4 overflow-x-auto border-t border-[var(--color-line)] px-4 py-1.5 text-[11px] whitespace-nowrap text-[var(--color-muted)]">
+      <footer className="flex shrink-0 items-center gap-4 overflow-x-auto border-t border-[var(--color-line)] px-4 py-1.5 text-[0.6875rem] whitespace-nowrap text-[var(--color-muted)]">
         <span className="text-[var(--color-chutney)]">●</span>
         <span className="hidden sm:inline">all checks local, nothing uploaded</span>
         <span className="hidden text-[var(--color-faint)] sm:inline">·</span>

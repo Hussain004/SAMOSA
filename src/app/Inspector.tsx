@@ -45,7 +45,7 @@ export function Inspector({ step, report, explanation, onApplyFix, onCopy, onClo
         </div>
         <button
           onClick={onClose}
-          className="rounded border border-[var(--color-line)] px-2 py-1 text-[10px] text-[var(--color-muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-text)]"
+          className="rounded border border-[var(--color-line)] px-2 py-1 text-[0.625rem] text-[var(--color-muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-text)]"
         >
           close
         </button>
@@ -112,7 +112,7 @@ export function Inspector({ step, report, explanation, onApplyFix, onCopy, onClo
                   <p className="flex flex-wrap items-center gap-2 text-xs">
                     {fix.title}
                     {!fix.verified && (
-                      <span className="rounded border border-[var(--color-saffron)]/50 px-1 py-0.5 text-[9px] uppercase tracking-wide text-[var(--color-saffron)]">
+                      <span className="rounded border border-[var(--color-saffron)]/50 px-1 py-0.5 text-[0.5625rem] uppercase tracking-wide text-[var(--color-saffron)]">
                         unverified
                       </span>
                     )}
@@ -120,14 +120,14 @@ export function Inspector({ step, report, explanation, onApplyFix, onCopy, onClo
                   {fix.detail && (
                     <Tex
                       latex={fix.detail}
-                      className="mt-1 overflow-x-auto text-[12px] text-[var(--color-muted)]"
+                      className="mt-1 overflow-x-auto text-[0.75rem] text-[var(--color-muted)]"
                     />
                   )}
                 </div>
                 {fix.edit && (
                   <button
                     onClick={() => onApplyFix(fix)}
-                    className="shrink-0 rounded border border-[var(--color-chutney)]/50 px-2 py-1 text-[10px] text-[var(--color-chutney)] hover:bg-[#5bc27a18]"
+                    className="shrink-0 rounded border border-[var(--color-chutney)]/50 px-2 py-1 text-[0.625rem] text-[var(--color-chutney)] hover:bg-[#5bc27a18]"
                   >
                     apply
                   </button>
@@ -197,7 +197,7 @@ function CounterexampleView({
       {computed.length > 0 && (
         <div className="mt-3">
           <h3 className="pane-title">computed by SAMOSA</h3>
-          <p className="mt-0.5 text-[10px] text-[var(--color-faint)]">
+          <p className="mt-0.5 text-[0.625rem] text-[var(--color-faint)]">
             The rows that define a symbol, run with the values above.
           </p>
           <div className="mt-1 space-y-1 rounded border border-[var(--color-line)] bg-black/10 p-2">
@@ -215,7 +215,7 @@ function CounterexampleView({
           className="samosa-diff mt-1 overflow-x-auto rounded border border-[var(--color-line)] bg-black/20 p-2"
           latex={String.raw`\begin{aligned} \text{left side} &= ${left} \\ \text{right side} &= ${right} \\ \text{difference} &= ${difference} \end{aligned}`}
         />
-        <p className="mt-1 text-[10px] text-[var(--color-faint)]">
+        <p className="mt-1 text-[0.625rem] text-[var(--color-faint)]">
           The difference is what the step claims is zero. The nonzero entries are the ones in red.
         </p>
       </div>
@@ -226,14 +226,14 @@ function CounterexampleView({
             onCopy(counterexample.numpy);
             setCopied(true);
           }}
-          className="rounded border border-[var(--color-line)] px-2 py-1 text-[10px] text-[var(--color-muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-text)]"
+          className="rounded border border-[var(--color-line)] px-2 py-1 text-[0.625rem] text-[var(--color-muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-text)]"
         >
           {copied ? '✓ copied' : 'copy as NumPy'}
         </button>
       </div>
       <details className="mt-2">
-        <summary className="cursor-pointer text-[10px] text-[var(--color-faint)]">the NumPy snippet</summary>
-        <pre className="mt-1 max-h-56 overflow-auto rounded border border-[var(--color-line)] bg-black/30 p-2 text-[10px] leading-relaxed">
+        <summary className="cursor-pointer text-[0.625rem] text-[var(--color-faint)]">the NumPy snippet</summary>
+        <pre className="mt-1 max-h-56 overflow-auto rounded border border-[var(--color-line)] bg-black/30 p-2 text-[0.625rem] leading-relaxed">
           {counterexample.numpy}
         </pre>
       </details>

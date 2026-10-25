@@ -115,20 +115,20 @@ function Row({
       }`}
     >
       <span
-        className="mt-1 w-6 shrink-0 text-right text-[10px] tabular-nums text-[var(--color-faint)]"
+        className="mt-1 w-6 shrink-0 text-right text-[0.625rem] tabular-nums text-[var(--color-faint)]"
         title={`row ${step.row}, source line ${step.line ?? '?'}`}
       >
         {step.line ?? step.row}
       </span>
       <div className="min-w-0 flex-1 overflow-x-auto overflow-y-hidden py-0.5">
-        <div className="text-[15px] leading-8" dangerouslySetInnerHTML={{ __html: html }} />
+        <div className="text-[0.9375rem] leading-8" dangerouslySetInnerHTML={{ __html: html }} />
         {step.annotation && (
           <p className="mt-0.5 text-xs text-[var(--color-faint)]">{step.annotation}</p>
         )}
       </div>
       <div className="mt-1 shrink-0">
         {spotTheBug && !revealed ? (
-          <span className="text-[11px] text-[var(--color-faint)]">
+          <span className="text-[0.6875rem] text-[var(--color-faint)]">
             {guess === step.id ? 'you think this one' : 'click the wrong row'}
           </span>
         ) : (
@@ -138,7 +138,7 @@ function Row({
               {VERDICT_LABEL[step.verdict]}
             </span>
             {step.mode && (
-              <span className="ml-2 text-[10px] uppercase tracking-wider text-[var(--color-faint)]">{step.mode}</span>
+              <span className="ml-2 text-[0.625rem] uppercase tracking-wider text-[var(--color-faint)]">{step.mode}</span>
             )}
           </>
         )}
