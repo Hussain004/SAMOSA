@@ -76,25 +76,37 @@ checks it, exactly, and it also finds the two ways you can get it wrong.
 **Nineteen seconds.** The line everybody writes and nobody checks, and what
 happens when a machine reads it.
 
-![The nineteen second tour: the derivation types in, the wrong row gets its badge, the counterexample arrives](public/brag.webp)
+<p align="center">
+  <img src="public/brag.webp" width="100%" alt="The nineteen second tour: the derivation types in, the wrong row gets its badge, the counterexample arrives" />
+</p>
 
 **A transposed product.** The squiggle, the counterexample, and the fix that
 takes one keystroke.
 
-![A transposed product is flagged, the counterexample is small, and the fix applies](public/gifs/transpose.webp)
+<p align="center">
+  <img src="public/gifs/transpose.webp" width="100%" alt="A transposed product is flagged, the counterexample is small, and the fix applies" />
+</p>
 
 **The Kalman update, with the missing noise term.** The row everybody writes
 from memory, and the term that is not there.
 
-![The Kalman measurement update, with the row that is wrong](public/gifs/kalman.webp)
+<p align="center">
+  <img src="public/gifs/kalman.webp" width="100%" alt="The Kalman measurement update, with the row that is wrong" />
+</p>
 
 **A gradient in the wrong layout.** The numerator layout is a transpose away
 from the right answer, and SAMOSA says so.
 
-![A gradient in the numerator layout, with the hint](public/gifs/gradient.webp)
+<p align="center">
+  <img src="public/gifs/gradient.webp" width="100%" alt="A gradient in the numerator layout, with the hint" />
+</p>
 
-The same three, as videos: [the transposed product](public/gifs/transpose.mp4),
-[the Kalman update](public/gifs/kalman.mp4), [the layout](public/gifs/gradient.mp4).
+The clips are animated WebP, so they autoplay and loop in the README. The
+full-quality recordings are also there as MP4:
+[the transposed product](public/gifs/transpose.mp4),
+[the Kalman update](public/gifs/kalman.mp4),
+[the layout](public/gifs/gradient.mp4), and
+[the nineteen second tour](public/brag.mp4).
 
 ## Quick start
 

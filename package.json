@@ -31,6 +31,7 @@
     "build:pkg": "node scripts/copy-docs.mjs && node scripts/build-pkg.mjs",
     "gen:demo": "vite-node scripts/gen-demo.ts --write",
     "gen:tex": "vite-node scripts/gen-tex.ts --write",
+    "record:gifs": "node scripts/record-gifs.mjs",
     "publish:pkg": "npm run build:pkg && cd pkg && npm publish --access public",
     "setup": "git config core.hooksPath .githooks",
     "test": "vitest run",

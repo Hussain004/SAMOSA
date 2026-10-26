@@ -1,6 +1,6 @@
 import { chromium } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 /**
@@ -79,12 +79,14 @@ async function main() {
 async function record(name, script) {
   const dir = resolve(WORK, name);
   mkdirSync(dir, { recursive: true });
-  // the recording is at the full size of the window: the text in the app is
-  // 13 pixels, and a GIF that is scaled down is a GIF nobody can read
+  // The page is 1080 by 660 CSS pixels, but it is recorded at twice that in
+  // each direction. The text in the app is 13 CSS pixels; at this size the
+  // screenshot still has 26 device pixels per glyph, so the downscaled WebP
+  // keeps the edges of the type instead of smearing them.
   const context = await chromium.launchPersistentContext('', {
-    recordVideo: { dir, size: { width: 1080, height: 660 } },
+    recordVideo: { dir, size: { width: 2160, height: 1320 } },
     viewport: { width: 1080, height: 660 },
-    deviceScaleFactor: 1,
+    deviceScaleFactor: 2,
   });
   const page = await context.newPage();
   await script(page);
@@ -93,14 +95,14 @@ async function record(name, script) {
   await context.close();
   const raw = await video.path();
 
-  // The video: the same recording, in colour and at full resolution. It is
-  // the one to watch, and the GIF is the one that plays in the readme.
+  // The video: the full 2x capture at its native size, with a high bitrate.
+  // It is the one to watch when the animated WebP is not enough.
   execFileSync('ffmpeg', [
     '-y',
     '-i',
     raw,
     '-vf',
-    'trim=start=1.2,setpts=PTS-STARTPTS,fps=20,scale=1080:-1:flags=lanczos',
+    'trim=start=1.2,setpts=PTS-STARTPTS,fps=25,scale=2160:-2:flags=lanczos',
     '-c:v',
     'libx264',
     '-pix_fmt',
@@ -108,41 +110,43 @@ async function record(name, script) {
     '-preset',
     'slow',
     '-crf',
-    '20',
+    '16',
     '-movflags',
     '+faststart',
     resolve(OUT, `${name}.mp4`),
   ]);
 
-  // The GIF keeps every pixel of the recording, so the text stays legible.
-  // The idle seconds at the start are trimmed, the palette has every colour
-  // the screen uses, and there is no dithering: the noise of the dither is
-  // what makes a recorded text look rough.
+  // The GIF is the fallback. It is smaller than the old one in colour depth,
+  // but it keeps the 2x capture down to a readable frame, and the palette is
+  // built from the whole clip rather than from the differences.
   execFileSync('ffmpeg', [
     '-y',
     '-i',
     raw,
     '-vf',
-    'trim=start=1.2,setpts=PTS-STARTPTS,fps=10,scale=1080:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=256:stats_mode=diff[p];[s1][p]paletteuse=dither=none:diff_mode=rectangle',
+    'trim=start=1.2,setpts=PTS-STARTPTS,fps=15,scale=1440:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=256:stats_mode=full[p];[s1][p]paletteuse=dither=none:diff_mode=rectangle',
     '-loop',
     '0',
     resolve(OUT, `${name}.gif`),
   ]);
 
   // The WebP is what the readme shows: it is an image, so it plays by itself,
-  // and it has all the colours, so the text is as sharp as the screen.
+  // and it has all the colours. Quality 95 is the point: the old 72 was the
+  // reason the type looked soft even before GitHub resized it.
   execFileSync('ffmpeg', [
     '-y',
     '-i',
     raw,
     '-vf',
-    'trim=start=1.2,setpts=PTS-STARTPTS,fps=16,scale=1080:-1:flags=lanczos',
+    'trim=start=1.2,setpts=PTS-STARTPTS,fps=25,scale=1600:-2:flags=lanczos',
     '-vcodec',
     'libwebp_anim',
     '-lossless',
     '0',
     '-q:v',
-    '72',
+    '95',
+    '-compression_level',
+    '6',
     '-loop',
     '0',
     '-an',
@@ -205,6 +209,3 @@ async function type(page, text) {
 
 await main();
 
-void readdirSync;
-void readFileSync;
-void writeFileSync;
