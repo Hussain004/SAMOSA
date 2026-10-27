@@ -2647,16 +2647,16 @@ P.lessThan = P.lt = function(y) {
 P.lessThanOrEqualTo = P.lte = function(y) {
   return this.cmp(y) < 1;
 };
-P.logarithm = P.log = function(base2) {
+P.logarithm = P.log = function(base3) {
   var isBase10, d, denominator, k, inf, num, sd, r, arg2 = this, Ctor = arg2.constructor, pr = Ctor.precision, rm = Ctor.rounding, guard = 5;
-  if (base2 == null) {
-    base2 = new Ctor(10);
+  if (base3 == null) {
+    base3 = new Ctor(10);
     isBase10 = true;
   } else {
-    base2 = new Ctor(base2);
-    d = base2.d;
-    if (base2.s < 0 || !d || !d[0] || base2.eq(1)) return new Ctor(NaN);
-    isBase10 = base2.eq(10);
+    base3 = new Ctor(base3);
+    d = base3.d;
+    if (base3.s < 0 || !d || !d[0] || base3.eq(1)) return new Ctor(NaN);
+    isBase10 = base3.eq(10);
   }
   d = arg2.d;
   if (arg2.s < 0 || !d || !d[0] || arg2.eq(1)) {
@@ -2673,13 +2673,13 @@ P.logarithm = P.log = function(base2) {
   external = false;
   sd = pr + guard;
   num = naturalLogarithm(arg2, sd);
-  denominator = isBase10 ? getLn10(Ctor, sd + 10) : naturalLogarithm(base2, sd);
+  denominator = isBase10 ? getLn10(Ctor, sd + 10) : naturalLogarithm(base3, sd);
   r = divide(num, denominator, sd, 1);
   if (checkRoundingDigits(r.d, k = pr, rm)) {
     do {
       sd += 10;
       num = naturalLogarithm(arg2, sd);
-      denominator = isBase10 ? getLn10(Ctor, sd + 10) : naturalLogarithm(base2, sd);
+      denominator = isBase10 ? getLn10(Ctor, sd + 10) : naturalLogarithm(base3, sd);
       r = divide(num, denominator, sd, 1);
       if (!inf) {
         if (+digitsToString(r.d).slice(k + 1, k + 15) + 1 == 1e14) {
@@ -3290,12 +3290,12 @@ function cosine(Ctor, x) {
   return x;
 }
 var divide = /* @__PURE__ */ (function() {
-  function multiplyInteger(x, k, base2) {
+  function multiplyInteger(x, k, base3) {
     var temp, carry = 0, i = x.length;
     for (x = x.slice(); i--; ) {
       temp = x[i] * k + carry;
-      x[i] = temp % base2 | 0;
-      carry = temp / base2 | 0;
+      x[i] = temp % base3 | 0;
+      carry = temp / base3 | 0;
     }
     if (carry) x.unshift(carry);
     return x;
@@ -3314,16 +3314,16 @@ var divide = /* @__PURE__ */ (function() {
     }
     return r;
   }
-  function subtract(a, b, aL, base2) {
+  function subtract(a, b, aL, base3) {
     var i = 0;
     for (; aL--; ) {
       a[aL] -= i;
       i = a[aL] < b[aL] ? 1 : 0;
-      a[aL] = i * base2 + a[aL] - b[aL];
+      a[aL] = i * base3 + a[aL] - b[aL];
     }
     for (; !a[0] && a.length > 1; ) a.shift();
   }
-  return function(x, y, pr, rm, dp, base2) {
+  return function(x, y, pr, rm, dp, base3) {
     var cmp, e, i, k, logBase, more, prod, prodL, q, qd, rem, remL, rem0, sd, t, xi, xL, yd0, yL, yz, Ctor = x.constructor, sign2 = x.s == y.s ? 1 : -1, xd = x.d, yd = y.d;
     if (!xd || !xd[0] || !yd || !yd[0]) {
       return new Ctor(
@@ -3334,11 +3334,11 @@ var divide = /* @__PURE__ */ (function() {
         )
       );
     }
-    if (base2) {
+    if (base3) {
       logBase = 1;
       e = x.e - y.e;
     } else {
-      base2 = BASE;
+      base3 = BASE;
       logBase = LOG_BASE;
       e = mathfloor(x.e / logBase) - mathfloor(y.e / logBase);
     }
@@ -3367,16 +3367,16 @@ var divide = /* @__PURE__ */ (function() {
         yd = yd[0];
         sd++;
         for (; (i < xL || k) && sd--; i++) {
-          t = k * base2 + (xd[i] || 0);
+          t = k * base3 + (xd[i] || 0);
           qd[i] = t / yd | 0;
           k = t % yd | 0;
         }
         more = k || i < xL;
       } else {
-        k = base2 / (yd[0] + 1) | 0;
+        k = base3 / (yd[0] + 1) | 0;
         if (k > 1) {
-          yd = multiplyInteger(yd, k, base2);
-          xd = multiplyInteger(xd, k, base2);
+          yd = multiplyInteger(yd, k, base3);
+          xd = multiplyInteger(xd, k, base3);
           yL = yd.length;
           xL = xd.length;
         }
@@ -3387,23 +3387,23 @@ var divide = /* @__PURE__ */ (function() {
         yz = yd.slice();
         yz.unshift(0);
         yd0 = yd[0];
-        if (yd[1] >= base2 / 2) ++yd0;
+        if (yd[1] >= base3 / 2) ++yd0;
         do {
           k = 0;
           cmp = compare(yd, rem, yL, remL);
           if (cmp < 0) {
             rem0 = rem[0];
-            if (yL != remL) rem0 = rem0 * base2 + (rem[1] || 0);
+            if (yL != remL) rem0 = rem0 * base3 + (rem[1] || 0);
             k = rem0 / yd0 | 0;
             if (k > 1) {
-              if (k >= base2) k = base2 - 1;
-              prod = multiplyInteger(yd, k, base2);
+              if (k >= base3) k = base3 - 1;
+              prod = multiplyInteger(yd, k, base3);
               prodL = prod.length;
               remL = rem.length;
               cmp = compare(prod, rem, prodL, remL);
               if (cmp == 1) {
                 k--;
-                subtract(prod, yL < prodL ? yz : yd, prodL, base2);
+                subtract(prod, yL < prodL ? yz : yd, prodL, base3);
               }
             } else {
               if (k == 0) cmp = k = 1;
@@ -3411,13 +3411,13 @@ var divide = /* @__PURE__ */ (function() {
             }
             prodL = prod.length;
             if (prodL < remL) prod.unshift(0);
-            subtract(rem, prod, remL, base2);
+            subtract(rem, prod, remL, base3);
             if (cmp == -1) {
               remL = rem.length;
               cmp = compare(yd, rem, yL, remL);
               if (cmp < 1) {
                 k++;
-                subtract(rem, yL < remL ? yz : yd, remL, base2);
+                subtract(rem, yL < remL ? yz : yd, remL, base3);
               }
             }
             remL = rem.length;
@@ -3785,7 +3785,7 @@ function parseDecimal(x, str) {
   return x;
 }
 function parseOther(x, str) {
-  var base2, Ctor, divisor, i, isFloat, len, p, xd, xe;
+  var base3, Ctor, divisor, i, isFloat, len, p, xd, xe;
   if (str.indexOf("_") > -1) {
     str = str.replace(/(\d)_(?=\d)/g, "$1");
     if (isDecimal.test(str)) return parseDecimal(x, str);
@@ -3796,12 +3796,12 @@ function parseOther(x, str) {
     return x;
   }
   if (isHex.test(str)) {
-    base2 = 16;
+    base3 = 16;
     str = str.toLowerCase();
   } else if (isBinary.test(str)) {
-    base2 = 2;
+    base3 = 2;
   } else if (isOctal.test(str)) {
-    base2 = 8;
+    base3 = 8;
   } else {
     throw Error(invalidArgument + str);
   }
@@ -3819,9 +3819,9 @@ function parseOther(x, str) {
     str = str.replace(".", "");
     len = str.length;
     i = len - i;
-    divisor = intPow(Ctor, new Ctor(base2), i, i * 2);
+    divisor = intPow(Ctor, new Ctor(base3), i, i * 2);
   }
-  xd = convertBase(str, base2, BASE);
+  xd = convertBase(str, base3, BASE);
   xe = xd.length - 1;
   for (i = xe; xd[i] === 0; --i) xd.pop();
   if (i < 0) return new Ctor(x.s * 0);
@@ -3899,7 +3899,7 @@ function toLessThanHalfPi(Ctor, x) {
   return x.minus(pi).abs();
 }
 function toStringBinary(x, baseOut, sd, rm) {
-  var base2, e, i, k, len, roundUp, str, xd, y, Ctor = x.constructor, isExp = sd !== void 0;
+  var base3, e, i, k, len, roundUp, str, xd, y, Ctor = x.constructor, isExp = sd !== void 0;
   if (isExp) {
     checkInt32(sd, 1, MAX_DIGITS);
     if (rm === void 0) rm = Ctor.rounding;
@@ -3914,23 +3914,23 @@ function toStringBinary(x, baseOut, sd, rm) {
     str = finiteToString(x);
     i = str.indexOf(".");
     if (isExp) {
-      base2 = 2;
+      base3 = 2;
       if (baseOut == 16) {
         sd = sd * 4 - 3;
       } else if (baseOut == 8) {
         sd = sd * 3 - 2;
       }
     } else {
-      base2 = baseOut;
+      base3 = baseOut;
     }
     if (i >= 0) {
       str = str.replace(".", "");
       y = new Ctor(1);
       y.e = str.length - i;
-      y.d = convertBase(finiteToString(y), 10, base2);
+      y.d = convertBase(finiteToString(y), 10, base3);
       y.e = y.d.length;
     }
-    xd = convertBase(str, 10, base2);
+    xd = convertBase(str, 10, base3);
     e = len = xd.length;
     for (; xd[--len] == 0; ) xd.pop();
     if (!xd[0]) {
@@ -3942,18 +3942,18 @@ function toStringBinary(x, baseOut, sd, rm) {
         x = new Ctor(x);
         x.d = xd;
         x.e = e;
-        x = divide(x, y, sd, rm, 0, base2);
+        x = divide(x, y, sd, rm, 0, base3);
         xd = x.d;
         e = x.e;
         roundUp = inexact;
       }
       i = xd[sd];
-      k = base2 / 2;
+      k = base3 / 2;
       roundUp = roundUp || xd[sd + 1] !== void 0;
       roundUp = rm < 4 ? (i !== void 0 || roundUp) && (rm === 0 || rm === (x.s < 0 ? 3 : 2)) : i > k || i === k && (rm === 4 || roundUp || rm === 6 && xd[sd - 1] & 1 || rm === (x.s < 0 ? 8 : 7));
       xd.length = sd;
       if (roundUp) {
-        for (; ++xd[--sd] > base2 - 1; ) {
+        for (; ++xd[--sd] > base3 - 1; ) {
           xd[sd] = 0;
           if (!sd) {
             ++e;
@@ -3968,7 +3968,7 @@ function toStringBinary(x, baseOut, sd, rm) {
           if (baseOut == 16 || baseOut == 8) {
             i = baseOut == 16 ? 4 : 3;
             for (--len; len % i; len++) str += "0";
-            xd = convertBase(str, base2, baseOut);
+            xd = convertBase(str, base3, baseOut);
             for (len = xd.length; !xd[len - 1]; --len) ;
             for (i = 1, str = "1."; i < len; i++) str += NUMERALS.charAt(xd[i]);
           } else {
@@ -4530,11 +4530,11 @@ var GFpField = class {
   inv(a) {
     if (a === 0) throw new Error("inverse of zero in GF(p)");
     let result = 1;
-    let base2 = a;
+    let base3 = a;
     let e = this.p - 2;
     while (e > 0) {
-      if (e & 1) result = this.mul(result, base2);
-      base2 = this.mul(base2, base2);
+      if (e & 1) result = this.mul(result, base3);
+      base3 = this.mul(base3, base3);
       e = Math.floor(e / 2);
     }
     return result;
@@ -4788,12 +4788,12 @@ function block(rows) {
 function matPow(f, a, k) {
   if (k === 0) return identity(a.r, f.one, f.zero);
   let result = identity(a.r, f.one, f.zero);
-  let base2 = a;
+  let base3 = a;
   let e = k;
   while (e > 0) {
-    if (e & 1) result = matMul(f, result, base2);
+    if (e & 1) result = matMul(f, result, base3);
     e >>= 1;
-    if (e > 0) base2 = matMul(f, base2, base2);
+    if (e > 0) base3 = matMul(f, base3, base3);
   }
   return result;
 }
@@ -4805,12 +4805,12 @@ var DualField = class {
   one;
   pi;
   base;
-  constructor(base2) {
-    this.base = base2;
-    this.name = `dual(${base2.name})`;
-    this.zero = { v: base2.zero, t: base2.zero };
-    this.one = { v: base2.one, t: base2.zero };
-    this.pi = { v: base2.pi, t: base2.zero };
+  constructor(base3) {
+    this.base = base3;
+    this.name = `dual(${base3.name})`;
+    this.zero = { v: base3.zero, t: base3.zero };
+    this.one = { v: base3.one, t: base3.zero };
+    this.pi = { v: base3.pi, t: base3.zero };
   }
   add(a, b) {
     return { v: this.base.add(a.v, b.v), t: this.base.add(a.t, b.t) };
@@ -4896,12 +4896,12 @@ var HyperDualField = class {
   one;
   pi;
   base;
-  constructor(base2) {
-    this.base = base2;
-    this.name = `hyperdual(${base2.name})`;
-    this.zero = { v: base2.zero, e1: base2.zero, e2: base2.zero, e12: base2.zero };
-    this.one = { v: base2.one, e1: base2.zero, e2: base2.zero, e12: base2.zero };
-    this.pi = { v: base2.pi, e1: base2.zero, e2: base2.zero, e12: base2.zero };
+  constructor(base3) {
+    this.base = base3;
+    this.name = `hyperdual(${base3.name})`;
+    this.zero = { v: base3.zero, e1: base3.zero, e2: base3.zero, e12: base3.zero };
+    this.one = { v: base3.one, e1: base3.zero, e2: base3.zero, e12: base3.zero };
+    this.pi = { v: base3.pi, e1: base3.zero, e2: base3.zero, e12: base3.zero };
   }
   add(a, b) {
     return {
@@ -5611,15 +5611,15 @@ function hyperEnv(env, hyper) {
   }
   return { field: hyper, values, defs: env.defs, memo: /* @__PURE__ */ new Map(), quad: /* @__PURE__ */ new Map(), random: env.random };
 }
-function directionalDerivative(base2, fnNode, env, wrtName, baseValue, direction) {
-  const dual = new DualField(base2);
+function directionalDerivative(base3, fnNode, env, wrtName, baseValue, direction) {
+  const dual = new DualField(base3);
   const dEnv = dualEnv(env, dual);
   if (isScalarVal(baseValue) && isScalarVal(direction)) {
     dEnv.values.set(wrtName, scalar({ v: baseValue.v, t: direction.v }));
   } else {
     const bm = isMatrixVal(baseValue) ? baseValue.m : { r: 1, c: 1, d: [baseValue.v] };
     const dm = isMatrixVal(direction) ? direction.m : { r: 1, c: 1, d: [direction.v] };
-    const dMat = toDual(base2, bm);
+    const dMat = toDual(base3, bm);
     for (let i = 0; i < dMat.d.length; i++) dMat.d[i] = { v: dMat.d[i].v, t: dm.d[i] };
     dEnv.values.set(wrtName, { k: "m", m: dMat });
   }
@@ -5627,21 +5627,21 @@ function directionalDerivative(base2, fnNode, env, wrtName, baseValue, direction
   if (isScalarVal(result)) return scalar(result.v.t);
   return { k: "m", m: { r: result.m.r, c: result.m.c, d: result.m.d.map((x) => x.t) } };
 }
-function mixedSecondDerivative(base2, fnNode, env, wrtName, baseValue, v, w) {
-  const hyper = new HyperDualField(base2);
+function mixedSecondDerivative(base3, fnNode, env, wrtName, baseValue, v, w) {
+  const hyper = new HyperDualField(base3);
   const hEnv = hyperEnv(env, hyper);
   if (isScalarVal(baseValue) && isScalarVal(v) && isScalarVal(w)) {
     hEnv.values.set(
       wrtName,
-      scalar({ v: baseValue.v, e1: v.v, e2: w.v, e12: base2.zero })
+      scalar({ v: baseValue.v, e1: v.v, e2: w.v, e12: base3.zero })
     );
   } else {
     const bm = isMatrixVal(baseValue) ? baseValue.m : { r: 1, c: 1, d: [baseValue.v] };
     const vm = isMatrixVal(v) ? v.m : { r: 1, c: 1, d: [v.v] };
     const wm = isMatrixVal(w) ? w.m : { r: 1, c: 1, d: [w.v] };
-    const hMat = toHyperDual(base2, bm);
+    const hMat = toHyperDual(base3, bm);
     for (let i = 0; i < hMat.d.length; i++) {
-      hMat.d[i] = { v: hMat.d[i].v, e1: vm.d[i], e2: wm.d[i], e12: base2.zero };
+      hMat.d[i] = { v: hMat.d[i].v, e1: vm.d[i], e2: wm.d[i], e12: base3.zero };
     }
     hEnv.values.set(wrtName, { k: "m", m: hMat });
   }
@@ -6561,9 +6561,9 @@ var Parser = class _Parser {
     if (this.opts.knownFns?.has(name)) return true;
     return DEFAULT_FUNCTIONS.has(name);
   }
-  makeSym(accents, base2, sub2, labelSup, span) {
+  makeSym(accents, base3, sub2, labelSup, span) {
     const prefix = accents.map((a) => `\\${a}`).join("");
-    let name = prefix + base2;
+    let name = prefix + base3;
     if (sub2) name += `_${sub2}`;
     if (labelSup) name += `^${labelSup}`;
     return { k: "sym", name, display: toDisplay(name), span };
@@ -6663,10 +6663,10 @@ var Parser = class _Parser {
    * (a label such as the plus in P^+). Only the first three change the
    * meaning of the expression.
    */
-  applyScripts(base2, accents, baseLatex) {
+  applyScripts(base3, accents, baseLatex) {
     let sub2 = null;
     let labelSup = null;
-    let spanEnd = base2.span.to;
+    let spanEnd = base3.span.to;
     const scripts = [];
     for (; ; ) {
       if (this.kind() === "sub" && sub2 === null) {
@@ -6694,7 +6694,7 @@ var Parser = class _Parser {
       }
       break;
     }
-    let node = base2;
+    let node = base3;
     if (node.k === "sym") {
       const indexNotation = sub2 !== null && /^[ijk]$/.test(sub2.trim()) && /^[A-Za-z]$/.test(baseLatex);
       node = indexNotation ? {
@@ -7294,16 +7294,16 @@ var Parser = class _Parser {
           this.pos++;
           return { text: t2.type === "cmd" ? `\\${t2.value}` : t2.value, span: { from: t2.from, to: t2.to } };
         })();
-        const base2 = g.text.trim();
-        const sym = this.makeSym(["mathbb"], base2, null, null, { from: t.from, to: g.span.to });
-        if (base2 === "E" || base2 === "V") {
-          return this.finishExpectation({ from: t.from, to: g.span.to }, base2 === "E" ? "E" : "Var");
+        const base3 = g.text.trim();
+        const sym = this.makeSym(["mathbb"], base3, null, null, { from: t.from, to: g.span.to });
+        if (base3 === "E" || base3 === "V") {
+          return this.finishExpectation({ from: t.from, to: g.span.to }, base3 === "E" ? "E" : "Var");
         }
-        if (base2 === "P" && this.kind() === "lparen") {
+        if (base3 === "P" && this.kind() === "lparen") {
           const { args, unknown } = this.parseArgs();
           return this.makeCall("P", t.from, args, unknown);
         }
-        return this.applyScripts(sym, ["mathbb"], base2);
+        return this.applyScripts(sym, ["mathbb"], base3);
       }
       case "det":
       case "exp":
@@ -7368,25 +7368,25 @@ var Parser = class _Parser {
     if (ACCENTS.has(name)) {
       const accentSpan = { from: t.from, to: t.to };
       this.pos++;
-      const base2 = this.parseAccentBase(name, accentSpan);
-      if (base2.k === "sym" && this.kind() === "lparen") {
-        const density = base2.name.match(/^\\mathcal([NU])$/);
+      const base3 = this.parseAccentBase(name, accentSpan);
+      if (base3.k === "sym" && this.kind() === "lparen") {
+        const density = base3.name.match(/^\\mathcal([NU])$/);
         if (density) {
           const { args, unknown } = this.parseArgs();
           return this.makeCall(
             density[1] === "N" ? "normalDensity" : "uniformDensity",
-            base2.span.from,
+            base3.span.from,
             args,
             unknown
           );
         }
-        const plain = base2.name.startsWith(`\\${name}`) ? base2.name.slice(name.length + 1) : plainName(base2.name);
+        const plain = base3.name.startsWith(`\\${name}`) ? base3.name.slice(name.length + 1) : plainName(base3.name);
         if (this.looksLikeCall(plain)) {
           const { args, unknown } = this.parseArgs();
-          return this.makeCall(base2.name, base2.span.from, args, unknown);
+          return this.makeCall(base3.name, base3.span.from, args, unknown);
         }
       }
-      return base2;
+      return base3;
     }
     if (name === "begin") {
       return this.parseMatrixEnv();
@@ -8706,14 +8706,14 @@ function parseCompactItem(item, result) {
   return false;
 }
 function parseType(name, type) {
-  const base2 = { name, display: toDisplay(name), source: "declared" };
-  if (type === "scalar") return { ...base2, kind: "scalar", props: [] };
-  if (type === "pos") return { ...base2, kind: "scalar", props: ["pos"] };
-  if (type === "int") return { ...base2, kind: "scalar", props: ["int"] };
+  const base3 = { name, display: toDisplay(name), source: "declared" };
+  if (type === "scalar") return { ...base3, kind: "scalar", props: [] };
+  if (type === "pos") return { ...base3, kind: "scalar", props: ["pos"] };
+  if (type === "int") return { ...base3, kind: "scalar", props: ["int"] };
   const fn = type.match(/^fn\s*(.+?)\s*(?:->|→)\s*(.+)$/);
   if (fn) {
     return {
-      ...base2,
+      ...base3,
       kind: "function",
       dom: parseDims(fn[1]),
       cod: parseDim(fn[2]) ?? void 0,
@@ -8748,14 +8748,14 @@ function parseType(name, type) {
   }
   if (!dims.length) {
     if (!props.length) return null;
-    return { ...base2, kind: "matrix", props };
+    return { ...base3, kind: "matrix", props };
   }
   if (dims.length === 1) {
     const matrixish = props.some(
       (p) => typeof p === "string" && ["sym", "spd", "psd", "orth", "diag", "triu", "tril", "skew", "idem", "proj", "stoch"].includes(p)
     );
     return {
-      ...base2,
+      ...base3,
       kind: matrixish ? "matrix" : "vector",
       rows: dims[0],
       cols: matrixish ? dims[0] : 1,
@@ -8763,7 +8763,7 @@ function parseType(name, type) {
     };
   }
   return {
-    ...base2,
+    ...base3,
     kind: "matrix",
     rows: dims[0],
     cols: dims[1],
@@ -9051,8 +9051,8 @@ function symbolType(ctx, name, span) {
     });
     return ty;
   }
-  const base2 = baseLetter(name);
-  const guess = guessType(ctx, name, base2);
+  const base3 = baseLetter(name);
+  const guess = guessType(ctx, name, base3);
   ctx.symbols.set(name, {
     name,
     display: toDisplay(name),
@@ -9086,44 +9086,44 @@ function baseLetter(name) {
   const m = stripped.match(/^([A-Za-z]+)/);
   return m ? m[1] : stripped;
 }
-function guessType(ctx, name, base2) {
-  if (base2 === "I" && !name.includes("_")) {
+function guessType(ctx, name, base3) {
+  if (base3 === "I" && !name.includes("_")) {
     return {
       ty: { t: "mat", r: freshDim(ctx), c: freshDim(ctx) },
       props: ["ident"],
       assumption: "I is the identity matrix"
     };
   }
-  if (base2 === "0" && !name.includes("_")) {
+  if (base3 === "0" && !name.includes("_")) {
     return {
       ty: { t: "mat", r: freshDim(ctx), c: freshDim(ctx) },
       props: ["zero"],
       assumption: "0 is the zero matrix"
     };
   }
-  if (name === "\\mathbf{1}" || name === "\\mathbf1" || base2 === "\\mathbf1") {
+  if (name === "\\mathbf{1}" || name === "\\mathbf1" || base3 === "\\mathbf1") {
     return {
       ty: { t: "mat", r: freshDim(ctx), c: freshDim(ctx) },
       props: ["ones"],
       assumption: "the ones vector"
     };
   }
-  if (CONSTANTS.has(name) || CONSTANTS.has(base2)) {
+  if (CONSTANTS.has(name) || CONSTANTS.has(base3)) {
     if (!name.includes("_")) {
       return { ty: { t: "scalar" }, props: [], assumption: `${name} is a constant` };
     }
   }
-  if (/^[nmdkNTTP]$/.test(base2) && !name.includes("_")) {
+  if (/^[nmdkNTTP]$/.test(base3) && !name.includes("_")) {
     return { ty: { t: "scalar" }, props: [], assumption: `${name} is a size` };
   }
-  if (/^[ijk]$/.test(base2) && ctx.bound.has(base2)) {
+  if (/^[ijk]$/.test(base3) && ctx.bound.has(base3)) {
     return { ty: { t: "scalar" }, props: [], assumption: `${name} is an index` };
   }
-  const isGreek = GREEK.has(base2) || /\\[a-zA-Z]+$/.test(name);
-  const isCapital = /^[A-Z]/.test(base2);
+  const isGreek = GREEK.has(base3) || /\\[a-zA-Z]+$/.test(name);
+  const isCapital = /^[A-Z]/.test(base3);
   if (isGreek || isCapital) {
     const props = [];
-    if (base2 === "Sigma" || base2 === "Lambda" || base2 === "\\Sigma" || base2 === "\\Lambda") props.push("sym");
+    if (base3 === "Sigma" || base3 === "Lambda" || base3 === "\\Sigma" || base3 === "\\Lambda") props.push("sym");
     return {
       ty: { t: "mat", r: freshDim(ctx), c: freshDim(ctx) },
       props,
@@ -9728,7 +9728,7 @@ function now() {
   return Date.now();
 }
 function checkStep(step, ctx, defs, opts, diagnostics) {
-  const base2 = {
+  const base3 = {
     trialsPerSize: opts.trials,
     sizes: [],
     assumptions: [],
@@ -9742,7 +9742,7 @@ function checkStep(step, ctx, defs, opts, diagnostics) {
       text: step.text,
       relation: "other",
       verdict: "unchecked",
-      card: base2,
+      card: base3,
       message: step.unreadable,
       reason: step.unreadable,
       annotation: step.annotation
@@ -9758,14 +9758,14 @@ function checkStep(step, ctx, defs, opts, diagnostics) {
       rhsSpan: step.rhs?.span,
       relation: "defined",
       verdict: "defined",
-      card: base2,
+      card: base3,
       message: step.defName ? `defined: ${step.defName}` : "defined",
       isDefinition: true,
       annotation: step.annotation
     };
   }
   if (step.relation === "=>" || step.relation === "<=>") {
-    return checkImplication(step, ctx, defs, opts, base2);
+    return checkImplication(step, ctx, defs, opts, base3);
   }
   if (step.relation !== "=" && step.relation !== "propto") {
     const message = unsupportedRelation(step.relation);
@@ -9776,7 +9776,7 @@ function checkStep(step, ctx, defs, opts, diagnostics) {
       text: step.text,
       relation: step.relation,
       verdict: "unchecked",
-      card: base2,
+      card: base3,
       message,
       reason: message,
       annotation: step.annotation
@@ -9791,7 +9791,7 @@ function checkStep(step, ctx, defs, opts, diagnostics) {
       text: step.text,
       relation: step.relation,
       verdict: "unchecked",
-      card: base2,
+      card: base3,
       message,
       reason: message,
       annotation: step.annotation
@@ -9823,14 +9823,14 @@ function checkStep(step, ctx, defs, opts, diagnostics) {
       rhsSpan: step.rhs.span,
       relation: step.relation,
       verdict: "shape",
-      card: base2,
+      card: base3,
       message: shapeErrors[0].message,
       reason: shapeErrors.map((e) => e.message).join("; "),
       annotation: step.annotation
     };
   }
   if (step.relation === "propto") {
-    return checkProportionality(step, ctx, defs, opts, base2);
+    return checkProportionality(step, ctx, defs, opts, base3);
   }
   const mode = planMode(step, ctx, defs);
   if (mode === "unchecked") {
@@ -9843,14 +9843,14 @@ function checkStep(step, ctx, defs, opts, diagnostics) {
       rhsSpan: step.rhs.span,
       relation: step.relation,
       verdict: "unchecked",
-      card: base2,
+      card: base3,
       message,
       reason: message,
       annotation: step.annotation
     };
   }
-  if (mode === "exact") return checkExact(step, ctx, defs, opts, base2);
-  return checkNumeric(step, ctx, defs, opts, base2);
+  if (mode === "exact") return checkExact(step, ctx, defs, opts, base3);
+  return checkNumeric(step, ctx, defs, opts, base3);
 }
 function unifyShapes(ctx, a, b, span) {
   const r = unifyDim(ctx, a.r, b.r, "in this equality", span);
@@ -10972,11 +10972,11 @@ function renderNode(node) {
 function renderSymbol(name) {
   const supIndex = name.indexOf("^");
   const subIndex = name.indexOf("_");
-  let base2 = name;
+  let base3 = name;
   let sub2 = "";
   let sup = "";
   if (subIndex >= 0 && (supIndex < 0 || subIndex < supIndex)) {
-    base2 = name.slice(0, subIndex);
+    base3 = name.slice(0, subIndex);
     const rest = name.slice(subIndex + 1);
     if (supIndex > subIndex) {
       sub2 = rest.slice(0, supIndex - subIndex - 1);
@@ -10985,10 +10985,10 @@ function renderSymbol(name) {
       sub2 = rest;
     }
   } else if (supIndex >= 0) {
-    base2 = name.slice(0, supIndex);
+    base3 = name.slice(0, supIndex);
     sup = name.slice(supIndex);
   }
-  let out = base2;
+  let out = base3;
   if (sub2) out += sub2.length === 1 ? `_${sub2}` : `_{${sub2}}`;
   if (sup) out += sup.length === 1 ? `^${sup}` : `^{${sup}}`;
   return out;
@@ -11007,13 +11007,13 @@ function renderOp(node) {
     case "div":
       return `\\frac{${a[0]}}{${a[1]}}`;
     case "pow":
-      return `{${a[0]}}^{${a[1]}}`;
+      return `${base(node.args[0])}^{${a[1]}}`;
     case "inv":
-      return `{${a[0]}}^{-1}`;
+      return `${base(node.args[0])}^{-1}`;
     case "invT":
-      return `{${a[0]}}^{-\\top}`;
+      return `${base(node.args[0])}^{-\\top}`;
     case "T":
-      return `{${a[0]}}^\\top`;
+      return `${base(node.args[0])}^\\top`;
     case "tr":
       return `\\operatorname{tr}\\left(${a[0]}\\right)`;
     case "det":
@@ -11043,10 +11043,19 @@ function renderOp(node) {
 function operand(node) {
   if (!node) return "";
   const text = renderNode(node);
-  if (node.k === "op" && (node.op === "add" || node.op === "sub" || node.op === "mul" || node.op === "neg")) {
-    return `{${text}}`;
+  if (node.k === "op" && (node.op === "add" || node.op === "sub" || node.op === "neg")) {
+    return `\\left(${text}\\right)`;
   }
+  if (node.k === "op" && node.op === "mul") return `{${text}}`;
   return text;
+}
+function base(node) {
+  if (!node) return "";
+  const text = renderNode(node);
+  if (node.k === "op" && ["add", "sub", "neg", "mul", "kron", "had"].includes(node.op)) {
+    return `\\left(${text}\\right)`;
+  }
+  return `{${text}}`;
 }
 
 // src/core/numpy.ts
@@ -11078,9 +11087,9 @@ function sanitizeName(name) {
     rest = rest.slice(1 + command.length);
   }
   const cut = rest.search(/[_^]/);
-  const base2 = (cut < 0 ? rest : rest.slice(0, cut)).replace(/[^A-Za-z0-9]/g, "") || "x";
+  const base3 = (cut < 0 ? rest : rest.slice(0, cut)).replace(/[^A-Za-z0-9]/g, "") || "x";
   const suffix = cut < 0 ? "" : rest.slice(cut);
-  return accents.length ? `${base2}_${accents.join("_")}${suffix}` : `${base2}${suffix}`;
+  return accents.length ? `${base3}_${accents.join("_")}${suffix}` : `${base3}${suffix}`;
 }
 function numpyNames(symbols) {
   const map = /* @__PURE__ */ new Map();
@@ -12678,9 +12687,9 @@ function buffer(value) {
 }
 
 // node_modules/.pnpm/unified@10.1.2/node_modules/unified/lib/index.js
-var unified = base().freeze();
+var unified = base2().freeze();
 var own = {}.hasOwnProperty;
-function base() {
+function base2() {
   const transformers = trough();
   const attachers = [];
   let namespace = {};
@@ -12700,7 +12709,7 @@ function base() {
   processor.processSync = processSync;
   return processor;
   function processor() {
-    const destination = base();
+    const destination = base2();
     let index2 = -1;
     while (++index2 < attachers.length) {
       destination.use(...attachers[index2]);
@@ -34760,19 +34769,19 @@ function expandGlob(pattern, cwd = process.cwd()) {
   const root = resolve(cwd);
   const absolute = resolve(root, pattern);
   const first = pattern.split("*")[0].split("?")[0].split("{")[0];
-  const base2 = resolve(root, first.endsWith("/") ? first : first.slice(0, Math.max(0, first.lastIndexOf("/") + 1)));
-  const relative = (absolute.startsWith(base2) ? absolute.slice(base2.length) : pattern).replace(/^\/+/, "");
-  const baseRelative = base2 === root ? "" : base2.slice(root.length + 1);
+  const base3 = resolve(root, first.endsWith("/") ? first : first.slice(0, Math.max(0, first.lastIndexOf("/") + 1)));
+  const relative = (absolute.startsWith(base3) ? absolute.slice(base3.length) : pattern).replace(/^\/+/, "");
+  const baseRelative = base3 === root ? "" : base3.slice(root.length + 1);
   const out = [];
-  walk2(base2, "", relative, out, 0, baseRelative);
+  walk2(base3, "", relative, out, 0, baseRelative);
   out.sort();
   return out;
 }
-function walk2(base2, prefix, pattern, out, depth, baseRelative) {
+function walk2(base3, prefix, pattern, out, depth, baseRelative) {
   if (depth > 12) return;
   let entries;
   try {
-    entries = readdirSync(join(base2, prefix));
+    entries = readdirSync(join(base3, prefix));
   } catch {
     return;
   }
@@ -34781,13 +34790,13 @@ function walk2(base2, prefix, pattern, out, depth, baseRelative) {
     const relative = prefix ? `${prefix}/${entry}` : entry;
     let isDirectory;
     try {
-      isDirectory = statSync(join(base2, relative)).isDirectory();
+      isDirectory = statSync(join(base3, relative)).isDirectory();
     } catch {
       continue;
     }
     if (isDirectory) {
       if (patternMatches(relative, pattern) || patternHasDoubleStar(pattern)) {
-        walk2(base2, relative, pattern, out, depth + 1, baseRelative);
+        walk2(base3, relative, pattern, out, depth + 1, baseRelative);
       }
       continue;
     }

@@ -86,13 +86,13 @@ function renderOp(node: Extract<Node, { k: 'op' }>): string {
     case 'div':
       return `\\frac{${a[0]}}{${a[1]}}`;
     case 'pow':
-      return `{${a[0]}}^{${a[1]}}`;
+      return `${base(node.args[0])}^{${a[1]}}`;
     case 'inv':
-      return `{${a[0]}}^{-1}`;
+      return `${base(node.args[0])}^{-1}`;
     case 'invT':
-      return `{${a[0]}}^{-\\top}`;
+      return `${base(node.args[0])}^{-\\top}`;
     case 'T':
-      return `{${a[0]}}^\\top`;
+      return `${base(node.args[0])}^\\top`;
     case 'tr':
       return `\\operatorname{tr}\\left(${a[0]}\\right)`;
     case 'det':
@@ -123,17 +123,36 @@ function renderOp(node: Extract<Node, { k: 'op' }>): string {
 /**
  * An operand of a sum, a difference or a product.
  *
- * A compound operand is written in braces, because a sum inside a product
- * without them means something else: `I - K C \bar\Sigma` is not
- * `(I - K C) \bar\Sigma`.
+ * A compound operand needs to be marked, because a sum inside a product
+ * without a mark means something else: `I - K C \bar\Sigma` is not
+ * `(I - K C) \bar\Sigma`. The mark has to be parentheses, and not braces:
+ * braces group for the parser but draw nothing, so a row written back with
+ * them reads, in a paper, as the wrong formula.
  */
 function operand(node: Node | undefined): string {
   if (!node) return '';
   const text = renderNode(node);
-  if (node.k === 'op' && (node.op === 'add' || node.op === 'sub' || node.op === 'mul' || node.op === 'neg')) {
-    return `{${text}}`;
+  if (node.k === 'op' && (node.op === 'add' || node.op === 'sub' || node.op === 'neg')) {
+    return `\\left(${text}\\right)`;
   }
+  if (node.k === 'op' && node.op === 'mul') return `{${text}}`;
   return text;
+}
+
+/**
+ * The base of a power, an inverse or a transpose.
+ *
+ * `{A B}^\top` groups for the parser and draws as `A B^\top`, which is a
+ * different formula. A base that is not a single thing is written in
+ * parentheses, so what is drawn is what was checked.
+ */
+function base(node: Node | undefined): string {
+  if (!node) return '';
+  const text = renderNode(node);
+  if (node.k === 'op' && ['add', 'sub', 'neg', 'mul', 'kron', 'had'].includes(node.op)) {
+    return `\\left(${text}\\right)`;
+  }
+  return `{${text}}`;
 }
 
 /** A short, human readable name of a symbol. */

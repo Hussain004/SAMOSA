@@ -76,7 +76,7 @@
   "joseph": {
     "wrongRow": 4,
     "fixTitle": "this step is off by exactly + K_t Q_t K_t^\\top",
-    "fixEdit": "{{I - {K_t C_t}} \\bar\\Sigma_t} {I - {K_t C_t}}^\\top + {K_t Q_t} {K_t}^\\top",
+    "fixEdit": "{\\left(I - {K_t C_t}\\right) \\bar\\Sigma_t} \\left(I - {K_t C_t}\\right)^\\top + {K_t Q_t} {K_t}^\\top",
     "counterexample": {
       "dims": {
         "n": 1,
