@@ -23,6 +23,7 @@ export type Prop =
   | 'spd'
   | 'psd'
   | 'orth'
+  | 'rot'
   | 'diag'
   | 'triu'
   | 'tril'
@@ -77,6 +78,8 @@ const PROP_WORDS: Record<string, Prop> = {
   psd: 'psd',
   orth: 'orth',
   orthogonal: 'orth',
+  rot: 'rot',
+  rotation: 'rot',
   diag: 'diag',
   diagonal: 'diag',
   triu: 'triu',
@@ -513,7 +516,7 @@ function parseType(name: string, type: string): SymbolDecl | null {
     // one dimension means a column vector, unless the structure says matrix
     const matrixish = props.some((p) =>
       typeof p === 'string' &&
-      ['sym', 'spd', 'psd', 'orth', 'diag', 'triu', 'tril', 'skew', 'idem', 'proj', 'stoch'].includes(p),
+      ['sym', 'spd', 'psd', 'orth', 'rot', 'diag', 'triu', 'tril', 'skew', 'idem', 'proj', 'stoch'].includes(p),
     );
     return {
       ...base,

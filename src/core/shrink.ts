@@ -117,7 +117,7 @@ export function shrinkCounterexample(
     if (info.ty.t !== 'mat') continue;
     const r = dimSizeOf(ctx, info.ty.r, sizes);
     const c = dimSizeOf(ctx, info.ty.c, sizes);
-    const val = sampler.sample({ name, r, c, props: info.props });
+    const val = sampler.sample({ name, r, c, props: info.props, variety: 0 });
     if (val && val.k === 'm') values.set(name, val);
   }
   for (const [name, value] of values.entries()) env.values.set(name, value);

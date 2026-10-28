@@ -125,16 +125,35 @@ export function matDet<T>(f: Field<T>, a: Mat<T>): T {
   const m = a.d.slice();
   let det = f.one;
   for (let c = 0; c < n; c++) {
-    let pivot = c;
-    let best = f.abs(m[c * n + c]);
-    for (let r = c + 1; r < n; r++) {
-      const v = f.abs(m[r * n + c]);
-      if (f.cmp(v, best) > 0) {
-        best = v;
+    // The pivot is the entry of largest magnitude where the field can say
+    // what magnitude is. Over GF(p) it cannot (abs is not defined there), so
+    // any nonzero pivot is exact: pick the first one.
+    let pivot = -1;
+    let best: T | null = null;
+    for (let r = c; r < n; r++) {
+      const v = m[r * n + c];
+      if (f.isZero(v)) continue;
+      if (pivot === -1) {
         pivot = r;
+        try {
+          best = f.abs(v);
+        } catch {
+          best = null;
+        }
+        continue;
+      }
+      if (best === null) continue;
+      try {
+        const mag = f.abs(v);
+        if (f.cmp(mag, best) > 0) {
+          best = mag;
+          pivot = r;
+        }
+      } catch {
+        break;
       }
     }
-    if (f.isZero(best)) return f.zero;
+    if (pivot === -1) return f.zero;
     if (pivot !== c) {
       for (let j = 0; j < n; j++) {
         const tmp = m[c * n + j];

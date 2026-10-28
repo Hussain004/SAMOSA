@@ -14,8 +14,8 @@
         "mode": "exact",
         "message": "holds at every size tested",
         "relation": "=",
-        "bound": 5.418460044792529e-51,
-        "degree": 9
+        "bound": 3.4678144286672185e-49,
+        "degree": 18
       },
       {
         "row": 3,
@@ -23,8 +23,8 @@
         "mode": "exact",
         "message": "holds at every size tested",
         "relation": "=",
-        "bound": 2.6727647847683796e-51,
-        "degree": 8
+        "bound": 3.4678144286672185e-49,
+        "degree": 18
       },
       {
         "row": 4,
@@ -62,8 +62,8 @@
         "mode": "exact",
         "message": "holds at every size tested",
         "relation": "=",
-        "bound": 2.25983138666078e-46,
-        "degree": 53
+        "bound": 1.1003107678214565e-45,
+        "degree": 69
       }
     ],
     "okRows": 4,

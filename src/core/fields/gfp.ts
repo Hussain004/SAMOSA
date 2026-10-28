@@ -97,8 +97,8 @@ export class GFpField implements Field<number> {
     return a === b ? 0 : a < b ? -1 : 1;
   }
 
-  abs(a: number): number {
-    return a;
+  abs(_a: number): number {
+    return this.transcendental('abs');
   }
 
   private transcendental(op: string): never {

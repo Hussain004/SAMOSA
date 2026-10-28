@@ -30,7 +30,7 @@ import { isMatrixVal, isScalarVal, scalar, type Val } from './value.ts';
 import { collectDimVarsFor } from './dims.ts';
 import { GAUSS7, type QuadVar } from './quadrature.ts';
 import type { Assertion, Node, Relation, Span } from './ir.ts';
-import type { Dim } from './decl.ts';
+import type { Dim, Prop } from './decl.ts';
 
 /**
  * The verdict engine.
@@ -144,7 +144,7 @@ export interface CheckOptions {
   layout?: 'denominator' | 'numerator';
 }
 
-interface Step {
+export interface Step {
   id: string;
   row: number;
   span: Span;
@@ -198,26 +198,33 @@ function collectSymbols(node: Node | undefined, into: Set<string>): void {
   }
 }
 
-/** Checks a derivation. This is the entry point of the whole product. */
-export function check(src: string, opts: CheckOptions = {}): Report {
-  const started = now();
-  const seed = opts.seed ?? DEFAULT_SEED;
-  const trials = opts.trials ?? 3;
+/** The parsed shape of a source: what the checker and the explainer both walk. */
+export interface Source {
+  ctx: TypeContext;
+  defs: Map<string, Node>;
+  /** every step of the source, in order, with stable ids */
+  steps: Step[];
+}
 
+/**
+ * Builds the steps of a source.
+ *
+ * One function builds them for both `check` and `explain`, so a step id
+ * always points at the same row. Before they were built twice, and any row
+ * the parser could not read shifted every id that followed it.
+ */
+export function analyzeSource(src: string, opts: CheckOptions): Source {
   const rows = splitRows(src);
   const declared = parseDeclarations(opts.decls ?? '');
   const preset = presetDecls(opts.preset);
   const decls = mergeDecls(preset, declared.decls);
 
   const ctx = createContext(decls, opts.layout ?? 'denominator');
-  const chips: Chip[] = [];
-  const diagnostics: Diagnostic[] = [];
+  const defs = new Map<string, Node>();
   const definedNames = new Set<string>();
 
   const knownFns = new Set<string>(decls.filter((d) => d.kind === 'function').map((d) => d.name));
   const steps: Step[] = [];
-  /** the rows the parser could not read, with the reason */
-  const unparsed: Array<{ row: number; message: string; span: Span }> = [];
   let previousRhs: Node | undefined;
   let rowIndex = 0;
 
@@ -237,7 +244,6 @@ export function check(src: string, opts: CheckOptions = {}): Report {
         unreadable: parsed.error.message,
         symbols: new Set(),
       });
-      unparsed.push({ row: rowIndex, message: parsed.error.message, span: parsed.error.span });
       continue;
     }
     if (parsed.prose || !parsed.parts.length) continue;
@@ -304,10 +310,28 @@ export function check(src: string, opts: CheckOptions = {}): Report {
       });
       previousRhs = rhs;
       if (bareLhs && isDefinition) definedNames.add(bareLhs);
+      if (isDefinition && bareLhs && rhs) {
+        defs.set(bareLhs, rhs);
+        ctx.defs.set(bareLhs, rhs);
+      }
     }
   }
 
-  const defs = new Map<string, Node>();
+  return { ctx, defs, steps };
+}
+
+/** Checks a derivation. This is the entry point of the whole product. */
+export function check(src: string, opts: CheckOptions = {}): Report {
+  const started = now();
+  const seed = opts.seed ?? DEFAULT_SEED;
+  const trials = opts.trials ?? 3;
+
+  const source = analyzeSource(src, opts);
+  const { ctx, defs, steps } = source;
+  const decls = [...ctx.decls.values()];
+  const chips: Chip[] = [];
+  const diagnostics: Diagnostic[] = [];
+
   const results: StepResult[] = [];
 
   // A declaration that matches no symbol of the derivation is a name that was
@@ -330,10 +354,6 @@ export function check(src: string, opts: CheckOptions = {}): Report {
   }
 
   for (const step of steps) {
-    if (step.isDefinition && step.defName && step.rhs) {
-      defs.set(step.defName, step.rhs);
-      ctx.defs.set(step.defName, step.rhs);
-    }
     const result = checkStep(step, ctx, defs, { seed, trials, budgetMs: opts.budgetMs ?? 500 }, diagnostics);
     // every result carries the text of its row, so a caller can point at the
     // line of the file the step came from
@@ -587,8 +607,12 @@ function isRational(node: Node, ctx: TypeContext, defs: Map<string, Node>, seen:
       if (info && info.ty.t === 'rv') return false;
       return true;
     }
-    case 'op':
+    case 'op': {
+      // |x| and the matrix root need an order or positivity, which GF(p) has
+      // not, so they force numeric mode (review 3.2)
+      if (node.op === 'abs' || node.op === 'sqrtm') return false;
       return node.args.every((a) => isRational(a, ctx, defs, seen));
+    }
     case 'call':
       return node.fn === 'det' || node.fn === 'tr' || node.fn === 'trace' || node.fn === 'var' || node.fn === 'cov';
     case 'deriv':
@@ -622,20 +646,46 @@ function checkExact(
   const settings = sizeSettings(dimVars);
   const primes: [number, number] = [P1, P2];
 
+  // One corner per structured symbol: an orthogonal matrix is a rotation or
+  // a reflection, so with k of them there are 2^k combinations and the trial
+  // count has to rise until every combination is drawn (review 3.1). Below
+  // the cap the exhaustiveness is what keeps the bound honest: a wrong step
+  // hiding in a corner that was never drawn could not be priced.
+  const corners = cornerCount(step, ctx, defs);
+  if (corners > 7) {
+    const message = 'this step has too many structured symbols to draw every corner of';
+    return {
+      id: step.id,
+      row: step.row,
+      span: step.span,
+      text: step.text,
+      relation: step.relation,
+      verdict: 'unchecked',
+      card: { ...card, assumptions: collectAssumptions(ctx, step) },
+      message,
+      reason: message,
+      annotation: step.annotation,
+    };
+  }
+  const trialsNeeded = Math.max(opts.trials, 2 ** corners);
+  const mask = corners > 0 ? (1 << corners) - 1 : 0;
+
   let worstBound = 0;
   let worstDegree = 0;
-  const working: Map<string, number>[] = [];
+  const working: Array<{ setting: Map<string, number>; ranP1: number; ranP2: number }> = [];
   const sizes: Record<string, number>[] = [];
   const assumptions = collectAssumptions(ctx, step);
 
   for (const setting of settings) {
-    let usable = false;
-    for (let trial = 0; trial < opts.trials; trial++) {
+    const ran = new Map<number, number>([[P1, 0], [P2, 0]]);
+    const seen = new Map<number, Set<number>>([[P1, new Set()], [P2, new Set()]]);
+    for (let trial = 0; trial < trialsNeeded; trial++) {
       for (const p of primes) {
         const rng = rngFor(opts.seed, step.id, settingKey(setting), trial, p);
-        const outcome = runExactTrial(step, ctx, defs, setting, p, rng);
+        const outcome = runExactTrial(step, ctx, defs, setting, p, rng, trial);
         if (outcome.kind === 'ok') {
-          usable = true;
+          ran.set(p, (ran.get(p) ?? 0) + 1);
+          seen.get(p)!.add(trial & mask);
           continue;
         }
         if (outcome.kind === 'unknown') {
@@ -677,7 +727,15 @@ function checkExact(
         };
       }
     }
-    if (usable) working.push(setting);
+    // A size carries evidence only when every corner was drawn at both
+    // primes: a corner no trial evaluated is a place a wrong step can hide
+    // (review 3.1), and trials that failed on a domain error earn nothing.
+    const covered = primes.every(
+      (p) => (ran.get(p) ?? 0) > 0 && seen.get(p)!.size === 1 << corners,
+    );
+    if (covered) {
+      working.push({ setting, ranP1: ran.get(P1)!, ranP2: ran.get(P2)! });
+    }
   }
 
   if (!working.length) {
@@ -695,14 +753,43 @@ function checkExact(
     };
   }
 
-  for (const setting of working) {
+  // The degree is read after sampling, which can leak shape errors of the
+  // type inference into the next step, so the errors collected here are
+  // dropped: they were emitted already.
+  for (const { setting, ranP1, ranP2 } of working) {
     sizes.push(Object.fromEntries(setting) as Record<string, number>);
+    const errorsAt = ctx.errors.length;
     const dl = degreeOf(ctx, step.lhs!, setting, defs);
     const dr = degreeOf(ctx, step.rhs!, setting, defs);
+    ctx.errors.length = errorsAt;
     const d = Math.max(dl.n + dr.d, dr.n + dl.d);
     worstDegree = Math.max(worstDegree, d);
-    const bound = Math.pow(d / P1, opts.trials) * Math.pow(d / P2, opts.trials);
+    // The bound counts only the trials that ran, at this size (review 3.3):
+    // a skipped trial catches nothing, and a miss factors over the corners.
+    const bound = Math.pow(d / P1, ranP1) * Math.pow(d / P2, ranP2);
     worstBound = Math.max(worstBound, bound);
+  }
+
+  // An exact checkmark with degree 0 is an engine gap (review 3.3): the
+  // bound would read "at most 0", which is no receipt at all. It is
+  // downgraded to ? and said so, and nothing under 0 is ever printed.
+  if (worstDegree === 0) {
+    const message =
+      'the degree bound of this step came out as 0 although symbols were sampled, which is an engine gap; SAMOSA claims nothing here';
+    return {
+      id: step.id,
+      row: step.row,
+      span: step.span,
+      text: step.text,
+      lhsSpan: step.lhs?.span,
+      rhsSpan: step.rhs?.span,
+      relation: step.relation,
+      verdict: 'inconclusive',
+      card: { ...card, sizes, primes, assumptions },
+      message,
+      reason: message,
+      annotation: step.annotation,
+    };
   }
 
   return {
@@ -715,10 +802,30 @@ function checkExact(
     relation: step.relation,
     verdict: 'ok',
     mode: hasExpectation(step) ? 'quadrature' : 'exact',
-    card: { ...card, sizes, primes, degree: worstDegree, bound: worstBound, assumptions },
+    card: {
+      ...card,
+      trialsPerSize: trialsNeeded,
+      sizes,
+      primes,
+      degree: worstDegree,
+      bound: worstBound,
+      assumptions,
+    },
     message: 'holds at every size tested',
     annotation: step.annotation,
   };
+}
+
+/** How many structured symbols of this step have more than one corner. */
+function cornerCount(step: Step, ctx: TypeContext, defs: Map<string, Node>): number {
+  let k = 0;
+  for (const name of sampledNames(step, defs)) {
+    const info = ctx.symbols.get(name);
+    if (!info || info.ty.t !== 'mat') continue;
+    const has = (target: string) => info.props.some((x) => typeof x === 'string' && x === target);
+    if (has('orth') || has('idem') || has('proj') || has('rot')) k++;
+  }
+  return k;
 }
 
 type TrialOutcome =
@@ -733,6 +840,7 @@ function runExactTrial(
   setting: Map<string, number>,
   p: number,
   rng: Rng,
+  trial: number,
 ): TrialOutcome {
   const field = new GFpField(p);
   const sampler = new Sampler(field, rng);
@@ -740,7 +848,7 @@ function runExactTrial(
   env.defs = defs;
 
   const free = freeVariables(step);
-  const sampled = sampleFor(ctx, step, defs, setting, sampler, free);
+  const sampled = sampleFor(ctx, step, defs, setting, sampler, free, trial);
   if (sampled === 'unknown') {
     return { kind: 'unknown', message: 'SAMOSA could not sample an instance of these objects' };
   }
@@ -869,11 +977,21 @@ function compareDerivative<T>(
           )
         : quadraticForm(field, (direction as { k: 'm'; m: Mat<T> }).m, claimedVal.m, (w as { k: 'm'; m: Mat<T> }).m);
       const mixedScalar = asScalar(field, mixed);
-      if (mixedScalar !== null && field.eq(value, mixedScalar)) return { kind: 'equal' };
+      if (mixedScalar === null) {
+        return {
+          kind: 'different',
+          lhs: mixed,
+          rhs: claimedVal,
+          message: 'the claimed Hessian is not the Hessian of that function',
+        };
+      }
+      if (field.eq(value, mixedScalar)) return { kind: 'equal' };
+      // the evidence is the pair of scalars the comparison used: the mixed
+      // second derivative along d and w, and the quadratic form of the claim
       return {
         kind: 'different',
-        lhs: mixed,
-        rhs: claimedVal,
+        lhs: scalar(mixedScalar),
+        rhs: scalar(value),
         message: 'the claimed Hessian is not the Hessian of that function',
       };
     }
@@ -894,17 +1012,22 @@ function compareDerivative<T>(
       if (field.eq(flipped, tangentScalar)) {
         return {
           kind: 'different',
-          lhs: tangent,
-          rhs: claimedVal,
+          lhs: scalar(tangentScalar),
+          rhs: scalar(flipped),
           message: 'this is the numerator layout gradient; SAMOSA uses the denominator layout',
           layoutHint: 'The gradient has the shape of the variable it is taken with respect to. Transpose it.',
         };
       }
     }
+    // the evidence is the pair of scalars the comparison used: the
+    // directional derivative of the function along d, and the component of
+    // the claimed gradient along d. Reporting those keeps the delta
+    // computable, where the raw pair (a derivative value and a gradient)
+    // have shapes that cannot be subtracted.
     return {
       kind: 'different',
-      lhs: tangent,
-      rhs: claimedVal,
+      lhs: scalar(tangentScalar),
+      rhs: scalar(inner),
       message: 'the claimed gradient is not the gradient of that function',
     };
   }
@@ -1061,7 +1184,15 @@ function stepNodes(step: Step): Node[] {
   return out;
 }
 
-/** Samples every free symbol the step needs. */
+/**
+ * Samples every free symbol the step needs.
+ *
+ * The variety pegs one corner per structured symbol (review 3.1) and one
+ * sign per scalar (review 3.4): symbol i reads bit i of the trial index, so
+ * every combination of corners is evaluated across trials and no false
+ * verdict can hide in the corner nobody drew. The peg index is a counter in
+ * sampling order, which is deterministic for a given step.
+ */
 function sampleFor<T>(
   ctx: TypeContext,
   step: Step,
@@ -1069,22 +1200,18 @@ function sampleFor<T>(
   setting: Map<string, number>,
   sampler: Sampler<T>,
   free: Set<string> = new Set(),
+  variety = 0,
 ): { values: Map<string, Val<T>>; quad: Map<string, QuadVar> } | 'unknown' {
   const values = new Map<string, Val<T>>();
   const quad = new Map<string, QuadVar<any>>();
-  const names = new Set<string>();
-  for (const node of stepNodes(step)) collectSymbols(node, names);
-  // a definition brings in the symbols it is written with
-  for (const name of [...names]) {
-    const def = defs.get(name);
-    if (def) collectSymbols(def, names);
-  }
+  const names = sampledNames(step, defs, free);
+  const pegs = new Map(names.map((n, i) => [n, i]));
 
   for (const name of names) {
-    if (defs.has(name) && !free.has(name)) continue;
     if (values.has(name)) continue;
     const info = ctx.symbols.get(name);
     if (!info) continue;
+    const peg = pegs.get(name) ?? 0;
     if (info.ty.t === 'rv') {
       // a random variable: sample the root of its covariance, so that the
       // covariance symbol and the variable agree
@@ -1115,17 +1242,25 @@ function sampleFor<T>(
       continue;
     }
     if (info.ty.t === 'scalar') {
-      values.set(name, scalar(sampler.sampleScalar()));
+      const value = info.props.some((p) => p === 'pos')
+        ? sampler.samplePositiveScalar()
+        : sampler.sampleScalar(variety, peg);
+      values.set(name, scalar(value));
       continue;
     }
     if (info.ty.t !== 'mat') continue;
     const r = dimSizeOf(ctx, info.ty.r, setting);
     const c = dimSizeOf(ctx, info.ty.c, setting);
+    // A structure that is singular by construction (a rank deficient
+    // idempotent, for instance) never passes a singular rejection, so the
+    // rejection is skipped for it and the engine relies on the domain error
+    // of a step that actually inverts one (review 5.4).
+    const forced = singularByDesign(info.props, r, c, (variety >> peg) & 1);
     let placed = false;
     for (let attempt = 0; attempt < 20; attempt++) {
-      const val = sampler.sample({ name, r, c, props: info.props });
+      const val = sampler.sample({ name, r, c, props: info.props, variety: (variety >> peg) & 1 });
       if (!val) continue;
-      if (val.k === 'm' && isSingular(sampler.field, val.m)) continue;
+      if (val.k === 'm' && !forced && isSingular(sampler.field, val.m)) continue;
       values.set(name, val);
       placed = true;
       break;
@@ -1133,6 +1268,29 @@ function sampleFor<T>(
     if (!placed) return 'unknown';
   }
   return { values, quad };
+}
+
+/** The names a step samples: its own, plus the free names of its definitions. */
+export function sampledNames(step: Step, defs: Map<string, Node>, free: Set<string> = new Set()): string[] {
+  const names = new Set<string>();
+  for (const node of stepNodes(step)) collectSymbols(node, names);
+  for (const name of [...names]) {
+    const def = defs.get(name);
+    if (def) collectSymbols(def, names);
+  }
+  return [...names].filter((name) => !(defs.has(name) && !free.has(name)));
+}
+
+/** Has this structure a singular corner by construction? */
+function singularByDesign(props: Prop[], r: number, c: number, corner: number): boolean {
+  const has = (target: string) => props.some((x) => typeof x === 'string' && x === target);
+  if (has('zero')) return true;
+  if (has('idem') || has('proj')) {
+    const rank = corner === 0 ? Math.min(r, c) : Math.max(1, Math.min(r, c) - 1);
+    return rank < Math.min(r, c);
+  }
+  if (has('skew')) return r === c && r % 2 === 1;
+  return false;
 }
 
 function isSingular<T>(field: Field<T>, m: Mat<T>): boolean {
@@ -1335,6 +1493,9 @@ function guessProportionalityVariable(step: Step, ctx: TypeContext): string | un
 
 // ------------------------------------------------------------- numeric mode
 
+/** Eight instances per size at each precision, so signs and magnitudes both get covered (review 3.4). */
+const NUMERIC_TRIALS = 8;
+
 function checkNumeric(
   step: Step,
   ctx: TypeContext,
@@ -1346,36 +1507,68 @@ function checkNumeric(
   const settings = sizeSettings(dimVars);
   const sizes: Record<string, number>[] = [];
   const assumptions = collectAssumptions(ctx, step);
-  let maxDelta = 0;
+  let f64Max = 0;
+  let decMax = 0;
   const dec = new DecField(50);
 
+  const domainResult = (message: string): StepResult => {
+    const text =
+      `this step was not defined at a sampled point (${message}), for instance the log or the square root of a negative number; ` +
+      'declaring the symbols it depends on positive may be what it needs';
+    return {
+      id: step.id,
+      row: step.row,
+      span: step.span,
+      text: step.text,
+      lhsSpan: step.lhs?.span,
+      rhsSpan: step.rhs?.span,
+      relation: step.relation,
+      verdict: 'inconclusive',
+      mode: 'numeric',
+      card: { ...card, sizes, assumptions },
+      message: text,
+      reason: text,
+      annotation: step.annotation,
+    };
+  };
+  const unevaluable = (message: string): StepResult => ({
+    id: step.id,
+    row: step.row,
+    span: step.span,
+    text: step.text,
+    relation: step.relation,
+    verdict: 'unchecked',
+    card: { ...card, sizes, assumptions },
+    message,
+    reason: message,
+    annotation: step.annotation,
+  });
+
+  // First pass, float64: it screens only. Eight instances per size, with the
+  // signs and the magnitudes spread by the trial index (review 3.4), so a
+  // sign dependent identity cannot survive the screening by luck.
   for (const setting of settings) {
     sizes.push(Object.fromEntries(setting) as Record<string, number>);
-    for (let trial = 0; trial < 3; trial++) {
+    for (let trial = 0; trial < NUMERIC_TRIALS; trial++) {
       const rng = rngFor(opts.seed, step.id, settingKey(setting), trial, 'f64');
-      const delta = numericDelta(ctx, defs, step, setting, rng, new F64Field());
-      if (delta === null) {
-        const message = 'SAMOSA could not evaluate this step over the reals';
-        return {
-          id: step.id,
-          row: step.row,
-          span: step.span,
-          text: step.text,
-          relation: step.relation,
-          verdict: 'unchecked',
-          card: { ...card, sizes, assumptions },
-          message,
-          reason: message,
-          annotation: step.annotation,
-        };
+      const run = numericDelta(ctx, defs, step, setting, rng, trial, new F64Field());
+      if (run === null) {
+        return unevaluable('SAMOSA could not evaluate this step over the reals');
       }
-      maxDelta = Math.max(maxDelta, delta);
-      if (delta > 1e-6) {
+      if (run === 'domain') {
+        return domainResult('a sampled instance was outside the domain');
+      }
+      f64Max = Math.max(f64Max, run.delta);
+      if (run.delta > 1e-6) {
         let confirmed = false;
-        for (let k = 0; k < 3 && !confirmed; k++) {
-          const rng2 = rngFor(opts.seed, step.id, settingKey(setting), trial, 'dec', k);
-          const d2 = numericDelta(ctx, defs, step, setting, rng2, dec);
-          if (d2 !== null && d2 > 1e-20) confirmed = true;
+        for (let k = 0; k < NUMERIC_TRIALS && !confirmed; k++) {
+          const rng2 = rngFor(opts.seed, step.id, settingKey(setting), k, 'dec', 1);
+          const run2 = numericDelta(ctx, defs, step, setting, rng2, k, dec);
+          if (run2 === null) continue;
+          if (run2 === 'domain') {
+            return domainResult('a 50 digit instance was outside the domain');
+          }
+          if (run2.delta > 1e-20) confirmed = true;
         }
         const message = confirmed
           ? 'the two sides differ'
@@ -1384,12 +1577,13 @@ function checkNumeric(
           id: step.id,
           row: step.row,
           span: step.span,
+          text: step.text,
           lhsSpan: step.lhs?.span,
           rhsSpan: step.rhs?.span,
           relation: step.relation,
           verdict: confirmed ? 'wrong' : 'inconclusive',
           mode: 'numeric',
-          card: { ...card, sizes, maxDelta, assumptions },
+          card: { ...card, sizes, maxDelta: Math.max(f64Max, decMax), assumptions },
           message,
           reason: message,
           annotation: step.annotation,
@@ -1398,28 +1592,24 @@ function checkNumeric(
     }
   }
 
+  // Second pass, 50 digits: it decides. The float64 maximum never enters the
+  // verdict (review 4.6), because a transcendental identity that is not
+  // bit-exact in float64 can still be exactly true at 50 digits.
   for (const setting of settings) {
-    const rng = rngFor(opts.seed, step.id, settingKey(setting), 'dec');
-    const delta = numericDelta(ctx, defs, step, setting, rng, dec);
-    if (delta === null) {
-      const message = 'SAMOSA could not evaluate this step at 50 digits';
-      return {
-        id: step.id,
-        row: step.row,
-        span: step.span,
-        text: step.text,
-        relation: step.relation,
-        verdict: 'unchecked',
-        card: { ...card, sizes, assumptions },
-        message,
-        reason: message,
-        annotation: step.annotation,
-      };
+    for (let trial = 0; trial < NUMERIC_TRIALS; trial++) {
+      const rng = rngFor(opts.seed, step.id, settingKey(setting), trial, 'dec');
+      const run = numericDelta(ctx, defs, step, setting, rng, trial, dec);
+      if (run === null) {
+        return unevaluable('SAMOSA could not evaluate this step at 50 digits');
+      }
+      if (run === 'domain') {
+        return domainResult('a 50 digit instance was outside the domain');
+      }
+      decMax = Math.max(decMax, run.delta);
     }
-    maxDelta = Math.max(maxDelta, delta);
   }
 
-  if (maxDelta < 1e-35) {
+  if (decMax < 1e-35) {
     return {
       id: step.id,
       row: step.row,
@@ -1430,7 +1620,13 @@ function checkNumeric(
       relation: step.relation,
       verdict: 'ok',
       mode: 'numeric',
-      card: { ...card, sizes, maxDelta, assumptions },
+      card: {
+        ...card,
+        trialsPerSize: NUMERIC_TRIALS,
+        sizes,
+        maxDelta: decMax,
+        assumptions,
+      },
       message: 'the two sides agree to 50 digits',
       annotation: step.annotation,
     };
@@ -1440,15 +1636,20 @@ function checkNumeric(
     id: step.id,
     row: step.row,
     span: step.span,
+    text: step.text,
+    lhsSpan: step.lhs?.span,
+    rhsSpan: step.rhs?.span,
     relation: step.relation,
     verdict: 'inconclusive',
     mode: 'numeric',
-    card: { ...card, sizes, maxDelta, assumptions },
+    card: { ...card, sizes, maxDelta: decMax, assumptions },
     message,
     reason: message,
     annotation: step.annotation,
   };
 }
+
+type NumericRun = { delta: number } | 'domain' | null;
 
 function numericDelta<T>(
   ctx: TypeContext,
@@ -1456,21 +1657,25 @@ function numericDelta<T>(
   step: Step,
   setting: Map<string, number>,
   rng: Rng,
+  trial: number,
   field: Field<T>,
-): number | null {
+): NumericRun {
   const sampler = new Sampler(field, rng);
   const env = makeEnv(field, rng);
   env.defs = defs;
   const free = freeVariables(step);
-  const sampled = sampleFor(ctx, step, defs, setting, sampler, free);
+  const sampled = sampleFor(ctx, step, defs, setting, sampler, free, trial);
   if (sampled === 'unknown') return null;
   for (const [name, value] of sampled.values.entries()) env.values.set(name, value);
   for (const [name, quadVar] of sampled.quad.entries()) env.quad.set(name, quadVar);
 
   const sides = evaluateSides(field, step.lhs!, step.rhs!, env, sampler);
-  if (sides.kind === 'unknown') return null;
-  if (sides.kind === 'equal') return 0;
-  return relativeDelta(field, sides.lhs, sides.rhs);
+  if (sides.kind === 'unknown') return 'domain';
+  if (sides.kind === 'equal') return { delta: 0 };
+  const delta = relativeDelta(field, sides.lhs, sides.rhs);
+  // A NaN or an infinity is not a delta: the step was not defined, or the
+  // two sides have incomparable shapes. Both are domain (review 3.4).
+  return Number.isFinite(delta) ? { delta } : 'domain';
 }
 
 function relativeDelta<T>(field: Field<T>, a: Val<T>, b: Val<T>): number {
@@ -1561,6 +1766,7 @@ const PROP_WORDS: Record<string, string> = {
   spd: 'symmetric positive definite',
   psd: 'symmetric positive semi definite',
   orth: 'orthogonal',
+  rot: 'a rotation',
   diag: 'diagonal',
   triu: 'upper triangular',
   tril: 'lower triangular',

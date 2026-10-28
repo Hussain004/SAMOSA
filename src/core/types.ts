@@ -739,8 +739,13 @@ export function degreeOf(
         case 'tr':
         case 'vec':
         case 'diag':
-        case 'adj':
           return args[0];
+        case 'adj': {
+          // the entries of the adjugate are cofactors, which are determinants
+          // of minors: degree (n - 1) in the entries
+          const size = matrixSize(ctx, node.args[0], sizes);
+          return { n: (size - 1) * args[0].n, d: (size - 1) * args[0].d };
+        }
         case 'det': {
           const size = matrixSize(ctx, node.args[0], sizes);
           return { n: size * args[0].n, d: size * args[0].d };
@@ -756,17 +761,49 @@ export function degreeOf(
       return args[0] ?? ZERO_DEG;
     }
     case 'call': {
+      // det, tr and the statistical operators go through the same rules as
+      // their operator forms (review 3.3): det multiplies the degree by the
+      // size, tr is the degree of its argument, and a variance or a
+      // covariance squares the random symbols in.
+      const arg = node.args[0] ? degreeOf(ctx, node.args[0], sizes, defs) : ZERO_DEG;
+      if (node.fn === 'det') {
+        const size = matrixSize(ctx, node.args[0], sizes);
+        return { n: size * arg.n, d: size * arg.d };
+      }
+      if (node.fn === 'tr' || node.fn === 'trace') return arg;
+      if (node.fn === 'var' || node.fn === 'cov') {
+        return { n: 2 * arg.n, d: 2 * arg.d };
+      }
       // a transcendental function is not rational, so it has no rational degree
       return ZERO_DEG;
     }
-    case 'deriv':
-      return ZERO_DEG;
-    case 'expect':
-      return ZERO_DEG;
+    case 'deriv': {
+      // the derivative of a polynomial of degree k along a direction is a
+      // polynomial of degree k + 1 in the sampled symbols: the direction
+      // enters linearly (review 3.3)
+      const fnDef = node.f.k === 'sym' ? defs?.get(node.f.name) : undefined;
+      const base = fnDef ? degreeOf(ctx, fnDef, sizes, defs) : LEAF_DEG;
+      return { n: base.n + 1, d: base.d + 1 };
+    }
+    case 'expect': {
+      const body = node.args[0] ? degreeOf(ctx, node.args[0], sizes, defs) : ZERO_DEG;
+      if (node.op === 'E') return body;
+      // a variance or a covariance squares the body
+      return { n: 2 * body.n, d: 2 * body.d };
+    }
     case 'bigop':
       return degreeOf(ctx, node.body, sizes, defs);
-    case 'block':
-      return ZERO_DEG;
+    case 'block': {
+      // the degree of a block matrix is the largest over its cells
+      let best = ZERO_DEG;
+      for (const row of node.rows) {
+        for (const cell of row) {
+          const deg = degreeOf(ctx, cell, sizes, defs);
+          if (deg.n + deg.d > best.n + best.d) best = deg;
+        }
+      }
+      return best;
+    }
     case 'raw':
       return ZERO_DEG;
   }
@@ -781,7 +818,7 @@ function recipeDegree(ctx: TypeContext, name: string, props: Prop[], sizes: Map<
   const has = (p: Prop) => props.some((x) => (typeof x === 'string' ? x === p : false));
   const info = ctx.symbols.get(name);
   const size = info && isMatrix(info.ty) ? dimSize(ctx, info.ty.r, sizes) : 3;
-  if (has('orth')) return { n: size, d: size };
+  if (has('orth') || has('rot')) return { n: size, d: size };
   if (has('idem') || has('proj')) return { n: 2 * size, d: size };
   if (has('unit')) return { n: 2, d: 2 };
   return null;
@@ -800,6 +837,12 @@ function matrixSize(ctx: TypeContext, node: Node, sizes: Map<string, number>): n
   if (node.k === 'op' && (node.op === 'T' || node.op === 'inv' || node.op === 'invT')) {
     return matrixSize(ctx, node.args[0], sizes);
   }
+  // The operand of det, adj or a product is whatever its inferred type says,
+  // not a default: det(AB) at n = 4 is a determinant of order 4 (review 3.3).
+  const ty = inferType(ctx, node);
+  if (ty.t === 'mat') return dimSize(ctx, ty.r, sizes);
+  if (ty.t === 'rv' && ty.of.t === 'mat') return dimSize(ctx, ty.of.r, sizes);
+  if (ty.t === 'scalar' || ty.t === 'poly') return 1;
   return 3;
 }
 

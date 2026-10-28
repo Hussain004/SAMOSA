@@ -34,17 +34,26 @@ export type WorkerResponse =
 
 const scope = self as unknown as DedicatedWorkerGlobalScope;
 
+/**
+ * The last report this worker built.
+ *
+ * Explain requests need the verdicts, so the app does not have to send the
+ * report back with every request.
+ */
+let lastReport: Report | undefined;
+
 scope.onmessage = (event: MessageEvent<WorkerRequest>) => {
   const request = event.data;
   try {
     if (request.type === 'check') {
       const report = check(request.src, request.options);
+      lastReport = report;
       const response: WorkerResponse = { type: 'report', gen: request.gen, report };
       scope.postMessage(response);
       return;
     }
     if (request.type === 'explain') {
-      const explanation = explain(request.src, request.stepId, request.options);
+      const explanation = explain(request.src, request.stepId, request.options, lastReport);
       const response: WorkerResponse = {
         type: 'explain',
         gen: request.gen,

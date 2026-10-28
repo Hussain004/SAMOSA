@@ -25,6 +25,16 @@ export interface SampleSpec {
   r: number;
   c: number;
   props: Prop[];
+  /**
+   * The corner the recipe draws from.
+   *
+   * Some recipes have more than one kind of instance: an orthogonal matrix is
+   * a rotation or a reflection, an idempotent is full rank or rank deficient.
+   * The verdict engine pegs one corner per structure symbol to a bit of the
+   * trial index, so every combination of corners is evaluated and no false
+   * verdict can hide in the corner nobody drew.
+   */
+  variety: number;
 }
 
 export class Sampler<T> {
@@ -44,8 +54,14 @@ export class Sampler<T> {
     if (has('ident')) return { k: 'm', m: identity<T>(r, this.field.one, this.field.zero) };
     if (has('zero')) return { k: 'm', m: zeros<T>(r, c, this.field.zero) };
     if (has('ones')) return { k: 'm', m: this.mat(r, c, () => this.field.one) };
-    if (has('orth')) return { k: 'm', m: this.sampleOrthogonal(r) };
-    if (has('idem') || has('proj')) return { k: 'm', m: this.sampleIdempotent(r, c) };
+    // a rotation is an orthogonal matrix of determinant one, so it has no
+    // corners: every rotation is caught by the same recipe
+    if (has('rot')) return { k: 'm', m: this.sampleOrthogonal(r, false) };
+    if (has('orth')) return { k: 'm', m: this.sampleOrthogonal(r, (spec.variety & 1) === 1) };
+    if (has('idem') || has('proj')) {
+      const rank = (spec.variety & 1) === 0 ? Math.min(r, c) : Math.max(1, Math.min(r, c) - 1);
+      return { k: 'm', m: this.sampleIdempotent(r, c, rank) };
+    }
     if (has('unit')) return { k: 'm', m: this.sampleUnit(r, c) };
     if (has('stoch')) return { k: 'm', m: this.sampleStochastic(r, c) };
     if (has('diag')) return { k: 'm', m: this.sampleDiagonal(r, c) };
@@ -77,6 +93,10 @@ export class Sampler<T> {
     const f = this.field;
     if (f instanceof GFpField) return randField(this.rng, f.p) as T;
     return f.normal(this.rng);
+  }
+
+  private norm(): T {
+    return this.field.normal(this.rng) as T;
   }
 
   /** iid entries. */
@@ -116,8 +136,14 @@ export class Sampler<T> {
    *
    * Over a finite field the Cayley transform is exact: Q = (I - S)(I + S)^-1
    * with S skew gives Q^T Q = I as an identity, not as an approximation.
+   *
+   * The component is a corner (section 3.1 of the review): with the
+   * reflection flag false this is a rotation and its determinant is one,
+   * with it true ONE column is negated, which flips the determinant and
+   * keeps the orthogonality. Both corners of O(n) have to be drawn, or an
+   * identity about det(Q) is decided by half the truth.
    */
-  sampleOrthogonal(n: number): Mat<T> {
+  sampleOrthogonal(n: number, reflect = false): Mat<T> {
     const f = this.field;
     if (f instanceof GFpField) {
       const g = f as unknown as Field<T>;
@@ -126,41 +152,58 @@ export class Sampler<T> {
       const plus = matAdd(g, eye, s);
       const minus = matSub(g, eye, s);
       const inv = matInv(g, plus);
-      return matMul(g, minus, inv);
+      const q = matMul(g, minus, inv);
+      if (!reflect) return q;
+      // negate the first column: det flips, the orthogonality does not
+      return this.mat(n, n, (i, j) => (j === 0 ? g.neg(q.d[i * n]) : q.d[i * n + j]));
     }
     // over the reals: a QR factorisation with the sign fixed, so it is Haar
-    return this.qrHaar(this.sampleGeneral(n, n));
+    const q = this.qrHaar(this.sampleGeneral(n, n));
+    if (!reflect) return q;
+    return this.mat(n, n, (i, j) => (j === 0 ? f.neg(q.d[i * n]) : q.d[i * n + j]));
   }
 
   /** Gram-Schmidt with the sign correction, which gives a Haar measure. */
   private qrHaar(a: Mat<T>): Mat<T> {
     const f = this.field;
     const n = a.r;
-    const cols: Mat<T>[] = [];
+    let cols: Mat<T>[] = [];
     for (let j = 0; j < n; j++) {
-        const v: Mat<T> = { r: n, c: 1, d: new Array<T>(n).fill(f.zero) };
+      const v: Mat<T> = { r: n, c: 1, d: new Array<T>(n) };
       for (let i = 0; i < n; i++) v.d[i] = a.d[i * n + j];
-      for (const q of cols) {
-        let proj = f.zero;
-        for (let i = 0; i < n; i++) proj = f.add(proj, f.mul(q.d[i], v.d[i]));
-        for (let i = 0; i < n; i++) v.d[i] = f.sub(v.d[i], f.mul(proj, q.d[i]));
-      }
-      let norm = f.zero;
-      for (let i = 0; i < n; i++) norm = f.add(norm, f.mul(v.d[i], v.d[i]));
-      let normNum = Math.sqrt(f.toNumber(norm));
-      if (normNum < 1e-9) normNum = 1;
-      if (f.toNumber(v.d[n - 1]) < 0) normNum = -normNum;
-      const scale = f.fromRational(Math.round(normNum * 1e6), 1e6);
-      for (let i = 0; i < n; i++) v.d[i] = f.div(v.d[i], scale);
       cols.push(v);
+    }
+    // Two passes of Gram-Schmidt: the second squares the rounding error of
+    // the first, so the columns are orthonormal to the precision the field
+    // itself affords the square root. The normalisation uses the field's own
+    // root, not a decimal rounding, so a numeric check against Q'Q = I can
+    // actually pass.
+    for (let pass = 0; pass < 2; pass++) {
+      const next: Mat<T>[] = [];
+      for (let j = 0; j < n; j++) {
+        const v: Mat<T> = { r: n, c: 1, d: [...cols[j].d] };
+        for (const q of next) {
+          let proj = f.zero;
+          for (let i = 0; i < n; i++) proj = f.add(proj, f.mul(q.d[i], v.d[i]));
+          for (let i = 0; i < n; i++) v.d[i] = f.sub(v.d[i], f.mul(proj, q.d[i]));
+        }
+        let norm = f.zero;
+        for (let i = 0; i < n; i++) norm = f.add(norm, f.mul(v.d[i], v.d[i]));
+        let scale = f.sqrt(norm);
+        if (f.toNumber(scale) < 1e-9) scale = f.one;
+        if (f.toNumber(v.d[n - 1]) < 0) scale = f.neg(scale);
+        for (let i = 0; i < n; i++) v.d[i] = f.div(v.d[i], scale);
+        next.push(v);
+      }
+      cols = next;
     }
     return this.mat(n, n, (i, j) => cols[j].d[i]);
   }
 
-  /** An idempotent matrix of rank k: U (V^T U)^-1 V^T. */
-  sampleIdempotent(r: number, c: number): Mat<T> {
+  /** An idempotent matrix of the given rank: U (V^T U)^-1 V^T. */
+  sampleIdempotent(r: number, c: number, rank: number): Mat<T> {
     const f = this.field;
-    const k = Math.max(1, Math.min(r, c) - 1);
+    const k = rank;
     const u = this.sampleGeneral(r, k);
     const v = this.sampleGeneral(c, k);
     const vtu = matMul(f, transpose(v), u);
@@ -204,9 +247,36 @@ export class Sampler<T> {
     });
   }
 
-  /** A scalar drawn from the field. */
-  sampleScalar(): T {
-    return this.element();
+  /**
+   * A scalar drawn from the field.
+   *
+   * Over a finite field every element is as good as any other. Over the
+   * reals the samples have to span what the step distinguishes: the sign
+   * comes from a bit of the trial index, and the magnitude cycles through a
+   * tiny, a unit and a large class, so the samples cover the line without
+   * being random about the coverage (section 3.4 of the review). A sign
+   * that never turns negative is how |x| = x used to look true.
+   */
+  sampleScalar(variety = 0, index = 0): T {
+    const f = this.field;
+    if (f instanceof GFpField) return randField(this.rng, f.p) as T;
+    const z = this.norm();
+    const sign = ((variety >> index) & 1) === 1 ? -1 : 1;
+    const cls = (variety + index) % 3;
+    const magnitude =
+      cls === 0
+        ? f.mul(f.abs(z), f.fromRational(1, 10))
+        : cls === 1
+          ? f.abs(z)
+          : f.mul(f.abs(z), f.fromRational(5, 1));
+    return sign < 0 ? f.neg(magnitude) : magnitude;
+  }
+
+  /** A strictly positive scalar over the reals; the pos property is a real order, so GF(p) cannot have it. */
+  samplePositiveScalar(): T {
+    const f = this.field;
+    if (f instanceof GFpField) return randField(this.rng, f.p) as T;
+    return f.add(f.abs(this.norm()), f.fromRational(5, 100));
   }
 }
 

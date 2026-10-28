@@ -4558,8 +4558,8 @@ var GFpField = class {
   cmp(a, b) {
     return a === b ? 0 : a < b ? -1 : 1;
   }
-  abs(a) {
-    return a;
+  abs(_a) {
+    return this.transcendental("abs");
   }
   transcendental(op) {
     throw new Error(`${op} is not available in GF(p); this step needs numeric mode`);
@@ -4696,16 +4696,32 @@ function matDet(f, a) {
   const m = a.d.slice();
   let det = f.one;
   for (let c = 0; c < n; c++) {
-    let pivot = c;
-    let best = f.abs(m[c * n + c]);
-    for (let r = c + 1; r < n; r++) {
-      const v = f.abs(m[r * n + c]);
-      if (f.cmp(v, best) > 0) {
-        best = v;
+    let pivot = -1;
+    let best = null;
+    for (let r = c; r < n; r++) {
+      const v = m[r * n + c];
+      if (f.isZero(v)) continue;
+      if (pivot === -1) {
         pivot = r;
+        try {
+          best = f.abs(v);
+        } catch {
+          best = null;
+        }
+        continue;
+      }
+      if (best === null) continue;
+      try {
+        const mag = f.abs(v);
+        if (f.cmp(mag, best) > 0) {
+          best = mag;
+          pivot = r;
+        }
+      } catch {
+        break;
       }
     }
-    if (f.isZero(best)) return f.zero;
+    if (pivot === -1) return f.zero;
     if (pivot !== c) {
       for (let j = 0; j < n; j++) {
         const tmp = m[c * n + j];
@@ -5714,8 +5730,12 @@ var Sampler = class {
     if (has("ident")) return { k: "m", m: identity(r, this.field.one, this.field.zero) };
     if (has("zero")) return { k: "m", m: zeros(r, c, this.field.zero) };
     if (has("ones")) return { k: "m", m: this.mat(r, c, () => this.field.one) };
-    if (has("orth")) return { k: "m", m: this.sampleOrthogonal(r) };
-    if (has("idem") || has("proj")) return { k: "m", m: this.sampleIdempotent(r, c) };
+    if (has("rot")) return { k: "m", m: this.sampleOrthogonal(r, false) };
+    if (has("orth")) return { k: "m", m: this.sampleOrthogonal(r, (spec.variety & 1) === 1) };
+    if (has("idem") || has("proj")) {
+      const rank = (spec.variety & 1) === 0 ? Math.min(r, c) : Math.max(1, Math.min(r, c) - 1);
+      return { k: "m", m: this.sampleIdempotent(r, c, rank) };
+    }
     if (has("unit")) return { k: "m", m: this.sampleUnit(r, c) };
     if (has("stoch")) return { k: "m", m: this.sampleStochastic(r, c) };
     if (has("diag")) return { k: "m", m: this.sampleDiagonal(r, c) };
@@ -5743,6 +5763,9 @@ var Sampler = class {
     const f = this.field;
     if (f instanceof GFpField) return randField(this.rng, f.p);
     return f.normal(this.rng);
+  }
+  norm() {
+    return this.field.normal(this.rng);
   }
   /** iid entries. */
   sampleGeneral(r, c) {
@@ -5776,8 +5799,14 @@ var Sampler = class {
    *
    * Over a finite field the Cayley transform is exact: Q = (I - S)(I + S)^-1
    * with S skew gives Q^T Q = I as an identity, not as an approximation.
+   *
+   * The component is a corner (section 3.1 of the review): with the
+   * reflection flag false this is a rotation and its determinant is one,
+   * with it true ONE column is negated, which flips the determinant and
+   * keeps the orthogonality. Both corners of O(n) have to be drawn, or an
+   * identity about det(Q) is decided by half the truth.
    */
-  sampleOrthogonal(n) {
+  sampleOrthogonal(n, reflect = false) {
     const f = this.field;
     if (f instanceof GFpField) {
       const g = f;
@@ -5786,38 +5815,49 @@ var Sampler = class {
       const plus = matAdd(g, eye, s2);
       const minus = matSub(g, eye, s2);
       const inv = matInv(g, plus);
-      return matMul(g, minus, inv);
+      const q2 = matMul(g, minus, inv);
+      if (!reflect) return q2;
+      return this.mat(n, n, (i, j) => j === 0 ? g.neg(q2.d[i * n]) : q2.d[i * n + j]);
     }
-    return this.qrHaar(this.sampleGeneral(n, n));
+    const q = this.qrHaar(this.sampleGeneral(n, n));
+    if (!reflect) return q;
+    return this.mat(n, n, (i, j) => j === 0 ? f.neg(q.d[i * n]) : q.d[i * n + j]);
   }
   /** Gram-Schmidt with the sign correction, which gives a Haar measure. */
   qrHaar(a) {
     const f = this.field;
     const n = a.r;
-    const cols = [];
+    let cols = [];
     for (let j = 0; j < n; j++) {
-      const v = { r: n, c: 1, d: new Array(n).fill(f.zero) };
+      const v = { r: n, c: 1, d: new Array(n) };
       for (let i = 0; i < n; i++) v.d[i] = a.d[i * n + j];
-      for (const q of cols) {
-        let proj = f.zero;
-        for (let i = 0; i < n; i++) proj = f.add(proj, f.mul(q.d[i], v.d[i]));
-        for (let i = 0; i < n; i++) v.d[i] = f.sub(v.d[i], f.mul(proj, q.d[i]));
-      }
-      let norm = f.zero;
-      for (let i = 0; i < n; i++) norm = f.add(norm, f.mul(v.d[i], v.d[i]));
-      let normNum = Math.sqrt(f.toNumber(norm));
-      if (normNum < 1e-9) normNum = 1;
-      if (f.toNumber(v.d[n - 1]) < 0) normNum = -normNum;
-      const scale = f.fromRational(Math.round(normNum * 1e6), 1e6);
-      for (let i = 0; i < n; i++) v.d[i] = f.div(v.d[i], scale);
       cols.push(v);
+    }
+    for (let pass = 0; pass < 2; pass++) {
+      const next = [];
+      for (let j = 0; j < n; j++) {
+        const v = { r: n, c: 1, d: [...cols[j].d] };
+        for (const q of next) {
+          let proj = f.zero;
+          for (let i = 0; i < n; i++) proj = f.add(proj, f.mul(q.d[i], v.d[i]));
+          for (let i = 0; i < n; i++) v.d[i] = f.sub(v.d[i], f.mul(proj, q.d[i]));
+        }
+        let norm = f.zero;
+        for (let i = 0; i < n; i++) norm = f.add(norm, f.mul(v.d[i], v.d[i]));
+        let scale = f.sqrt(norm);
+        if (f.toNumber(scale) < 1e-9) scale = f.one;
+        if (f.toNumber(v.d[n - 1]) < 0) scale = f.neg(scale);
+        for (let i = 0; i < n; i++) v.d[i] = f.div(v.d[i], scale);
+        next.push(v);
+      }
+      cols = next;
     }
     return this.mat(n, n, (i, j) => cols[j].d[i]);
   }
-  /** An idempotent matrix of rank k: U (V^T U)^-1 V^T. */
-  sampleIdempotent(r, c) {
+  /** An idempotent matrix of the given rank: U (V^T U)^-1 V^T. */
+  sampleIdempotent(r, c, rank) {
     const f = this.field;
-    const k = Math.max(1, Math.min(r, c) - 1);
+    const k = rank;
     const u = this.sampleGeneral(r, k);
     const v = this.sampleGeneral(c, k);
     const vtu = matMul(f, transpose(v), u);
@@ -5857,9 +5897,30 @@ var Sampler = class {
       return f.div(raw.d[i * c + j], sum2);
     });
   }
-  /** A scalar drawn from the field. */
-  sampleScalar() {
-    return this.element();
+  /**
+   * A scalar drawn from the field.
+   *
+   * Over a finite field every element is as good as any other. Over the
+   * reals the samples have to span what the step distinguishes: the sign
+   * comes from a bit of the trial index, and the magnitude cycles through a
+   * tiny, a unit and a large class, so the samples cover the line without
+   * being random about the coverage (section 3.4 of the review). A sign
+   * that never turns negative is how |x| = x used to look true.
+   */
+  sampleScalar(variety = 0, index2 = 0) {
+    const f = this.field;
+    if (f instanceof GFpField) return randField(this.rng, f.p);
+    const z = this.norm();
+    const sign2 = (variety >> index2 & 1) === 1 ? -1 : 1;
+    const cls = (variety + index2) % 3;
+    const magnitude = cls === 0 ? f.mul(f.abs(z), f.fromRational(1, 10)) : cls === 1 ? f.abs(z) : f.mul(f.abs(z), f.fromRational(5, 1));
+    return sign2 < 0 ? f.neg(magnitude) : magnitude;
+  }
+  /** A strictly positive scalar over the reals; the pos property is a real order, so GF(p) cannot have it. */
+  samplePositiveScalar() {
+    const f = this.field;
+    if (f instanceof GFpField) return randField(this.rng, f.p);
+    return f.add(f.abs(this.norm()), f.fromRational(5, 100));
   }
 };
 
@@ -8376,6 +8437,8 @@ var PROP_WORDS = {
   psd: "psd",
   orth: "orth",
   orthogonal: "orth",
+  rot: "rot",
+  rotation: "rot",
   diag: "diag",
   diagonal: "diag",
   triu: "triu",
@@ -8752,7 +8815,7 @@ function parseType(name, type) {
   }
   if (dims.length === 1) {
     const matrixish = props.some(
-      (p) => typeof p === "string" && ["sym", "spd", "psd", "orth", "diag", "triu", "tril", "skew", "idem", "proj", "stoch"].includes(p)
+      (p) => typeof p === "string" && ["sym", "spd", "psd", "orth", "rot", "diag", "triu", "tril", "skew", "idem", "proj", "stoch"].includes(p)
     );
     return {
       ...base3,
@@ -9424,8 +9487,11 @@ function degreeOf(ctx, node, sizes, defs) {
         case "tr":
         case "vec":
         case "diag":
-        case "adj":
           return args[0];
+        case "adj": {
+          const size = matrixSize(ctx, node.args[0], sizes);
+          return { n: (size - 1) * args[0].n, d: (size - 1) * args[0].d };
+        }
         case "det": {
           const size = matrixSize(ctx, node.args[0], sizes);
           return { n: size * args[0].n, d: size * args[0].d };
@@ -9441,16 +9507,39 @@ function degreeOf(ctx, node, sizes, defs) {
       return args[0] ?? ZERO_DEG;
     }
     case "call": {
+      const arg2 = node.args[0] ? degreeOf(ctx, node.args[0], sizes, defs) : ZERO_DEG;
+      if (node.fn === "det") {
+        const size = matrixSize(ctx, node.args[0], sizes);
+        return { n: size * arg2.n, d: size * arg2.d };
+      }
+      if (node.fn === "tr" || node.fn === "trace") return arg2;
+      if (node.fn === "var" || node.fn === "cov") {
+        return { n: 2 * arg2.n, d: 2 * arg2.d };
+      }
       return ZERO_DEG;
     }
-    case "deriv":
-      return ZERO_DEG;
-    case "expect":
-      return ZERO_DEG;
+    case "deriv": {
+      const fnDef = node.f.k === "sym" ? defs?.get(node.f.name) : void 0;
+      const base3 = fnDef ? degreeOf(ctx, fnDef, sizes, defs) : LEAF_DEG;
+      return { n: base3.n + 1, d: base3.d + 1 };
+    }
+    case "expect": {
+      const body = node.args[0] ? degreeOf(ctx, node.args[0], sizes, defs) : ZERO_DEG;
+      if (node.op === "E") return body;
+      return { n: 2 * body.n, d: 2 * body.d };
+    }
     case "bigop":
       return degreeOf(ctx, node.body, sizes, defs);
-    case "block":
-      return ZERO_DEG;
+    case "block": {
+      let best = ZERO_DEG;
+      for (const row of node.rows) {
+        for (const cell of row) {
+          const deg = degreeOf(ctx, cell, sizes, defs);
+          if (deg.n + deg.d > best.n + best.d) best = deg;
+        }
+      }
+      return best;
+    }
     case "raw":
       return ZERO_DEG;
   }
@@ -9462,7 +9551,7 @@ function recipeDegree(ctx, name, props, sizes) {
   const has = (p) => props.some((x) => typeof x === "string" ? x === p : false);
   const info = ctx.symbols.get(name);
   const size = info && isMatrix(info.ty) ? dimSize(ctx, info.ty.r, sizes) : 3;
-  if (has("orth")) return { n: size, d: size };
+  if (has("orth") || has("rot")) return { n: size, d: size };
   if (has("idem") || has("proj")) return { n: 2 * size, d: size };
   if (has("unit")) return { n: 2, d: 2 };
   return null;
@@ -9479,6 +9568,10 @@ function matrixSize(ctx, node, sizes) {
   if (node.k === "op" && (node.op === "T" || node.op === "inv" || node.op === "invT")) {
     return matrixSize(ctx, node.args[0], sizes);
   }
+  const ty = inferType(ctx, node);
+  if (ty.t === "mat") return dimSize(ctx, ty.r, sizes);
+  if (ty.t === "rv" && ty.of.t === "mat") return dimSize(ctx, ty.of.r, sizes);
+  if (ty.t === "scalar" || ty.t === "poly") return 1;
   return 3;
 }
 function dimSizeOf(ctx, d, sizes) {
@@ -9586,21 +9679,16 @@ function collectSymbols(node, into) {
       return;
   }
 }
-function check(src, opts = {}) {
-  const started = now();
-  const seed = opts.seed ?? DEFAULT_SEED;
-  const trials = opts.trials ?? 3;
+function analyzeSource(src, opts) {
   const rows = splitRows(src);
   const declared = parseDeclarations(opts.decls ?? "");
   const preset = presetDecls(opts.preset);
   const decls = mergeDecls(preset, declared.decls);
   const ctx = createContext(decls, opts.layout ?? "denominator");
-  const chips = [];
-  const diagnostics = [];
+  const defs = /* @__PURE__ */ new Map();
   const definedNames = /* @__PURE__ */ new Set();
   const knownFns = new Set(decls.filter((d) => d.kind === "function").map((d) => d.name));
   const steps = [];
-  const unparsed = [];
   let previousRhs;
   let rowIndex = 0;
   for (const row of rows) {
@@ -9618,7 +9706,6 @@ function check(src, opts = {}) {
         unreadable: parsed.error.message,
         symbols: /* @__PURE__ */ new Set()
       });
-      unparsed.push({ row: rowIndex, message: parsed.error.message, span: parsed.error.span });
       continue;
     }
     if (parsed.prose || !parsed.parts.length) continue;
@@ -9670,9 +9757,23 @@ function check(src, opts = {}) {
       });
       previousRhs = rhs;
       if (bareLhs && isDefinition) definedNames.add(bareLhs);
+      if (isDefinition && bareLhs && rhs) {
+        defs.set(bareLhs, rhs);
+        ctx.defs.set(bareLhs, rhs);
+      }
     }
   }
-  const defs = /* @__PURE__ */ new Map();
+  return { ctx, defs, steps };
+}
+function check(src, opts = {}) {
+  const started = now();
+  const seed = opts.seed ?? DEFAULT_SEED;
+  const trials = opts.trials ?? 3;
+  const source = analyzeSource(src, opts);
+  const { ctx, defs, steps } = source;
+  const decls = [...ctx.decls.values()];
+  const chips = [];
+  const diagnostics = [];
   const results = [];
   const used = /* @__PURE__ */ new Set();
   for (const step of steps) {
@@ -9691,10 +9792,6 @@ function check(src, opts = {}) {
     });
   }
   for (const step of steps) {
-    if (step.isDefinition && step.defName && step.rhs) {
-      defs.set(step.defName, step.rhs);
-      ctx.defs.set(step.defName, step.rhs);
-    }
     const result = checkStep(step, ctx, defs, { seed, trials, budgetMs: opts.budgetMs ?? 500 }, diagnostics);
     result.text ??= step.text;
     results.push(result);
@@ -9897,8 +9994,10 @@ function isRational(node, ctx, defs, seen) {
       if (info && info.ty.t === "rv") return false;
       return true;
     }
-    case "op":
+    case "op": {
+      if (node.op === "abs" || node.op === "sqrtm") return false;
       return node.args.every((a) => isRational(a, ctx, defs, seen));
+    }
     case "call":
       return node.fn === "det" || node.fn === "tr" || node.fn === "trace" || node.fn === "var" || node.fn === "cov";
     case "deriv":
@@ -9917,19 +10016,39 @@ function checkExact(step, ctx, defs, opts, card) {
   const dimVars = collectDimVars(ctx, step, defs);
   const settings = sizeSettings(dimVars);
   const primes = [P1, P2];
+  const corners = cornerCount(step, ctx, defs);
+  if (corners > 7) {
+    const message = "this step has too many structured symbols to draw every corner of";
+    return {
+      id: step.id,
+      row: step.row,
+      span: step.span,
+      text: step.text,
+      relation: step.relation,
+      verdict: "unchecked",
+      card: { ...card, assumptions: collectAssumptions(ctx, step) },
+      message,
+      reason: message,
+      annotation: step.annotation
+    };
+  }
+  const trialsNeeded = Math.max(opts.trials, 2 ** corners);
+  const mask = corners > 0 ? (1 << corners) - 1 : 0;
   let worstBound = 0;
   let worstDegree = 0;
   const working = [];
   const sizes = [];
   const assumptions = collectAssumptions(ctx, step);
   for (const setting of settings) {
-    let usable = false;
-    for (let trial = 0; trial < opts.trials; trial++) {
+    const ran = /* @__PURE__ */ new Map([[P1, 0], [P2, 0]]);
+    const seen = /* @__PURE__ */ new Map([[P1, /* @__PURE__ */ new Set()], [P2, /* @__PURE__ */ new Set()]]);
+    for (let trial = 0; trial < trialsNeeded; trial++) {
       for (const p of primes) {
         const rng = rngFor(opts.seed, step.id, settingKey(setting), trial, p);
-        const outcome = runExactTrial(step, ctx, defs, setting, p, rng);
+        const outcome = runExactTrial(step, ctx, defs, setting, p, rng, trial);
         if (outcome.kind === "ok") {
-          usable = true;
+          ran.set(p, (ran.get(p) ?? 0) + 1);
+          seen.get(p).add(trial & mask);
           continue;
         }
         if (outcome.kind === "unknown") {
@@ -9970,7 +10089,12 @@ function checkExact(step, ctx, defs, opts, card) {
         };
       }
     }
-    if (usable) working.push(setting);
+    const covered = primes.every(
+      (p) => (ran.get(p) ?? 0) > 0 && seen.get(p).size === 1 << corners
+    );
+    if (covered) {
+      working.push({ setting, ranP1: ran.get(P1), ranP2: ran.get(P2) });
+    }
   }
   if (!working.length) {
     const message = "this step could not be evaluated at any size";
@@ -9986,14 +10110,33 @@ function checkExact(step, ctx, defs, opts, card) {
       annotation: step.annotation
     };
   }
-  for (const setting of working) {
+  for (const { setting, ranP1, ranP2 } of working) {
     sizes.push(Object.fromEntries(setting));
+    const errorsAt = ctx.errors.length;
     const dl = degreeOf(ctx, step.lhs, setting, defs);
     const dr = degreeOf(ctx, step.rhs, setting, defs);
+    ctx.errors.length = errorsAt;
     const d = Math.max(dl.n + dr.d, dr.n + dl.d);
     worstDegree = Math.max(worstDegree, d);
-    const bound = Math.pow(d / P1, opts.trials) * Math.pow(d / P2, opts.trials);
+    const bound = Math.pow(d / P1, ranP1) * Math.pow(d / P2, ranP2);
     worstBound = Math.max(worstBound, bound);
+  }
+  if (worstDegree === 0) {
+    const message = "the degree bound of this step came out as 0 although symbols were sampled, which is an engine gap; SAMOSA claims nothing here";
+    return {
+      id: step.id,
+      row: step.row,
+      span: step.span,
+      text: step.text,
+      lhsSpan: step.lhs?.span,
+      rhsSpan: step.rhs?.span,
+      relation: step.relation,
+      verdict: "inconclusive",
+      card: { ...card, sizes, primes, assumptions },
+      message,
+      reason: message,
+      annotation: step.annotation
+    };
   }
   return {
     id: step.id,
@@ -10005,18 +10148,36 @@ function checkExact(step, ctx, defs, opts, card) {
     relation: step.relation,
     verdict: "ok",
     mode: hasExpectation(step) ? "quadrature" : "exact",
-    card: { ...card, sizes, primes, degree: worstDegree, bound: worstBound, assumptions },
+    card: {
+      ...card,
+      trialsPerSize: trialsNeeded,
+      sizes,
+      primes,
+      degree: worstDegree,
+      bound: worstBound,
+      assumptions
+    },
     message: "holds at every size tested",
     annotation: step.annotation
   };
 }
-function runExactTrial(step, ctx, defs, setting, p, rng) {
+function cornerCount(step, ctx, defs) {
+  let k = 0;
+  for (const name of sampledNames(step, defs)) {
+    const info = ctx.symbols.get(name);
+    if (!info || info.ty.t !== "mat") continue;
+    const has = (target) => info.props.some((x) => typeof x === "string" && x === target);
+    if (has("orth") || has("idem") || has("proj") || has("rot")) k++;
+  }
+  return k;
+}
+function runExactTrial(step, ctx, defs, setting, p, rng, trial) {
   const field = new GFpField(p);
   const sampler = new Sampler(field, rng);
   const env = makeEnv(field, rng);
   env.defs = defs;
   const free = freeVariables(step);
-  const sampled = sampleFor(ctx, step, defs, setting, sampler, free);
+  const sampled = sampleFor(ctx, step, defs, setting, sampler, free, trial);
   if (sampled === "unknown") {
     return { kind: "unknown", message: "SAMOSA could not sample an instance of these objects" };
   }
@@ -10093,11 +10254,19 @@ function compareDerivative(field, deriv, claimed, env, sampler) {
         w.v
       ) : quadraticForm(field, direction.m, claimedVal2.m, w.m);
       const mixedScalar = asScalar(field, mixed);
-      if (mixedScalar !== null && field.eq(value, mixedScalar)) return { kind: "equal" };
+      if (mixedScalar === null) {
+        return {
+          kind: "different",
+          lhs: mixed,
+          rhs: claimedVal2,
+          message: "the claimed Hessian is not the Hessian of that function"
+        };
+      }
+      if (field.eq(value, mixedScalar)) return { kind: "equal" };
       return {
         kind: "different",
-        lhs: mixed,
-        rhs: claimedVal2,
+        lhs: scalar(mixedScalar),
+        rhs: scalar(value),
         message: "the claimed Hessian is not the Hessian of that function"
       };
     }
@@ -10115,8 +10284,8 @@ function compareDerivative(field, deriv, claimed, env, sampler) {
       if (field.eq(flipped, tangentScalar)) {
         return {
           kind: "different",
-          lhs: tangent,
-          rhs: claimedVal,
+          lhs: scalar(tangentScalar),
+          rhs: scalar(flipped),
           message: "this is the numerator layout gradient; SAMOSA uses the denominator layout",
           layoutHint: "The gradient has the shape of the variable it is taken with respect to. Transpose it."
         };
@@ -10124,8 +10293,8 @@ function compareDerivative(field, deriv, claimed, env, sampler) {
     }
     return {
       kind: "different",
-      lhs: tangent,
-      rhs: claimedVal,
+      lhs: scalar(tangentScalar),
+      rhs: scalar(inner2),
       message: "the claimed gradient is not the gradient of that function"
     };
   }
@@ -10254,20 +10423,16 @@ function stepNodes(step) {
   if (step.conclusion?.rhs) out.push(step.conclusion.rhs);
   return out;
 }
-function sampleFor(ctx, step, defs, setting, sampler, free = /* @__PURE__ */ new Set()) {
+function sampleFor(ctx, step, defs, setting, sampler, free = /* @__PURE__ */ new Set(), variety = 0) {
   const values = /* @__PURE__ */ new Map();
   const quad = /* @__PURE__ */ new Map();
-  const names = /* @__PURE__ */ new Set();
-  for (const node of stepNodes(step)) collectSymbols(node, names);
-  for (const name of [...names]) {
-    const def = defs.get(name);
-    if (def) collectSymbols(def, names);
-  }
+  const names = sampledNames(step, defs, free);
+  const pegs = new Map(names.map((n, i) => [n, i]));
   for (const name of names) {
-    if (defs.has(name) && !free.has(name)) continue;
     if (values.has(name)) continue;
     const info = ctx.symbols.get(name);
     if (!info) continue;
+    const peg = pegs.get(name) ?? 0;
     if (info.ty.t === "rv") {
       const dist = info.ty.dist;
       const size = info.ty.of.t === "mat" ? dimSizeOf(ctx, info.ty.of.r, setting) : 1;
@@ -10296,17 +10461,19 @@ function sampleFor(ctx, step, defs, setting, sampler, free = /* @__PURE__ */ new
       continue;
     }
     if (info.ty.t === "scalar") {
-      values.set(name, scalar(sampler.sampleScalar()));
+      const value = info.props.some((p) => p === "pos") ? sampler.samplePositiveScalar() : sampler.sampleScalar(variety, peg);
+      values.set(name, scalar(value));
       continue;
     }
     if (info.ty.t !== "mat") continue;
     const r = dimSizeOf(ctx, info.ty.r, setting);
     const c = dimSizeOf(ctx, info.ty.c, setting);
+    const forced = singularByDesign(info.props, r, c, variety >> peg & 1);
     let placed = false;
     for (let attempt = 0; attempt < 20; attempt++) {
-      const val = sampler.sample({ name, r, c, props: info.props });
+      const val = sampler.sample({ name, r, c, props: info.props, variety: variety >> peg & 1 });
       if (!val) continue;
-      if (val.k === "m" && isSingular(sampler.field, val.m)) continue;
+      if (val.k === "m" && !forced && isSingular(sampler.field, val.m)) continue;
       values.set(name, val);
       placed = true;
       break;
@@ -10314,6 +10481,25 @@ function sampleFor(ctx, step, defs, setting, sampler, free = /* @__PURE__ */ new
     if (!placed) return "unknown";
   }
   return { values, quad };
+}
+function sampledNames(step, defs, free = /* @__PURE__ */ new Set()) {
+  const names = /* @__PURE__ */ new Set();
+  for (const node of stepNodes(step)) collectSymbols(node, names);
+  for (const name of [...names]) {
+    const def = defs.get(name);
+    if (def) collectSymbols(def, names);
+  }
+  return [...names].filter((name) => !(defs.has(name) && !free.has(name)));
+}
+function singularByDesign(props, r, c, corner) {
+  const has = (target) => props.some((x) => typeof x === "string" && x === target);
+  if (has("zero")) return true;
+  if (has("idem") || has("proj")) {
+    const rank = corner === 0 ? Math.min(r, c) : Math.max(1, Math.min(r, c) - 1);
+    return rank < Math.min(r, c);
+  }
+  if (has("skew")) return r === c && r % 2 === 1;
+  return false;
 }
 function isSingular(field, m) {
   if (m.r !== m.c) return false;
@@ -10483,52 +10669,80 @@ function guessProportionalityVariable(step, ctx) {
   }
   return void 0;
 }
+var NUMERIC_TRIALS = 8;
 function checkNumeric(step, ctx, defs, opts, card) {
   const dimVars = collectDimVars(ctx, step, defs);
   const settings = sizeSettings(dimVars);
   const sizes = [];
   const assumptions = collectAssumptions(ctx, step);
-  let maxDelta = 0;
+  let f64Max = 0;
+  let decMax = 0;
   const dec = new DecField(50);
+  const domainResult = (message2) => {
+    const text = `this step was not defined at a sampled point (${message2}), for instance the log or the square root of a negative number; declaring the symbols it depends on positive may be what it needs`;
+    return {
+      id: step.id,
+      row: step.row,
+      span: step.span,
+      text: step.text,
+      lhsSpan: step.lhs?.span,
+      rhsSpan: step.rhs?.span,
+      relation: step.relation,
+      verdict: "inconclusive",
+      mode: "numeric",
+      card: { ...card, sizes, assumptions },
+      message: text,
+      reason: text,
+      annotation: step.annotation
+    };
+  };
+  const unevaluable = (message2) => ({
+    id: step.id,
+    row: step.row,
+    span: step.span,
+    text: step.text,
+    relation: step.relation,
+    verdict: "unchecked",
+    card: { ...card, sizes, assumptions },
+    message: message2,
+    reason: message2,
+    annotation: step.annotation
+  });
   for (const setting of settings) {
     sizes.push(Object.fromEntries(setting));
-    for (let trial = 0; trial < 3; trial++) {
+    for (let trial = 0; trial < NUMERIC_TRIALS; trial++) {
       const rng = rngFor(opts.seed, step.id, settingKey(setting), trial, "f64");
-      const delta = numericDelta(ctx, defs, step, setting, rng, new F64Field());
-      if (delta === null) {
-        const message2 = "SAMOSA could not evaluate this step over the reals";
-        return {
-          id: step.id,
-          row: step.row,
-          span: step.span,
-          text: step.text,
-          relation: step.relation,
-          verdict: "unchecked",
-          card: { ...card, sizes, assumptions },
-          message: message2,
-          reason: message2,
-          annotation: step.annotation
-        };
+      const run = numericDelta(ctx, defs, step, setting, rng, trial, new F64Field());
+      if (run === null) {
+        return unevaluable("SAMOSA could not evaluate this step over the reals");
       }
-      maxDelta = Math.max(maxDelta, delta);
-      if (delta > 1e-6) {
+      if (run === "domain") {
+        return domainResult("a sampled instance was outside the domain");
+      }
+      f64Max = Math.max(f64Max, run.delta);
+      if (run.delta > 1e-6) {
         let confirmed = false;
-        for (let k = 0; k < 3 && !confirmed; k++) {
-          const rng2 = rngFor(opts.seed, step.id, settingKey(setting), trial, "dec", k);
-          const d2 = numericDelta(ctx, defs, step, setting, rng2, dec);
-          if (d2 !== null && d2 > 1e-20) confirmed = true;
+        for (let k = 0; k < NUMERIC_TRIALS && !confirmed; k++) {
+          const rng2 = rngFor(opts.seed, step.id, settingKey(setting), k, "dec", 1);
+          const run2 = numericDelta(ctx, defs, step, setting, rng2, k, dec);
+          if (run2 === null) continue;
+          if (run2 === "domain") {
+            return domainResult("a 50 digit instance was outside the domain");
+          }
+          if (run2.delta > 1e-20) confirmed = true;
         }
         const message2 = confirmed ? "the two sides differ" : "the two sides differ, but not enough to call it wrong";
         return {
           id: step.id,
           row: step.row,
           span: step.span,
+          text: step.text,
           lhsSpan: step.lhs?.span,
           rhsSpan: step.rhs?.span,
           relation: step.relation,
           verdict: confirmed ? "wrong" : "inconclusive",
           mode: "numeric",
-          card: { ...card, sizes, maxDelta, assumptions },
+          card: { ...card, sizes, maxDelta: Math.max(f64Max, decMax), assumptions },
           message: message2,
           reason: message2,
           annotation: step.annotation
@@ -10537,26 +10751,19 @@ function checkNumeric(step, ctx, defs, opts, card) {
     }
   }
   for (const setting of settings) {
-    const rng = rngFor(opts.seed, step.id, settingKey(setting), "dec");
-    const delta = numericDelta(ctx, defs, step, setting, rng, dec);
-    if (delta === null) {
-      const message2 = "SAMOSA could not evaluate this step at 50 digits";
-      return {
-        id: step.id,
-        row: step.row,
-        span: step.span,
-        text: step.text,
-        relation: step.relation,
-        verdict: "unchecked",
-        card: { ...card, sizes, assumptions },
-        message: message2,
-        reason: message2,
-        annotation: step.annotation
-      };
+    for (let trial = 0; trial < NUMERIC_TRIALS; trial++) {
+      const rng = rngFor(opts.seed, step.id, settingKey(setting), trial, "dec");
+      const run = numericDelta(ctx, defs, step, setting, rng, trial, dec);
+      if (run === null) {
+        return unevaluable("SAMOSA could not evaluate this step at 50 digits");
+      }
+      if (run === "domain") {
+        return domainResult("a 50 digit instance was outside the domain");
+      }
+      decMax = Math.max(decMax, run.delta);
     }
-    maxDelta = Math.max(maxDelta, delta);
   }
-  if (maxDelta < 1e-35) {
+  if (decMax < 1e-35) {
     return {
       id: step.id,
       row: step.row,
@@ -10567,7 +10774,13 @@ function checkNumeric(step, ctx, defs, opts, card) {
       relation: step.relation,
       verdict: "ok",
       mode: "numeric",
-      card: { ...card, sizes, maxDelta, assumptions },
+      card: {
+        ...card,
+        trialsPerSize: NUMERIC_TRIALS,
+        sizes,
+        maxDelta: decMax,
+        assumptions
+      },
       message: "the two sides agree to 50 digits",
       annotation: step.annotation
     };
@@ -10577,28 +10790,32 @@ function checkNumeric(step, ctx, defs, opts, card) {
     id: step.id,
     row: step.row,
     span: step.span,
+    text: step.text,
+    lhsSpan: step.lhs?.span,
+    rhsSpan: step.rhs?.span,
     relation: step.relation,
     verdict: "inconclusive",
     mode: "numeric",
-    card: { ...card, sizes, maxDelta, assumptions },
+    card: { ...card, sizes, maxDelta: decMax, assumptions },
     message,
     reason: message,
     annotation: step.annotation
   };
 }
-function numericDelta(ctx, defs, step, setting, rng, field) {
+function numericDelta(ctx, defs, step, setting, rng, trial, field) {
   const sampler = new Sampler(field, rng);
   const env = makeEnv(field, rng);
   env.defs = defs;
   const free = freeVariables(step);
-  const sampled = sampleFor(ctx, step, defs, setting, sampler, free);
+  const sampled = sampleFor(ctx, step, defs, setting, sampler, free, trial);
   if (sampled === "unknown") return null;
   for (const [name, value] of sampled.values.entries()) env.values.set(name, value);
   for (const [name, quadVar] of sampled.quad.entries()) env.quad.set(name, quadVar);
   const sides = evaluateSides(field, step.lhs, step.rhs, env, sampler);
-  if (sides.kind === "unknown") return null;
-  if (sides.kind === "equal") return 0;
-  return relativeDelta(field, sides.lhs, sides.rhs);
+  if (sides.kind === "unknown") return "domain";
+  if (sides.kind === "equal") return { delta: 0 };
+  const delta = relativeDelta(field, sides.lhs, sides.rhs);
+  return Number.isFinite(delta) ? { delta } : "domain";
 }
 function relativeDelta(field, a, b) {
   const flat = (v) => v.k === "s" ? [field.toNumber(v.v)] : v.m.d.map((x) => field.toNumber(x));
@@ -10669,6 +10886,7 @@ var PROP_WORDS2 = {
   spd: "symmetric positive definite",
   psd: "symmetric positive semi definite",
   orth: "orthogonal",
+  rot: "a rotation",
   diag: "diagonal",
   triu: "upper triangular",
   tril: "lower triangular",
@@ -11328,7 +11546,7 @@ function shrinkCounterexample(ctx, lhs, rhs, defs, sizes, seed, budgetMs = 200) 
     if (info.ty.t !== "mat") continue;
     const r = dimSizeOf(ctx, info.ty.r, sizes);
     const c = dimSizeOf(ctx, info.ty.c, sizes);
-    const val = sampler.sample({ name, r, c, props: info.props });
+    const val = sampler.sample({ name, r, c, props: info.props, variety: 0 });
     if (val && val.k === "m") values.set(name, val);
   }
   for (const [name, value] of values.entries()) env.values.set(name, value);
@@ -11849,13 +12067,14 @@ function sampleSymbols(ctx, sh, setting, sampler) {
     const info = ctx.symbols.get(name);
     if (!info) continue;
     if (info.ty.t === "scalar") {
-      values.set(name, { k: "s", v: sampler.sampleScalar() });
+      const value = info.props.some((p) => p === "pos") ? sampler.samplePositiveScalar() : sampler.sampleScalar();
+      values.set(name, { k: "s", v: value });
       continue;
     }
     if (info.ty.t !== "mat") continue;
     const r = dimSizeOf(ctx, info.ty.r, setting);
     const c = dimSizeOf(ctx, info.ty.c, setting);
-    const val = sampler.sample({ name, r, c, props: info.props });
+    const val = sampler.sample({ name, r, c, props: info.props, variety: 0 });
     if (!val) return null;
     values.set(name, val);
   }
@@ -11864,21 +12083,23 @@ function sampleSymbols(ctx, sh, setting, sampler) {
 var ASSUMPTION_TRIES = [
   { props: ["sym"], text: "symmetric" },
   { props: ["orth"], text: "orthogonal" },
-  { props: ["diag"], text: "diagonal" }
+  { props: ["diag"], text: "diagonal" },
+  { props: ["pos"], text: "positive", scalar: true }
 ];
 function assumptionRepairs(sh) {
   const out = [];
   const candidates = [...sh.ctx.symbols.values()].filter(
-    (s2) => s2.ty.t === "mat" && s2.props.length === 0 && s2.source !== "preset"
+    (s2) => s2.props.length === 0 && s2.source !== "preset" && (s2.ty.t === "mat" || s2.ty.t === "scalar")
   );
   for (const symbol of candidates) {
     for (const attempt of ASSUMPTION_TRIES) {
       if (!canHave(sh.ctx, symbol.name, attempt.props)) continue;
       if (holdsWithProps(sh, symbol.name, attempt.props)) {
+        const decl = attempt.scalar ? `${symbol.name}: pos` : `${symbol.name}: ${attempt.props[0]} ${dimText(sh.ctx, symbol.name)}`;
         out.push({
           kind: "assumption",
           title: `holds if ${symbol.name} is ${attempt.text}`,
-          addDecl: `${symbol.name}: ${attempt.props[0]} ${dimText(sh.ctx, symbol.name)}`,
+          addDecl: decl,
           verified: true
         });
         return out;
@@ -11889,11 +12110,15 @@ function assumptionRepairs(sh) {
 }
 function canHave(ctx, name, props) {
   const info = ctx.symbols.get(name);
-  if (!info || info.ty.t !== "mat") return false;
+  if (!info) return false;
+  if (props.includes("pos")) return info.ty.t === "scalar";
+  if (info.ty.t !== "mat") return false;
   const r = info.ty.r;
   const c = info.ty.c;
   const square = typeof r === "number" && typeof c === "number" ? r === c : typeof r !== "number" && typeof c !== "number" && r.v === c.v;
-  if (props.includes("sym") || props.includes("orth") || props.includes("diag")) return square;
+  if (props.includes("sym") || props.includes("orth") || props.includes("rot") || props.includes("diag")) {
+    return square;
+  }
   return true;
 }
 function dimText(ctx, name) {
@@ -11982,13 +12207,14 @@ function residualRepairs(sh) {
   const terms = candidateTerms(sh);
   for (const [text, term] of terms) {
     const scale = matchesScale(field, term, samples);
-    if (scale === null) continue;
+    if (scale === null || scale === 0) continue;
     const patched = {
       k: "op",
       op: "add",
       args: [sh.rhs, term],
       span: sh.rhs.span
     };
+    if (renderNode(patched) === renderNode(sh.rhs)) continue;
     const verified = holdsWith(sh, "rhs", patched);
     out.push({
       kind: "residual",
@@ -12091,14 +12317,14 @@ function scaleText(scale) {
 // src/core/index.ts
 function explainAll(src, opts = {}, limit = 8, report) {
   const out = /* @__PURE__ */ new Map();
-  const parsed = parseForExplain(src, opts);
+  const parsed = analyzeSource(src, opts);
   const deadline = Date.now() + (opts.budgetMs ?? 4e3);
   let count = 0;
   for (const step of parsed.steps) {
     if (count >= limit) break;
     if (Date.now() > deadline) break;
     if (!step.lhs || !step.rhs) continue;
-    if (step.relation !== "=" && step.relation !== "shape") continue;
+    if (step.relation !== "=") continue;
     const verdict = report?.steps.find((s2) => s2.id === step.id)?.verdict;
     if (verdict && verdict !== "wrong" && verdict !== "shape") continue;
     out.set(step.id, explainStep(parsed, step, opts));
@@ -12106,62 +12332,8 @@ function explainAll(src, opts = {}, limit = 8, report) {
   }
   return out;
 }
-function parseForExplain(src, opts) {
-  const rows = splitRows(src);
-  const declared = parseDeclarations(opts.decls ?? "");
-  const preset = presetDecls(opts.preset);
-  const decls = [...preset];
-  const index2 = new Map(decls.map((d, i) => [d.name, i]));
-  for (const d of declared.decls) {
-    const at = index2.get(d.name);
-    if (at === void 0) {
-      index2.set(d.name, decls.length);
-      decls.push(d);
-    } else {
-      decls[at] = d;
-    }
-  }
-  const ctx = createContext(decls, opts.layout ?? "denominator");
-  const defs = /* @__PURE__ */ new Map();
-  const steps = [];
-  let previousRhs;
-  rows.forEach((row, rowIndex) => {
-    const parsed = parseRow(src, row.text, row.from, rowIndex);
-    if (parsed.prose || !parsed.parts.length) return;
-    for (const part of parsed.parts) {
-      if (part.relation === "=>" || part.relation === "<=>") {
-        steps.push({
-          id: `s${steps.length}`,
-          lhs: part.conclusion?.lhs,
-          rhs: part.conclusion?.rhs,
-          relation: part.relation,
-          defined: false
-        });
-        previousRhs = part.conclusion?.rhs;
-        continue;
-      }
-      const lhs = part.lhs ?? previousRhs;
-      const rhs = part.rhs;
-      const bareLhs = lhs?.k === "sym" ? lhs.name : void 0;
-      const isDefinition = part.relation === ":=" || bareLhs !== void 0 && !ctx.decls.has(bareLhs) && !defs.has(bareLhs);
-      steps.push({
-        id: `s${steps.length}`,
-        lhs,
-        rhs,
-        relation: part.relation,
-        defined: isDefinition
-      });
-      previousRhs = rhs;
-      if (isDefinition && bareLhs && rhs) {
-        defs.set(bareLhs, rhs);
-        ctx.defs.set(bareLhs, rhs);
-      }
-    }
-  });
-  return { ctx, defs, steps };
-}
-function explainStep(parsed, step, opts) {
-  const { ctx, defs } = parsed;
+function explainStep(source, step, opts) {
+  const { ctx, defs } = source;
   if (!step.lhs || !step.rhs) return { fixes: [] };
   inferType(ctx, step.lhs);
   inferType(ctx, step.rhs);

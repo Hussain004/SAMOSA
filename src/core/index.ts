@@ -5,7 +5,7 @@
  * three of them always give the same verdict for the same input.
  */
 
-export { check, sizeSettings, ENGINE_VERSION, DEFAULT_SEED } from './verdict.ts';
+export { check, sizeSettings, ENGINE_VERSION, DEFAULT_SEED, analyzeSource } from './verdict.ts';
 export type {
   CheckOptions,
   Counterexample,
@@ -17,6 +17,7 @@ export type {
   StepResult,
   Verdict,
 } from './verdict.ts';
+export type { Source, Step } from './verdict.ts';
 
 export { parseRow, Parser, classifySuperscript, findRelations } from './parse.ts';
 export { tokenize, renderTokens } from './lex.ts';
@@ -34,15 +35,12 @@ export { renderNode } from './render.ts';
 export { shrinkCounterexample } from './shrink.ts';
 export type { ShrunkInstance } from './shrink.ts';
 
-import { check, type CheckOptions, type Fix, type Report, type StepResult } from './verdict.ts';
+import { analyzeSource, check, type CheckOptions, type Fix, type Report, type Source, type Step, type StepResult } from './verdict.ts';
 import { parseRow } from './parse.ts';
 import { splitRows } from './steps.ts';
-import { parseDeclarations } from './decl.ts';
-import { presetDecls } from './presets.ts';
-import { createContext, inferType } from './types.ts';
+import { inferType } from './types.ts';
 import { shrinkCounterexample, type ShrunkInstance } from './shrink.ts';
 import { repairs } from './repair.ts';
-import type { Node } from './ir.ts';
 import { collectDimVarsFor } from './dims.ts';
 
 /**
@@ -92,7 +90,7 @@ export function explain(
   opts: CheckOptions = {},
   report?: Report,
 ): Explanation {
-  const parsed = parseForExplain(src, opts);
+  const parsed = analyzeSource(src, opts);
   const step = parsed.steps.find((s) => s.id === stepId);
   if (!step || !step.lhs || !step.rhs) return { fixes: [] };
   // A row that holds has nothing to repair, so no fixes are offered for it.
@@ -114,14 +112,14 @@ export function explainAll(
   report?: Report,
 ): Map<string, Explanation> {
   const out = new Map<string, Explanation>();
-  const parsed = parseForExplain(src, opts);
+  const parsed = analyzeSource(src, opts);
   const deadline = Date.now() + (opts.budgetMs ?? 4000);
   let count = 0;
   for (const step of parsed.steps) {
     if (count >= limit) break;
     if (Date.now() > deadline) break;
     if (!step.lhs || !step.rhs) continue;
-    if (step.relation !== '=' && step.relation !== 'shape') continue;
+    if (step.relation !== '=') continue;
     const verdict = report?.steps.find((s) => s.id === step.id)?.verdict;
     if (verdict && verdict !== 'wrong' && verdict !== 'shape') continue;
     out.set(step.id, explainStep(parsed, step, opts));
@@ -130,76 +128,9 @@ export function explainAll(
   return out;
 }
 
-interface ParsedSource {
-  ctx: ReturnType<typeof createContext>;
-  defs: Map<string, Node>;
-  steps: Array<{ id: string; lhs?: Node; rhs?: Node; relation: string; defined: boolean }>;
-}
-
-/** Parses a source into the steps the explanations work on. */
-function parseForExplain(src: string, opts: CheckOptions): ParsedSource {
-  const rows = splitRows(src);
-  const declared = parseDeclarations(opts.decls ?? '');
-  const preset = presetDecls(opts.preset);
-  const decls = [...preset];
-  const index = new Map(decls.map((d, i) => [d.name, i]));
-  for (const d of declared.decls) {
-    const at = index.get(d.name);
-    if (at === undefined) {
-      index.set(d.name, decls.length);
-      decls.push(d);
-    } else {
-      decls[at] = d;
-    }
-  }
-
-  const ctx = createContext(decls, opts.layout ?? 'denominator');
-  const defs = new Map<string, Node>();
-  const steps: ParsedSource['steps'] = [];
-  let previousRhs: Node | undefined;
-
-  rows.forEach((row, rowIndex) => {
-    const parsed = parseRow(src, row.text, row.from, rowIndex);
-    if (parsed.prose || !parsed.parts.length) return;
-    for (const part of parsed.parts) {
-      if (part.relation === '=>' || part.relation === '<=>') {
-        steps.push({
-          id: `s${steps.length}`,
-          lhs: part.conclusion?.lhs,
-          rhs: part.conclusion?.rhs,
-          relation: part.relation,
-          defined: false,
-        });
-        previousRhs = part.conclusion?.rhs;
-        continue;
-      }
-      const lhs = part.lhs ?? previousRhs;
-      const rhs = part.rhs;
-      const bareLhs = lhs?.k === 'sym' ? lhs.name : undefined;
-      const isDefinition =
-        part.relation === ':=' ||
-        (bareLhs !== undefined && !ctx.decls.has(bareLhs) && !defs.has(bareLhs));
-      steps.push({
-        id: `s${steps.length}`,
-        lhs,
-        rhs,
-        relation: part.relation,
-        defined: isDefinition,
-      });
-      previousRhs = rhs;
-      if (isDefinition && bareLhs && rhs) {
-        defs.set(bareLhs, rhs);
-        ctx.defs.set(bareLhs, rhs);
-      }
-    }
-  });
-
-  return { ctx, defs, steps };
-}
-
 /** The fixes and the counterexample of one step. */
-function explainStep(parsed: ParsedSource, step: ParsedSource['steps'][number], opts: CheckOptions): Explanation {
-  const { ctx, defs } = parsed;
+function explainStep(source: Source, step: Step, opts: CheckOptions): Explanation {
+  const { ctx, defs } = source;
   if (!step.lhs || !step.rhs) return { fixes: [] };
 
   inferType(ctx, step.lhs);

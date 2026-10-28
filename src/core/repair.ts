@@ -418,13 +418,16 @@ function sampleSymbols(
     const info = ctx.symbols.get(name);
     if (!info) continue;
     if (info.ty.t === 'scalar') {
-      values.set(name, { k: 's', v: sampler.sampleScalar() });
+      const value = info.props.some((p) => p === 'pos')
+        ? sampler.samplePositiveScalar()
+        : sampler.sampleScalar();
+      values.set(name, { k: 's', v: value });
       continue;
     }
     if (info.ty.t !== 'mat') continue;
     const r = dimSizeOf(ctx, info.ty.r, setting);
     const c = dimSizeOf(ctx, info.ty.c, setting);
-    const val = sampler.sample({ name, r, c, props: info.props });
+    const val = sampler.sample({ name, r, c, props: info.props, variety: 0 });
     if (!val) return null;
     values.set(name, val);
   }
@@ -433,10 +436,11 @@ function sampleSymbols(
 
 // ------------------------------------------------------------ assumptions
 
-const ASSUMPTION_TRIES: Array<{ props: Prop[]; text: string }> = [
+const ASSUMPTION_TRIES: Array<{ props: Prop[]; text: string; scalar?: boolean }> = [
   { props: ['sym'], text: 'symmetric' },
   { props: ['orth'], text: 'orthogonal' },
   { props: ['diag'], text: 'diagonal' },
+  { props: ['pos'], text: 'positive', scalar: true },
 ];
 
 /**
@@ -447,21 +451,27 @@ const ASSUMPTION_TRIES: Array<{ props: Prop[]; text: string }> = [
  * into a lie.
  *
  * A property that the shape cannot have is never offered: a matrix that is
- * not square cannot be symmetric, so the suggestion would be nonsense.
+ * not square cannot be symmetric, so the suggestion would be nonsense. A
+ * positive scalar is offered for steps that failed on a domain error over a
+ * sign (review 3.4): a log or a square root of a negative sample.
  */
 function assumptionRepairs(sh: RepairCtx): Fix[] {
   const out: Fix[] = [];
   const candidates = [...sh.ctx.symbols.values()].filter(
-    (s) => s.ty.t === 'mat' && s.props.length === 0 && s.source !== 'preset',
+    (s) => s.props.length === 0 && s.source !== 'preset' && (s.ty.t === 'mat' || s.ty.t === 'scalar'),
   );
   for (const symbol of candidates) {
     for (const attempt of ASSUMPTION_TRIES) {
       if (!canHave(sh.ctx, symbol.name, attempt.props)) continue;
       if (holdsWithProps(sh, symbol.name, attempt.props)) {
+        const decl =
+          attempt.scalar
+            ? `${symbol.name}: pos`
+            : `${symbol.name}: ${attempt.props[0]} ${dimText(sh.ctx, symbol.name)}`;
         out.push({
           kind: 'assumption',
           title: `holds if ${symbol.name} is ${attempt.text}`,
-          addDecl: `${symbol.name}: ${attempt.props[0]} ${dimText(sh.ctx, symbol.name)}`,
+          addDecl: decl,
           verified: true,
         });
         return out;
@@ -471,16 +481,26 @@ function assumptionRepairs(sh: RepairCtx): Fix[] {
   return out;
 }
 
-/** Can a matrix of this shape have this property at all? */
+/** Can a symbol of this type have this property at all? */
 function canHave(ctx: TypeContext, name: string, props: Prop[]): boolean {
   const info = ctx.symbols.get(name);
-  if (!info || info.ty.t !== 'mat') return false;
+  if (!info) return false;
+  // positivity is a property of a scalar, not of a matrix
+  if (props.includes('pos')) return info.ty.t === 'scalar';
+  if (info.ty.t !== 'mat') return false;
   const r = info.ty.r;
   const c = info.ty.c;
   const square =
     typeof r === 'number' && typeof c === 'number' ? r === c : typeof r !== 'number' && typeof c !== 'number' && r.v === c.v;
-  // symmetry, orthogonality and diagonality all need a square matrix
-  if (props.includes('sym') || props.includes('orth') || props.includes('diag')) return square;
+  // symmetry, orthogonality, rotations and diagonality all need a square matrix
+  if (
+    props.includes('sym') ||
+    props.includes('orth') ||
+    props.includes('rot') ||
+    props.includes('diag')
+  ) {
+    return square;
+  }
   return true;
 }
 
@@ -596,7 +616,7 @@ function residualRepairs(sh: RepairCtx): Fix[] {
 
   for (const [text, term] of terms) {
     const scale = matchesScale(field, term, samples);
-    if (scale === null) continue;
+    if (scale === null || scale === 0) continue;
     // the patched row is checked like any other candidate, so the fix that is
     // offered is one that has been seen to hold
     const patched: Node = {
@@ -605,6 +625,8 @@ function residualRepairs(sh: RepairCtx): Fix[] {
       args: [sh.rhs, term],
       span: sh.rhs.span,
     };
+    // an edit that does not change the row is no fix at all
+    if (renderNode(patched) === renderNode(sh.rhs)) continue;
     const verified = holdsWith(sh, 'rhs', patched);
     out.push({
       kind: 'residual',
