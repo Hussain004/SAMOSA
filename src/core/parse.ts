@@ -293,7 +293,7 @@ export class Parser {
     let sub: string | null = null;
     let labelSup: string | null = null;
     let spanEnd = base.span.to;
-    const scripts: Array<{ kind: 'transpose' | 'inverse' | 'inverseT' | 'power'; text?: string; to: number }> = [];
+    const scripts: Array<{ kind: 'transpose' | 'inverse' | 'inverseT' | 'sqrtm' | 'invSqrtm' | 'power'; text?: string; to: number }> = [];
 
     // the scripts may come in either order, so P^\kappa_{B_R} works
     for (;;) {
@@ -353,6 +353,10 @@ export class Parser {
         node = { k: 'op', op: 'inv', args: [node], span };
       } else if (script.kind === 'inverseT') {
         node = { k: 'op', op: 'invT', args: [node], span };
+      } else if (script.kind === 'sqrtm') {
+        node = { k: 'op', op: 'sqrtm', args: [node], span };
+      } else if (script.kind === 'invSqrtm') {
+        node = { k: 'op', op: 'inv', args: [{ k: 'op', op: 'sqrtm', args: [node], span }], span };
       } else {
         const exp = { k: 'num' as const, value: ratFromDecimal(script.text ?? '2'), span: { from: node.span.from, to: script.to } };
         node = { k: 'op', op: 'pow', args: [node, exp], span };
@@ -523,6 +527,11 @@ export class Parser {
           node = { k: 'op', op: 'inv', args: [node], span: { from: node.span.from, to: sup.span.to } };
         } else if (classified.kind === 'inverseT') {
           node = { k: 'op', op: 'invT', args: [node], span: { from: node.span.from, to: sup.span.to } };
+        } else if (classified.kind === 'sqrtm') {
+          node = { k: 'op', op: 'sqrtm', args: [node], span: { from: node.span.from, to: sup.span.to } };
+        } else if (classified.kind === 'invSqrtm') {
+          const root: Node = { k: 'op', op: 'sqrtm', args: [node], span: sup.span };
+          node = { k: 'op', op: 'inv', args: [root], span: { from: node.span.from, to: sup.span.to } };
         } else if (classified.kind === 'power') {
           const exp = { k: 'num' as const, value: ratFromDecimal(classified.powerText), span: sup.span };
           node = { k: 'op', op: 'pow', args: [node, exp], span: { from: node.span.from, to: sup.span.to } };
@@ -1644,6 +1653,8 @@ type SupKind =
   | { kind: 'transpose' }
   | { kind: 'inverse' }
   | { kind: 'inverseT' }
+  | { kind: 'sqrtm' }
+  | { kind: 'invSqrtm' }
   | { kind: 'power'; powerText: string }
   | { kind: 'label' };
 
@@ -1654,6 +1665,10 @@ export function classifySuperscript(text: string): SupKind {
   }
   if (s === '-1') return { kind: 'inverse' };
   if (s === '-\\top' || s === '-T' || s === '-\\mathsf{T}') return { kind: 'inverseT' };
+  // a half power is a square root, written as 1/2, \frac{1}{2} or \frac12
+  // (review 4.2). The negative half power is the inverse of the square root.
+  if (s === '1/2' || s === '\\frac{1}{2}' || s === '\\frac12') return { kind: 'sqrtm' };
+  if (s === '-1/2' || s === '-\\frac{1}{2}' || s === '-\\frac12') return { kind: 'invSqrtm' };
   if (/^\d+$/.test(s)) return { kind: 'power', powerText: s };
   return { kind: 'label' };
 }

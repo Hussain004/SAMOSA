@@ -20,6 +20,7 @@ import {
   transpose,
   vec,
   zeros,
+  DomainError,
   type Mat,
 } from './linalg.ts';
 import type { Node } from './ir.ts';
@@ -284,7 +285,7 @@ function evalOp<T>(f: Field<T>, op: string, args: Val<T>[], _env: EvalEnv<T>): V
     }
     case 'pow': {
       const a = args[0];
-      const k = nodeExponent(args[1]);
+      const k = nodeExponent(f, args[1]);
       if (isScalarVal(a)) {
         let acc = f.one;
         for (let i = 0; i < k; i++) acc = f.mul(acc, a.v);
@@ -350,16 +351,29 @@ function evalOp<T>(f: Field<T>, op: string, args: Val<T>[], _env: EvalEnv<T>): V
       return { k: 'm', m: requireMatrix(a, 'an absolute value') };
     }
     case 'sqrtm': {
-      const a = requireMatrix(args[0], 'a matrix square root');
-      return { k: 'm', m: matPow(f, a, 0) };
+      // a scalar square root is exact element wise. A matrix square root is
+      // not available yet (review 4.2), and the honest answer is a domain
+      // error, never the identity that the old matPow(f, a, 0) returned.
+      const a = args[0];
+      if (isScalarVal(a)) return scalar(f.sqrt(a.v));
+      requireMatrix(a, 'a matrix square root');
+      throw new DomainError('the matrix square root is not available yet');
     }
     default:
       throw new EvalError(`unknown operation ${op}`);
   }
 }
 
-function nodeExponent<T>(val: Val<T>): number {
-  if (isScalarVal(val)) return Math.max(0, Math.round(Number(val.v)));
+function nodeExponent<T>(field: Field<T>, val: Val<T>): number {
+  if (isScalarVal(val)) {
+    // over a field whose values are plain numbers the direct read works;
+    // over the dual and hyperdual fields the value is an object, and the
+    // field's own toNumber reads the base value (review 7: the NaN made
+    // every power evaluate to one, which zeroed every tangent through it)
+    const direct = Number(val.v);
+    if (Number.isFinite(direct)) return Math.max(0, Math.round(direct));
+    return Math.max(0, Math.round(field.toNumber(val.v)));
+  }
   return 2;
 }
 

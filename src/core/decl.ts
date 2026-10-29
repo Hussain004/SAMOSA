@@ -92,6 +92,7 @@ const PROP_WORDS: Record<string, Prop> = {
   unit: 'unit',
   stoch: 'stoch',
   stochastic: 'stoch',
+  ones: 'ones',
   pos: 'pos',
   positive: 'pos',
   int: 'int',

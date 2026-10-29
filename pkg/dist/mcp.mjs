@@ -3299,7 +3299,7 @@ function evalOp(f, op, args, _env) {
     }
     case "pow": {
       const a = args[0];
-      const k = nodeExponent(args[1]);
+      const k = nodeExponent(f, args[1]);
       if (isScalarVal(a)) {
         let acc = f.one;
         for (let i2 = 0; i2 < k; i2++) acc = f.mul(acc, a.v);
@@ -3365,15 +3365,21 @@ function evalOp(f, op, args, _env) {
       return { k: "m", m: requireMatrix(a, "an absolute value") };
     }
     case "sqrtm": {
-      const a = requireMatrix(args[0], "a matrix square root");
-      return { k: "m", m: matPow(f, a, 0) };
+      const a = args[0];
+      if (isScalarVal(a)) return scalar(f.sqrt(a.v));
+      requireMatrix(a, "a matrix square root");
+      throw new DomainError("the matrix square root is not available yet");
     }
     default:
       throw new EvalError(`unknown operation ${op}`);
   }
 }
-function nodeExponent(val) {
-  if (isScalarVal(val)) return Math.max(0, Math.round(Number(val.v)));
+function nodeExponent(field, val) {
+  if (isScalarVal(val)) {
+    const direct = Number(val.v);
+    if (Number.isFinite(direct)) return Math.max(0, Math.round(direct));
+    return Math.max(0, Math.round(field.toNumber(val.v)));
+  }
   return 2;
 }
 function evalCall(f, fn, args, _env) {
@@ -3709,15 +3715,19 @@ var Sampler = class {
   sampleUnit(r, c) {
     const f = this.field;
     if (f instanceof GFpField) {
-      const t = this.sampleGeneral(c - 1, 1);
-      let sq = f.zero;
-      for (const x2 of t.d) sq = f.add(sq, f.mul(x2, x2));
-      const den = f.add(sq, f.one);
-      const inv = f.inv(den);
+      const k = Math.max(r - 1, 0);
+      const t = this.sampleGeneral(k, c);
+      const sq = new Array(c).fill(f.zero);
+      const inv = new Array(c);
+      for (let j = 0; j < c; j++) {
+        let s2 = f.zero;
+        for (let i2 = 0; i2 < k; i2++) s2 = f.add(s2, f.mul(t.d[i2 * c + j], t.d[i2 * c + j]));
+        sq[j] = s2;
+        inv[j] = f.inv(f.add(s2, f.one));
+      }
       return this.mat(r, c, (i2, j) => {
-        if (c === 1) return f.one;
-        if (j === c - 1) return f.mul(f.sub(sq, f.one), inv);
-        return f.mul(f.mul(f.fromRational(2, 1), t.d[i2 * t.c + j]), inv);
+        if (i2 === r - 1) return f.mul(f.sub(sq[j], f.one), inv[j]);
+        return f.mul(f.mul(f.fromRational(2, 1), t.d[i2 * c + j]), inv[j]);
       });
     }
     const v = this.sampleGeneral(r, c);
@@ -4616,6 +4626,10 @@ var Parser = class _Parser {
         node = { k: "op", op: "inv", args: [node], span };
       } else if (script.kind === "inverseT") {
         node = { k: "op", op: "invT", args: [node], span };
+      } else if (script.kind === "sqrtm") {
+        node = { k: "op", op: "sqrtm", args: [node], span };
+      } else if (script.kind === "invSqrtm") {
+        node = { k: "op", op: "inv", args: [{ k: "op", op: "sqrtm", args: [node], span }], span };
       } else {
         const exp2 = { k: "num", value: ratFromDecimal(script.text ?? "2"), span: { from: node.span.from, to: script.to } };
         node = { k: "op", op: "pow", args: [node, exp2], span };
@@ -4762,6 +4776,11 @@ var Parser = class _Parser {
           node = { k: "op", op: "inv", args: [node], span: { from: node.span.from, to: sup.span.to } };
         } else if (classified.kind === "inverseT") {
           node = { k: "op", op: "invT", args: [node], span: { from: node.span.from, to: sup.span.to } };
+        } else if (classified.kind === "sqrtm") {
+          node = { k: "op", op: "sqrtm", args: [node], span: { from: node.span.from, to: sup.span.to } };
+        } else if (classified.kind === "invSqrtm") {
+          const root = { k: "op", op: "sqrtm", args: [node], span: sup.span };
+          node = { k: "op", op: "inv", args: [root], span: { from: node.span.from, to: sup.span.to } };
         } else if (classified.kind === "power") {
           const exp2 = { k: "num", value: ratFromDecimal(classified.powerText), span: sup.span };
           node = { k: "op", op: "pow", args: [node, exp2], span: { from: node.span.from, to: sup.span.to } };
@@ -5755,6 +5774,8 @@ function classifySuperscript(text) {
   }
   if (s === "-1") return { kind: "inverse" };
   if (s === "-\\top" || s === "-T" || s === "-\\mathsf{T}") return { kind: "inverseT" };
+  if (s === "1/2" || s === "\\frac{1}{2}" || s === "\\frac12") return { kind: "sqrtm" };
+  if (s === "-1/2" || s === "-\\frac{1}{2}" || s === "-\\frac12") return { kind: "invSqrtm" };
   if (/^\d+$/.test(s)) return { kind: "power", powerText: s };
   return { kind: "label" };
 }
@@ -6292,6 +6313,7 @@ var PROP_WORDS = {
   unit: "unit",
   stoch: "stoch",
   stochastic: "stoch",
+  ones: "ones",
   pos: "pos",
   positive: "pos",
   int: "int",

@@ -216,15 +216,24 @@ export class Sampler<T> {
     const f = this.field;
     if (f instanceof GFpField) {
       // stereographic: (2t, ||t||^2 - 1) / (||t||^2 + 1) on the unit sphere
-      const t: Mat<T> = this.sampleGeneral(c - 1, 1);
-      let sq: T = f.zero as T;
-      for (const x of t.d) sq = f.add(sq, f.mul(x, x));
-      const den = f.add(sq, f.one);
-      const inv = f.inv(den);
+      // (review 4.1). A column vector is stereographed down the rows: t has
+      // length r - 1 and the last entry takes the pole. Every column of a
+      // matrix is stereographed over its own tangent vector, so each one is
+      // exactly unit over GF(p):
+      // ||u||^2 = (4||t||^2 + (||t||^2 - 1)^2) / (||t||^2 + 1)^2 = 1.
+      const k = Math.max(r - 1, 0);
+      const t = this.sampleGeneral(k, c);
+      const sq: T[] = new Array(c).fill(f.zero);
+      const inv: T[] = new Array(c);
+      for (let j = 0; j < c; j++) {
+        let s: T = f.zero as T;
+        for (let i = 0; i < k; i++) s = f.add(s, f.mul(t.d[i * c + j], t.d[i * c + j]));
+        sq[j] = s;
+        inv[j] = f.inv(f.add(s, f.one));
+      }
       return this.mat(r, c, (i, j) => {
-        if (c === 1) return f.one;
-        if (j === c - 1) return f.mul(f.sub(sq, f.one), inv);
-        return f.mul(f.mul(f.fromRational(2, 1), t.d[i * t.c + j]), inv);
+        if (i === r - 1) return f.mul(f.sub(sq[j], f.one), inv[j]);
+        return f.mul(f.mul(f.fromRational(2, 1), t.d[i * c + j]), inv[j]);
       });
     }
     const v = this.sampleGeneral(r, c);
