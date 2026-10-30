@@ -4813,6 +4813,44 @@ function matPow(f, a, k) {
   }
   return result;
 }
+function matSqrtm(f, a) {
+  if (a.r !== a.c) throw new DomainError("square root of a non square matrix");
+  const n = a.r;
+  if (n === 0) return a;
+  let x = a;
+  let y = identity(n, f.one, f.zero);
+  const half = f.fromRational(1, 2);
+  let diff = Infinity;
+  let scale = 0;
+  let prevRatio = Infinity;
+  let stalled = 0;
+  for (let i = 0; i < 120; i++) {
+    const xi = matInv(f, x);
+    const yi = matInv(f, y);
+    const nx = matScale(f, half, matAdd(f, x, yi));
+    const ny = matScale(f, half, matAdd(f, y, xi));
+    diff = 0;
+    scale = 0;
+    for (let k = 0; k < n * n; k++) {
+      const step = f.toNumber(f.abs(f.sub(nx.d[k], x.d[k])));
+      diff = Math.max(diff, step);
+      scale = Math.max(scale, Math.abs(f.toNumber(nx.d[k])));
+    }
+    x = nx;
+    y = ny;
+    const ratio = diff / Math.max(scale, 1);
+    if (ratio <= 1e-42) return x;
+    if (ratio <= 1e-12 && ratio >= 0.5 * prevRatio) {
+      stalled += 1;
+      if (stalled >= 2) return x;
+    } else {
+      stalled = 0;
+    }
+    prevRatio = ratio;
+  }
+  if (diff / Math.max(scale, 1) <= 1e-36) return x;
+  throw new DomainError("the matrix square root did not converge");
+}
 
 // src/core/fields/dual.ts
 var DualField = class {
@@ -5526,8 +5564,7 @@ function evalOp(f, op, args, _env) {
     case "sqrtm": {
       const a = args[0];
       if (isScalarVal(a)) return scalar(f.sqrt(a.v));
-      requireMatrix(a, "a matrix square root");
-      throw new DomainError("the matrix square root is not available yet");
+      return { k: "m", m: matSqrtm(f, requireMatrix(a, "a matrix square root")) };
     }
     default:
       throw new EvalError(`unknown operation ${op}`);
@@ -5544,10 +5581,13 @@ function nodeExponent(field, val) {
 function evalCall(f, fn, args, _env) {
   const a0 = args[0];
   switch (fn) {
+    case "sqrt": {
+      if (isMatrixVal(a0)) return { k: "m", m: matSqrtm(f, a0.m) };
+      return scalar(f.sqrt(requireScalar(a0, "a square root")));
+    }
     case "exp":
     case "log":
     case "ln":
-    case "sqrt":
     case "sin":
     case "cos":
     case "tan":
@@ -5557,7 +5597,6 @@ function evalCall(f, fn, args, _env) {
       const unary = (x) => {
         if (fn === "exp") return f.exp(x);
         if (fn === "log" || fn === "ln") return f.log(x);
-        if (fn === "sqrt") return f.sqrt(x);
         if (fn === "sin") return f.sin(x);
         if (fn === "cos") return f.cos(x);
         if (fn === "tan") return f.div(f.sin(x), f.cos(x));
@@ -10426,7 +10465,11 @@ function freeVariables(step) {
 }
 function defNameOf(lhs, ctx) {
   if (!lhs) return void 0;
-  if (lhs.k === "sym") return lhs.name;
+  if (lhs.k === "sym") {
+    const caret = lhs.name.lastIndexOf("^");
+    if (caret >= 0 && /^[+-]?[\d.]/.test(lhs.name.slice(caret + 1))) return void 0;
+    return lhs.name;
+  }
   if (lhs.k === "call") {
     const decl = ctx.decls.get(lhs.fn);
     if (decl && decl.kind === "function") return lhs.fn;

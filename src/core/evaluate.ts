@@ -20,7 +20,7 @@ import {
   transpose,
   vec,
   zeros,
-  DomainError,
+  matSqrtm,
   type Mat,
 } from './linalg.ts';
 import type { Node } from './ir.ts';
@@ -352,12 +352,11 @@ function evalOp<T>(f: Field<T>, op: string, args: Val<T>[], _env: EvalEnv<T>): V
     }
     case 'sqrtm': {
       // a scalar square root is exact element wise. A matrix square root is
-      // not available yet (review 4.2), and the honest answer is a domain
-      // error, never the identity that the old matPow(f, a, 0) returned.
+      // the Denman-Beavers iteration (review 4.2), never again the identity
+      // that the old matPow(f, a, 0) returned.
       const a = args[0];
       if (isScalarVal(a)) return scalar(f.sqrt(a.v));
-      requireMatrix(a, 'a matrix square root');
-      throw new DomainError('the matrix square root is not available yet');
+      return { k: 'm', m: matSqrtm(f, requireMatrix(a, 'a matrix square root')) };
     }
     default:
       throw new EvalError(`unknown operation ${op}`);
@@ -380,10 +379,16 @@ function nodeExponent<T>(field: Field<T>, val: Val<T>): number {
 function evalCall<T>(f: Field<T>, fn: string, args: Val<T>[], _env: EvalEnv<T>): Val<T> {
   const a0 = args[0];
   switch (fn) {
+    case 'sqrt': {
+      // the square root of a matrix is the matrix square root, not the
+      // entrywise root (review 4.2): the Gaussian and Mahalanobis reading
+      // of sqrt(Sigma) sqrt(Sigma) = Sigma is the one people write
+      if (isMatrixVal(a0)) return { k: 'm', m: matSqrtm(f, a0.m) };
+      return scalar(f.sqrt(requireScalar(a0, 'a square root')));
+    }
     case 'exp':
     case 'log':
     case 'ln':
-    case 'sqrt':
     case 'sin':
     case 'cos':
     case 'tan':
@@ -394,7 +399,6 @@ function evalCall<T>(f: Field<T>, fn: string, args: Val<T>[], _env: EvalEnv<T>):
       const unary = (x: T): T => {
         if (fn === 'exp') return f.exp(x);
         if (fn === 'log' || fn === 'ln') return f.log(x);
-        if (fn === 'sqrt') return f.sqrt(x);
         if (fn === 'sin') return f.sin(x);
         if (fn === 'cos') return f.cos(x);
         if (fn === 'tan') return f.div(f.sin(x), f.cos(x));

@@ -1161,7 +1161,15 @@ function freeVariables(step: Step): Set<string> {
 /** The name a definition binds, whether it is a symbol or a function. */
 function defNameOf(lhs: Node | undefined, ctx: TypeContext): string | undefined {
   if (!lhs) return undefined;
-  if (lhs.k === 'sym') return lhs.name;
+  if (lhs.k === 'sym') {
+    // a powered symbol, like \Sigma^{3/2}, is not a fresh name (review 4.2):
+    // a row that assigns to one is a claim about it, not a definition of it.
+    // A decorative label, like the star of w^\star, is part of the name, and
+    // the corpus defines w^\star, so those stay definable.
+    const caret = lhs.name.lastIndexOf('^');
+    if (caret >= 0 && /^[+-]?[\d.]/.test(lhs.name.slice(caret + 1))) return undefined;
+    return lhs.name;
+  }
   if (lhs.k === 'call') {
     const decl = ctx.decls.get(lhs.fn);
     if (decl && decl.kind === 'function') return lhs.fn;

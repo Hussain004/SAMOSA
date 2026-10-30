@@ -263,6 +263,70 @@ export function matPow<T>(f: Field<T>, a: Mat<T>, k: number): Mat<T> {
   return result;
 }
 
+/**
+ * The matrix square root, by the Denman-Beavers iteration (review 4.2).
+ *
+ * X and Y start at A and I, and the averages X' = (X + Y^-1)/2 and
+ * Y' = (Y + X^-1)/2 converge quadratically to A^{1/2} and A^{-1/2}. The
+ * iteration is written over the field, so a gradient through a square root
+ * comes out of the same dual arithmetic as everything else.
+ *
+ * It needs an order to measure convergence, so over GF(p) it refuses: the
+ * planner already sends a square root to numeric mode, and the honest
+ * answer anywhere else is a domain error.
+ */
+export function matSqrtm<T>(f: Field<T>, a: Mat<T>): Mat<T> {
+  if (a.r !== a.c) throw new DomainError('square root of a non square matrix');
+  const n = a.r;
+  if (n === 0) return a;
+  let x = a;
+  let y = identity<T>(n, f.one, f.zero);
+  const half = f.fromRational(1, 2);
+  let diff = Infinity;
+  let scale = 0;
+  let prevRatio = Infinity;
+  let stalled = 0;
+  for (let i = 0; i < 120; i++) {
+    // the simultaneous update: both halves read the old pair
+    const xi = matInv(f, x);
+    const yi = matInv(f, y);
+    const nx = matScale(f, half, matAdd(f, x, yi));
+    const ny = matScale(f, half, matAdd(f, y, xi));
+    // X and Y head for A^{1/2} and A^{-1/2}, which do not coincide, so the
+    // convergence test is the step X just took, not the gap between them.
+    // The step is measured against the size of X and the difference is
+    // taken in the field: subtracting the rounded doubles of two near equal
+    // entries would lose the step entirely
+    diff = 0;
+    scale = 0;
+    for (let k = 0; k < n * n; k++) {
+      const step = f.toNumber(f.abs(f.sub(nx.d[k], x.d[k])));
+      diff = Math.max(diff, step);
+      scale = Math.max(scale, Math.abs(f.toNumber(nx.d[k])));
+    }
+    x = nx;
+    y = ny;
+    const ratio = diff / Math.max(scale, 1);
+    if (ratio <= 1e-42) return x;
+    // the convergence is quadratic, so a step that stops shrinking while
+    // already far below anything the verdict measures is the field's own
+    // rounding floor, not a stuck iteration: float64 bottoms out around
+    // 1e-16 relative, an order the screening pass never has to see past
+    // (review 4.2)
+    if (ratio <= 1e-12 && ratio >= 0.5 * prevRatio) {
+      stalled += 1;
+      if (stalled >= 2) return x;
+    } else {
+      stalled = 0;
+    }
+    prevRatio = ratio;
+  }
+  // the precision floor: still far under the verdict gate, so it earns a
+  // checkmark, but only just
+  if (diff / Math.max(scale, 1) <= 1e-36) return x;
+  throw new DomainError('the matrix square root did not converge');
+}
+
 /** Adjugate (classical adjoint) of a square matrix. */
 export function matAdj<T>(f: Field<T>, a: Mat<T>): Mat<T> {
   const n = a.r;

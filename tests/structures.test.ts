@@ -49,9 +49,13 @@ const TRUE_FRIENDS: Array<Item & { holds?: boolean; pending?: string }> = [
   { name: 'the trace of a triangular matrix survives a transpose', src: String.raw`\operatorname{tr}(L) = \operatorname{tr}(L^\top)`, decls: 'L: tril n×n', holds: true },
   { name: 'the square root of a square is the number, for a positive one', src: String.raw`\sqrt{x^2} = x`, decls: 'x: pos', holds: true },
   { name: 'the log of a product splits, for positive ones', src: String.raw`\log(x y) = \log x + \log y`, decls: 'x: pos; y: pos', holds: true },
+  // the matrix square root, after review 4.2: the half powers read as the
+  // root, the root call on a matrix is the root, and a root row is a claim
+  { name: 'the matrix square root squares to the matrix', src: String.raw`\Sigma^{1/2} \Sigma^{1/2} = \Sigma`, decls: '\\Sigma: spd n', holds: true },
+  { name: 'the square root call on a matrix is the matrix square root', src: String.raw`\sqrt{\Sigma} \sqrt{\Sigma} = \Sigma`, decls: '\\Sigma: spd n', holds: true },
+  { name: 'the negative half power whitens', src: String.raw`\Sigma^{-1/2} \Sigma \Sigma^{-1/2} = I`, decls: '\\Sigma: spd n', holds: true },
   // the ones that wait on a structure parser still must never fail; the
   // skip name carries the review section that un-skips them
-  { name: 'the matrix square root squares to the matrix', src: String.raw`\Sigma^{1/2} \Sigma^{1/2} = \Sigma`, decls: '\\Sigma: spd n' },
   {
     name: 'the Schur determinant',
     src: String.raw`\det\begin{pmatrix} A & B \\ C & D \end{pmatrix} = \det(A)\det(D - C A^{-1} B)`,
@@ -99,6 +103,7 @@ const FALSE_FRIENDS: Array<Item & { caught?: boolean }> = [
   { name: 'the log of a square is not twice the log, for a scalar', src: String.raw`\log(x^2) = 2 \log x`, decls: 'x: scalar' },
   { name: 'the exponential does not split a sum of scalars', src: String.raw`e^{a + b} = e^a + e^b`, decls: 'a: scalar; b: scalar', caught: true },
   { name: 'a cube root is not a square root', src: String.raw`\sqrt[3]{8} = 3` },
+  { name: 'the matrix square root is not the identity', src: String.raw`\Sigma^{1/2} = I`, decls: '\\Sigma: spd n', caught: true },
   { name: 'a square of a Gaussian is not its mean', src: String.raw`E[x^2] = E[x]`, decls: 'x ~ N(\\mu, 1); \\mu: scalar', caught: true },
   { name: 'the adjugate of a product is not the product of the adjugates', src: String.raw`\operatorname{adj}(A B) = \operatorname{adj}(A)\operatorname{adj}(B)`, decls: 'A, B: n×n' },
   { name: 'the vectorisation does not survive a transpose', src: String.raw`\operatorname{vec}(A^\top) = \operatorname{vec}(A)`, decls: 'A: n×n' },
