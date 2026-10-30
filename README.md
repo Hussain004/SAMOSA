@@ -101,13 +101,6 @@ from the right answer, and SAMOSA says so.
   <img src="public/gifs/gradient.webp" width="100%" alt="A gradient in the numerator layout, with the hint" />
 </p>
 
-The clips are animated WebP, so they autoplay and loop in the README. The
-full-quality recordings are also there as MP4:
-[the transposed product](public/gifs/transpose.mp4),
-[the Kalman update](public/gifs/kalman.mp4),
-[the layout](public/gifs/gradient.mp4), and
-[the nineteen second tour](public/brag.mp4).
-
 ## Quick start
 
 ```bash
