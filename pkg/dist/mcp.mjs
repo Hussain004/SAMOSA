@@ -5182,12 +5182,24 @@ var Parser = class _Parser {
       }
       case "sqrt": {
         this.pos++;
+        let index = null;
         if (this.kind() === "lbrack") {
           this.pos++;
-          this.parseExpression();
+          index = this.parseExpression();
           this.expect("rbrack", "]");
         }
         const arg = this.kind() === "lbrace" ? this.parseGroupAsExpression() : this.parsePrimary();
+        if (index) {
+          const two = index.k === "num" && index.value.n === 2 && index.value.d === 1;
+          if (!two) {
+            const reason = index.k === "num" ? `the root of index ${index.value.n} is not read; only the square root is` : "the root with a symbolic index is not read; only the square root is";
+            return {
+              k: "raw",
+              text: reason,
+              span: { from: t.from, to: this.closingParen(t.to, [arg]) }
+            };
+          }
+        }
         return { k: "call", fn: "sqrt", args: [arg], span: { from: t.from, to: this.closingParen(t.to, [arg]) } };
       }
       case "nabla": {
@@ -7650,6 +7662,39 @@ function collectSymbols(node, into) {
       return;
   }
 }
+function rawReason(node) {
+  if (!node) return void 0;
+  if (node.k === "raw") return node.text;
+  switch (node.k) {
+    case "op":
+    case "call":
+      for (const a of node.args) {
+        const r = rawReason(a);
+        if (r) return r;
+      }
+      return void 0;
+    case "deriv":
+      return rawReason(node.f);
+    case "expect":
+      for (const a of node.args) {
+        const r = rawReason(a);
+        if (r) return r;
+      }
+      return void 0;
+    case "bigop":
+      return rawReason(node.lo ?? void 0) ?? rawReason(node.hi ?? void 0) ?? rawReason(node.body);
+    case "block":
+      for (const row of node.rows) {
+        for (const cell of row) {
+          const r = rawReason(cell);
+          if (r) return r;
+        }
+      }
+      return void 0;
+    default:
+      return void 0;
+  }
+}
 function analyzeSource(src, opts) {
   const rows = splitRows(src);
   const declared = parseDeclarations(opts.decls ?? "");
@@ -7912,6 +7957,22 @@ function checkStep(step, ctx, defs, opts, diagnostics) {
       card: base2,
       message: `${unknownFn.message}, so SAMOSA cannot read this step`,
       reason: unknownFn.message,
+      annotation: step.annotation
+    };
+  }
+  const unreadable = rawReason(step.lhs) ?? rawReason(step.rhs);
+  if (unreadable) {
+    return {
+      id: step.id,
+      row: step.row,
+      span: step.span,
+      lhsSpan: step.lhs?.span,
+      rhsSpan: step.rhs?.span,
+      relation: step.relation,
+      verdict: "unchecked",
+      card: base2,
+      message: unreadable,
+      reason: unreadable,
       annotation: step.annotation
     };
   }

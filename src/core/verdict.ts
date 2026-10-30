@@ -198,6 +198,44 @@ function collectSymbols(node: Node | undefined, into: Set<string>): void {
   }
 }
 
+/**
+ * The reason the parser left unread, if a side of the step carries a raw
+ * node (review 4.5): the row is a question, never a silent misread.
+ */
+function rawReason(node: Node | undefined): string | undefined {
+  if (!node) return undefined;
+  if (node.k === 'raw') return node.text;
+  switch (node.k) {
+    case 'op':
+    case 'call':
+      for (const a of node.args) {
+        const r = rawReason(a);
+        if (r) return r;
+      }
+      return undefined;
+    case 'deriv':
+      return rawReason(node.f);
+    case 'expect':
+      for (const a of node.args) {
+        const r = rawReason(a);
+        if (r) return r;
+      }
+      return undefined;
+    case 'bigop':
+      return rawReason(node.lo ?? undefined) ?? rawReason(node.hi ?? undefined) ?? rawReason(node.body);
+    case 'block':
+      for (const row of node.rows) {
+        for (const cell of row) {
+          const r = rawReason(cell);
+          if (r) return r;
+        }
+      }
+      return undefined;
+    default:
+      return undefined;
+  }
+}
+
 /** The parsed shape of a source: what the checker and the explainer both walk. */
 export interface Source {
   ctx: TypeContext;
@@ -539,6 +577,25 @@ function checkStep(
       card: base,
       message: `${unknownFn.message}, so SAMOSA cannot read this step`,
       reason: unknownFn.message,
+      annotation: step.annotation,
+    };
+  }
+
+  // A construct SAMOSA cannot read is a question, never a silent misread
+  // (review 4.5): the raw node carries the reason
+  const unreadable = rawReason(step.lhs) ?? rawReason(step.rhs);
+  if (unreadable) {
+    return {
+      id: step.id,
+      row: step.row,
+      span: step.span,
+      lhsSpan: step.lhs?.span,
+      rhsSpan: step.rhs?.span,
+      relation: step.relation,
+      verdict: 'unchecked',
+      card: base,
+      message: unreadable,
+      reason: unreadable,
       annotation: step.annotation,
     };
   }

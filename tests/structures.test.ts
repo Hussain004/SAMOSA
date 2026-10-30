@@ -109,6 +109,11 @@ const FALSE_FRIENDS: Array<Item & { caught?: boolean }> = [
   { name: 'the log of a square is not twice the log, for a scalar', src: String.raw`\log(x^2) = 2 \log x`, decls: 'x: scalar' },
   { name: 'the exponential does not split a sum of scalars', src: String.raw`e^{a + b} = e^a + e^b`, decls: 'a: scalar; b: scalar', caught: true },
   { name: 'a cube root is not a square root', src: String.raw`\sqrt[3]{8} = 3` },
+  // these two are true, but the root of index 3 is not read: the honest
+  // verdict is a question with the reason, never a silent square root
+  // (review 4.5)
+  { name: 'a cube root of eight is not read', src: String.raw`\sqrt[3]{8} = 2` },
+  { name: 'a cube root of a cube is not read', src: String.raw`\sqrt[3]{x^3} = x`, decls: 'x: pos' },
   { name: 'the matrix square root is not the identity', src: String.raw`\Sigma^{1/2} = I`, decls: '\\Sigma: spd n', caught: true },
   { name: 'a square of a Gaussian is not its mean', src: String.raw`E[x^2] = E[x]`, decls: 'x ~ N(\\mu, 1); \\mu: scalar', caught: true },
   { name: 'the adjugate of a product is not the product of the adjugates', src: String.raw`\operatorname{adj}(A B) = \operatorname{adj}(A)\operatorname{adj}(B)`, decls: 'A, B: n×n' },

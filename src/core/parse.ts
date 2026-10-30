@@ -942,13 +942,30 @@ export class Parser {
       }
       case 'sqrt': {
         this.pos++;
-        // optional index
+        // the optional index: \sqrt[3]{8} is the cube root
+        let index: Node | null = null;
         if (this.kind() === 'lbrack') {
           this.pos++;
-          this.parseExpression();
+          index = this.parseExpression();
           this.expect('rbrack', ']');
         }
         const arg = this.kind() === 'lbrace' ? this.parseGroupAsExpression() : this.parsePrimary();
+        // only the index 2 is the root SAMOSA can evaluate (review 4.5):
+        // any other index is named, never silently read as a square root
+        if (index) {
+          const two = index.k === 'num' && index.value.n === 2 && index.value.d === 1;
+          if (!two) {
+            const reason =
+              index.k === 'num'
+                ? `the root of index ${index.value.n} is not read; only the square root is`
+                : 'the root with a symbolic index is not read; only the square root is';
+            return {
+              k: 'raw',
+              text: reason,
+              span: { from: t.from, to: this.closingParen(t.to, [arg]) },
+            };
+          }
+        }
         return { k: 'call', fn: 'sqrt', args: [arg], span: { from: t.from, to: this.closingParen(t.to, [arg]) } };
       }
       case 'nabla': {
