@@ -1022,6 +1022,25 @@ export class Parser {
           }
           return scripted;
         }
+        // \operatorname{tr} A is the trace of A, not a symbol called
+        // \operatornametr: a known operator takes the next operand bare,
+        // the same as \det A (review 4.4)
+        const lower = text.toLowerCase();
+        if (this.isFnName(lower)) {
+          if (this.kind() === 'lbrace') {
+            const arg = this.parseGroupAsExpression();
+            return { k: 'call', fn: lower, args: [arg], span: { from: t.from, to: this.closingParen(t.to, [arg]) } };
+          }
+          const operand = this.kind();
+          if (
+            operand === 'ident' ||
+            operand === 'begin' ||
+            (operand === 'cmd' && !NON_OPERAND_COMMANDS.has(this.cur.value))
+          ) {
+            const arg = this.parsePrimary();
+            return { k: 'call', fn: lower, args: [arg], span: { from: t.from, to: this.closingParen(t.to, [arg]) } };
+          }
+        }
         return scripted;
       }
       case 'mathbb': {

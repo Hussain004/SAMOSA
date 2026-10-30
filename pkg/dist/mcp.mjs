@@ -5254,6 +5254,18 @@ var Parser = class _Parser {
           }
           return scripted;
         }
+        const lower = text.toLowerCase();
+        if (this.isFnName(lower)) {
+          if (this.kind() === "lbrace") {
+            const arg = this.parseGroupAsExpression();
+            return { k: "call", fn: lower, args: [arg], span: { from: t.from, to: this.closingParen(t.to, [arg]) } };
+          }
+          const operand2 = this.kind();
+          if (operand2 === "ident" || operand2 === "begin" || operand2 === "cmd" && !NON_OPERAND_COMMANDS.has(this.cur.value)) {
+            const arg = this.parsePrimary();
+            return { k: "call", fn: lower, args: [arg], span: { from: t.from, to: this.closingParen(t.to, [arg]) } };
+          }
+        }
         return scripted;
       }
       case "mathbb": {
@@ -7348,7 +7360,7 @@ function callType(ctx, fn, args, span) {
           cod: { t: "scalar" }
         };
       }
-      ctx.errors.push({ message: `unknown function ${fn}`, span });
+      ctx.errors.push({ message: `unknown function ${fn}`, span, kind: "unknown-function" });
       return { t: "poly" };
     }
   }
@@ -7863,7 +7875,9 @@ function checkStep(step, ctx, defs, opts, diagnostics) {
   if (lhsTy.t === "mat" && rhsTy.t === "mat") {
     unifyShapes(ctx, lhsTy, rhsTy, step.span);
   }
-  const shapeErrors = ctx.errors.splice(0, ctx.errors.length);
+  const allErrors = ctx.errors.splice(0, ctx.errors.length);
+  const shapeErrors = allErrors.filter((e) => e.kind !== "unknown-function");
+  const unknownFn = allErrors.find((e) => e.kind === "unknown-function");
   if (shapeErrors.length && transposed) {
     shapeErrors[0].message = "this is the numerator layout: SAMOSA uses the denominator layout, where the gradient has the shape of the variable it is taken with respect to";
   }
@@ -7882,6 +7896,22 @@ function checkStep(step, ctx, defs, opts, diagnostics) {
       card: base2,
       message: shapeErrors[0].message,
       reason: shapeErrors.map((e) => e.message).join("; "),
+      annotation: step.annotation
+    };
+  }
+  if (unknownFn) {
+    diagnostics.push({ severity: "error", message: unknownFn.message, span: unknownFn.span, stepId: step.id });
+    return {
+      id: step.id,
+      row: step.row,
+      span: step.span,
+      lhsSpan: step.lhs.span,
+      rhsSpan: step.rhs.span,
+      relation: step.relation,
+      verdict: "unchecked",
+      card: base2,
+      message: `${unknownFn.message}, so SAMOSA cannot read this step`,
+      reason: unknownFn.message,
       annotation: step.annotation
     };
   }
@@ -8168,6 +8198,11 @@ function evaluateSides(field, lhsNode, rhsNode, env, sampler) {
     }
     const lhs = evalNode(field, lhsNode, env);
     const rhs = evalNode(field, rhsNode, env);
+    const realMatrix = (v) => v.k === "m" && !(v.m.r === 1 && v.m.c === 1);
+    if (realMatrix(lhs) && rhs.k === "s" || lhs.k === "s" && realMatrix(rhs)) {
+      const message = lhs.k === "m" ? "a matrix on the left, a scalar on the right" : "a scalar on the left, a matrix on the right";
+      return { kind: "unknown", message, shape: true };
+    }
     if (valuesEqual(field, lhs, rhs)) return { kind: "equal" };
     return { kind: "different", lhs, rhs, message: "the two sides are not equal" };
   } catch (error) {
@@ -8674,6 +8709,20 @@ function checkNumeric(step, ctx, defs, opts, card) {
     reason: message2,
     annotation: step.annotation
   });
+  const shapeResult = (message2) => ({
+    id: step.id,
+    row: step.row,
+    span: step.span,
+    text: step.text,
+    lhsSpan: step.lhs?.span,
+    rhsSpan: step.rhs?.span,
+    relation: step.relation,
+    verdict: "shape",
+    card: { ...card, sizes, assumptions },
+    message: message2,
+    reason: message2,
+    annotation: step.annotation
+  });
   for (const setting of settings) {
     sizes.push(Object.fromEntries(setting));
     for (let trial = 0; trial < NUMERIC_TRIALS; trial++) {
@@ -8684,6 +8733,9 @@ function checkNumeric(step, ctx, defs, opts, card) {
       }
       if (run === "domain") {
         return domainResult("a sampled instance was outside the domain");
+      }
+      if (run.shapeMessage) {
+        return shapeResult(run.shapeMessage);
       }
       f64Max = Math.max(f64Max, run.delta);
       if (run.delta > 1e-6) {
@@ -8725,6 +8777,9 @@ function checkNumeric(step, ctx, defs, opts, card) {
       }
       if (run === "domain") {
         return domainResult("a 50 digit instance was outside the domain");
+      }
+      if (run.shapeMessage) {
+        return shapeResult(run.shapeMessage);
       }
       decMax = Math.max(decMax, run.delta);
     }
@@ -8778,7 +8833,10 @@ function numericDelta(ctx, defs, step, setting, rng, trial, field) {
   for (const [name, value] of sampled.values.entries()) env.values.set(name, value);
   for (const [name, quadVar] of sampled.quad.entries()) env.quad.set(name, quadVar);
   const sides = evaluateSides(field, step.lhs, step.rhs, env, sampler);
-  if (sides.kind === "unknown") return "domain";
+  if (sides.kind === "unknown") {
+    if (sides.shape) return { delta: Number.NaN, shapeMessage: sides.message };
+    return "domain";
+  }
   if (sides.kind === "equal") return { delta: 0 };
   const delta = relativeDelta(field, sides.lhs, sides.rhs);
   return Number.isFinite(delta) ? { delta } : "domain";
@@ -9064,6 +9122,13 @@ function runImplicationTrial(step, ctx, defs, setting, p, rng) {
     return { kind: "unknown", message: "could not evaluate the conclusion" };
   }
   if (valuesEqual(field, cl, cr)) return { kind: "ok" };
+  const realMatrix = (v) => v.k === "m" && !(v.m.r === 1 && v.m.c === 1);
+  if (realMatrix(cl) && cr.k === "s" || cl.k === "s" && realMatrix(cr)) {
+    return {
+      kind: "unknown",
+      message: cl.k === "m" ? "a matrix on the left, a scalar on the right" : "a scalar on the left, a matrix on the right"
+    };
+  }
   return {
     kind: "wrong",
     message: "the implication does not follow",

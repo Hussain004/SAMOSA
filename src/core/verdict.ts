@@ -498,7 +498,11 @@ function checkStep(
   if (lhsTy.t === 'mat' && rhsTy.t === 'mat') {
     unifyShapes(ctx, lhsTy, rhsTy, step.span);
   }
-  const shapeErrors = ctx.errors.splice(0, ctx.errors.length);
+  const allErrors = ctx.errors.splice(0, ctx.errors.length);
+  // an unknown function is not a shape claim (review 4.4): SAMOSA cannot
+  // read the name, so the row is ? and never a shape error
+  const shapeErrors = allErrors.filter((e) => e.kind !== 'unknown-function');
+  const unknownFn = allErrors.find((e) => e.kind === 'unknown-function');
 
   if (shapeErrors.length && transposed) {
     shapeErrors[0].message =
@@ -519,6 +523,22 @@ function checkStep(
       card: base,
       message: shapeErrors[0].message,
       reason: shapeErrors.map((e) => e.message).join('; '),
+      annotation: step.annotation,
+    };
+  }
+  if (unknownFn) {
+    diagnostics.push({ severity: 'error', message: unknownFn.message, span: unknownFn.span, stepId: step.id });
+    return {
+      id: step.id,
+      row: step.row,
+      span: step.span,
+      lhsSpan: step.lhs.span,
+      rhsSpan: step.rhs.span,
+      relation: step.relation,
+      verdict: 'unchecked',
+      card: base,
+      message: `${unknownFn.message}, so SAMOSA cannot read this step`,
+      reason: unknownFn.message,
       annotation: step.annotation,
     };
   }
@@ -916,6 +936,14 @@ function evaluateSides<T>(
     }
     const lhs = evalNode(field, lhsNode, env);
     const rhs = evalNode(field, rhsNode, env);
+    // a matrix compared with a scalar is not a claim about equality: it is
+    // the shapes that do not fit (review 4.4)
+    const realMatrix = (v: Val<T>): boolean => v.k === 'm' && !(v.m.r === 1 && v.m.c === 1);
+    if ((realMatrix(lhs) && rhs.k === 's') || (lhs.k === 's' && realMatrix(rhs))) {
+      const message =
+        lhs.k === 'm' ? 'a matrix on the left, a scalar on the right' : 'a scalar on the left, a matrix on the right';
+      return { kind: 'unknown', message, shape: true };
+    }
     if (valuesEqual(field, lhs, rhs)) return { kind: 'equal' };
     return { kind: 'different', lhs, rhs, message: 'the two sides are not equal' };
   } catch (error) {
@@ -1557,6 +1585,22 @@ function checkNumeric(
     reason: message,
     annotation: step.annotation,
   });
+  // the two sides do not fit together at all, so no instance would help:
+  // this is the shape verdict, met through the numbers (review 4.4)
+  const shapeResult = (message: string): StepResult => ({
+    id: step.id,
+    row: step.row,
+    span: step.span,
+    text: step.text,
+    lhsSpan: step.lhs?.span,
+    rhsSpan: step.rhs?.span,
+    relation: step.relation,
+    verdict: 'shape',
+    card: { ...card, sizes, assumptions },
+    message,
+    reason: message,
+    annotation: step.annotation,
+  });
 
   // First pass, float64: it screens only. Eight instances per size, with the
   // signs and the magnitudes spread by the trial index (review 3.4), so a
@@ -1571,6 +1615,9 @@ function checkNumeric(
       }
       if (run === 'domain') {
         return domainResult('a sampled instance was outside the domain');
+      }
+      if (run.shapeMessage) {
+        return shapeResult(run.shapeMessage);
       }
       f64Max = Math.max(f64Max, run.delta);
       if (run.delta > 1e-6) {
@@ -1619,6 +1666,9 @@ function checkNumeric(
       if (run === 'domain') {
         return domainResult('a 50 digit instance was outside the domain');
       }
+      if (run.shapeMessage) {
+        return shapeResult(run.shapeMessage);
+      }
       decMax = Math.max(decMax, run.delta);
     }
   }
@@ -1663,7 +1713,7 @@ function checkNumeric(
   };
 }
 
-type NumericRun = { delta: number } | 'domain' | null;
+type NumericRun = { delta: number; shapeMessage?: string } | 'domain' | null;
 
 function numericDelta<T>(
   ctx: TypeContext,
@@ -1684,7 +1734,12 @@ function numericDelta<T>(
   for (const [name, quadVar] of sampled.quad.entries()) env.quad.set(name, quadVar);
 
   const sides = evaluateSides(field, step.lhs!, step.rhs!, env, sampler);
-  if (sides.kind === 'unknown') return 'domain';
+  if (sides.kind === 'unknown') {
+    // a shape mismatch is not a domain miss: it is a claim about two sides
+    // that cannot be compared at all (review 4.4)
+    if (sides.shape) return { delta: Number.NaN, shapeMessage: sides.message };
+    return 'domain';
+  }
   if (sides.kind === 'equal') return { delta: 0 };
   const delta = relativeDelta(field, sides.lhs, sides.rhs);
   // A NaN or an infinity is not a delta: the step was not defined, or the
@@ -2054,6 +2109,16 @@ function runImplicationTrial(
     return { kind: 'unknown', message: 'could not evaluate the conclusion' };
   }
   if (valuesEqual(field, cl, cr)) return { kind: 'ok' };
+  // a matrix compared with a scalar is not a wrong claim, it is one that
+  // cannot be read (review 4.4)
+  const realMatrix = (v: Val<number>): boolean => v.k === 'm' && !(v.m.r === 1 && v.m.c === 1);
+  if ((realMatrix(cl) && cr.k === 's') || (cl.k === 's' && realMatrix(cr))) {
+    return {
+      kind: 'unknown',
+      message:
+        cl.k === 'm' ? 'a matrix on the left, a scalar on the right' : 'a scalar on the left, a matrix on the right',
+    };
+  }
 
   return {
     kind: 'wrong',

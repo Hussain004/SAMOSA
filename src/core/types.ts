@@ -26,6 +26,12 @@ export type Ty =
 export interface ShapeError {
   message: string;
   span: Span;
+  /**
+   * What kind of unreadable this is. A shape error is ⊘: the sizes of the
+   * two sides do not fit. An unknown function is not a shape claim at all:
+   * SAMOSA just cannot read the name, so it is ? (review 4.4).
+   */
+  kind?: 'shape' | 'unknown-function';
 }
 
 export interface SymbolInfo {
@@ -661,7 +667,7 @@ function callType(ctx: TypeContext, fn: string, args: Node[], span: Span): Ty {
           cod: { t: 'scalar' },
         };
       }
-      ctx.errors.push({ message: `unknown function ${fn}`, span });
+      ctx.errors.push({ message: `unknown function ${fn}`, span, kind: 'unknown-function' });
       return { t: 'poly' };
     }
   }
