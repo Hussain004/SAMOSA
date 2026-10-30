@@ -1073,9 +1073,15 @@ export class Parser {
           const arg = this.parseGroupAsExpression();
           return { k: 'call', fn: name === 'sigma' ? 'sigmoid' : name, args: [arg], span: { from: t.from, to: this.closingParen(t.to, [arg]) } };
         }
-        // \log x and \log\sigma(z): the argument is the next operand
+        // \log x and \log\sigma(z): the argument is the next operand, and
+        // \det\begin{bmatrix}... takes the environment as its operand
+        // (review 4.3)
         const nextKind = this.kind();
-        if (nextKind === 'ident' || (nextKind === 'cmd' && !NON_OPERAND_COMMANDS.has(this.cur.value))) {
+        if (
+          nextKind === 'ident' ||
+          nextKind === 'begin' ||
+          (nextKind === 'cmd' && !NON_OPERAND_COMMANDS.has(this.cur.value))
+        ) {
           const arg = this.parsePrimary();
           return {
             k: 'call',

@@ -73,6 +73,12 @@ function requireScalar<T>(val: Val<T>, what: string): T {
   throw new EvalError(`${what} needs a scalar, but got a ${val.m.r} by ${val.m.c} matrix`);
 }
 
+/** A scalar cell of a block matrix is a 1 by 1 matrix (review 4.3). */
+function cellMatrix<T>(val: Val<T>): Mat<T> {
+  if (isScalarVal(val)) return { r: 1, c: 1, d: [val.v] };
+  return requireMatrix(val, 'a matrix entry');
+}
+
 /** Evaluates an expression. */
 export function evalNode<T>(f: Field<T>, node: Node, env: EvalEnv<T>): Val<T> {
   switch (node.k) {
@@ -124,7 +130,7 @@ export function evalNode<T>(f: Field<T>, node: Node, env: EvalEnv<T>): Val<T> {
     }
     case 'block': {
       const rows = node.rows.map((row) => row.map((cell) => evalNode(f, cell, env)));
-      const mats = rows.map((row) => row.map((cell) => requireMatrix(cell, 'a matrix entry')));
+      const mats = rows.map((row) => row.map((cell) => cellMatrix(cell)));
       return { k: 'm', m: block(mats) };
     }
     case 'raw':

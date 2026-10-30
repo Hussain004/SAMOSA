@@ -60,14 +60,20 @@ const TRUE_FRIENDS: Array<Item & { holds?: boolean; pending?: string }> = [
     name: 'the Schur determinant',
     src: String.raw`\det\begin{pmatrix} A & B \\ C & D \end{pmatrix} = \det(A)\det(D - C A^{-1} B)`,
     decls: 'A: n×n; B: n×m; C: m×n; D: m×m',
-    pending: 'block matrices, review 4.3',
+    holds: true,
   },
   {
     name: 'the two by two block inverse',
     src: String.raw`\begin{pmatrix} A & B \\ C & D \end{pmatrix}^{-1} = \begin{pmatrix} A^{-1} + A^{-1} B (D - C A^{-1} B)^{-1} C A^{-1} & -A^{-1} B (D - C A^{-1} B)^{-1} \\ -(D - C A^{-1} B)^{-1} C A^{-1} & (D - C A^{-1} B)^{-1} \end{pmatrix}`,
     decls: 'A: n×n; B: n×m; C: m×n; D: m×m',
-    pending: 'block matrices, review 4.3',
+    holds: true,
   },
+  // the block matrix, after review 4.3: blocks type as the sum of their
+  // cells, a scalar cell is 1 by 1, and det reads the environment that
+  // follows it as its operand
+  { name: 'a horizontal block times a vertical one splits', src: String.raw`\begin{bmatrix} A & B \end{bmatrix}\begin{bmatrix} C \\ D \end{bmatrix} = AC + BD`, decls: 'A, B, C, D: n×n', holds: true },
+  { name: 'the determinant reads a following environment', src: String.raw`\det\begin{bmatrix} 1 & 2 \\ 3 & 4 \end{bmatrix} = -2`, holds: true },
+  { name: 'numbers alone multiply inside blocks', src: String.raw`\begin{bmatrix} 1 & 2 \\ 3 & 4 \end{bmatrix}\begin{bmatrix} 1 \\ 1 \end{bmatrix} = \begin{bmatrix} 3 \\ 7 \end{bmatrix}`, holds: true },
 ];
 
 /**
@@ -150,7 +156,7 @@ const NEGATIVE_CONTROLS: Array<{ op: Op | 'expect' | 'bigop' | 'deriv' | 'block'
     item: { name: 'the derivative', src: 'f(w) := w^2\n\\frac{\\partial f}{\\partial w} = w', decls: 'w: scalar' },
     strict: true,
   },
-  { op: 'block', item: { name: 'block rows', src: String.raw`\begin{pmatrix} A & B \end{pmatrix} = \begin{pmatrix} B & A \end{pmatrix}`, decls: 'A, B: n×n' }, strict: false, pending: 'block matrices, review 4.3' },
+  { op: 'block', item: { name: 'block rows', src: String.raw`\begin{pmatrix} A & B \end{pmatrix} = \begin{pmatrix} B & A \end{pmatrix}`, decls: 'A, B: n×n' }, strict: false },
   { op: 'adj', item: { name: 'the adjugate', src: String.raw`\operatorname{adj}(A B) = \operatorname{adj}(A)\operatorname{adj}(B)`, decls: 'A, B: n×n' }, strict: false },
   { op: 'diag', item: { name: 'the diagonal', src: String.raw`\operatorname{diag}(A B) = \operatorname{diag}(A)\operatorname{diag}(B)`, decls: 'A, B: n×n' }, strict: false },
   { op: 'vec', item: { name: 'the vectorisation', src: String.raw`\operatorname{vec}(A^\top) = \operatorname{vec}(A)`, decls: 'A: n×n' }, strict: false },

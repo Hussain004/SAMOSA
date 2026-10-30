@@ -2621,16 +2621,21 @@ function diag(f, v) {
   return { r: n, c: n, d };
 }
 function block(rows) {
-  const R = rows.length;
-  const C = rows[0].length;
   const r = rows.reduce((s, row) => s + row[0].r, 0);
-  const c = rows.reduce((s, row) => s + row[0].c, 0);
+  const c = rows[0].reduce((s, blk) => s + blk.c, 0);
+  for (const row of rows) {
+    const h = row[0].r;
+    for (const blk of row) {
+      if (blk.r !== h) throw new DomainError("the blocks of one row do not agree in height");
+    }
+    const width = row.reduce((s, blk) => s + blk.c, 0);
+    if (width !== c) throw new DomainError("the blocks of one row do not agree in width");
+  }
   const d = new Array(r * c);
   let oi = 0;
-  for (let i2 = 0; i2 < R; i2++) {
+  for (const row of rows) {
     let oj = 0;
-    for (let j = 0; j < C; j++) {
-      const blk = rows[i2][j];
+    for (const blk of row) {
       for (let bi = 0; bi < blk.r; bi++) {
         for (let bj = 0; bj < blk.c; bj++) {
           d[(oi + bi) * c + (oj + bj)] = blk.d[bi * blk.c + bj];
@@ -2638,7 +2643,7 @@ function block(rows) {
       }
       oj += blk.c;
     }
-    oi += rows[i2][0].r;
+    oi += row[0].r;
   }
   return { r, c, d };
 }
@@ -3147,6 +3152,10 @@ function requireScalar(val, what) {
   if (isScalarVal(val)) return val.v;
   throw new EvalError(`${what} needs a scalar, but got a ${val.m.r} by ${val.m.c} matrix`);
 }
+function cellMatrix(val) {
+  if (isScalarVal(val)) return { r: 1, c: 1, d: [val.v] };
+  return requireMatrix(val, "a matrix entry");
+}
 function evalNode(f, node, env) {
   switch (node.k) {
     case "num":
@@ -3196,7 +3205,7 @@ function evalNode(f, node, env) {
     }
     case "block": {
       const rows = node.rows.map((row) => row.map((cell) => evalNode(f, cell, env)));
-      const mats = rows.map((row) => row.map((cell) => requireMatrix(cell, "a matrix entry")));
+      const mats = rows.map((row) => row.map((cell) => cellMatrix(cell)));
       return { k: "m", m: block(mats) };
     }
     case "raw":
@@ -5291,7 +5300,7 @@ var Parser = class _Parser {
           return { k: "call", fn: name === "sigma" ? "sigmoid" : name, args: [arg], span: { from: t.from, to: this.closingParen(t.to, [arg]) } };
         }
         const nextKind = this.kind();
-        if (nextKind === "ident" || nextKind === "cmd" && !NON_OPERAND_COMMANDS.has(this.cur.value)) {
+        if (nextKind === "ident" || nextKind === "begin" || nextKind === "cmd" && !NON_OPERAND_COMMANDS.has(this.cur.value)) {
           const arg = this.parsePrimary();
           return {
             k: "call",
@@ -6174,6 +6183,16 @@ var MATH_ENVS = /* @__PURE__ */ new Set([
   "flalign",
   "flalign*"
 ]);
+var MATRIX_ENVS = /* @__PURE__ */ new Set([
+  "matrix",
+  "bmatrix",
+  "pmatrix",
+  "vmatrix",
+  "Bmatrix",
+  "Vmatrix",
+  "smallmatrix",
+  "cases"
+]);
 function splitRows(src) {
   const rows = [];
   const prose = [];
@@ -6207,9 +6226,14 @@ function splitRows(src) {
       const contentEnd2 = endIdx >= 0 ? endIdx : len;
       if (MATH_ENVS.has(envName)) {
         rows.push(...splitMathContent(src, contentStart2, contentEnd2, `${envName}@${beginIdx}`));
-      } else {
-        flushProse(src.slice(contentStart2, contentEnd2));
+        i2 = endIdx >= 0 ? endIdx + 1 : len;
+        continue;
       }
+      if (MATRIX_ENVS.has(envName)) {
+        i2 = endIdx >= 0 ? endIdx + envName.length + 6 : len;
+        continue;
+      }
+      flushProse(src.slice(contentStart2, contentEnd2));
       i2 = endIdx >= 0 ? endIdx + 1 : len;
       continue;
     }
@@ -6231,7 +6255,9 @@ function splitRows(src) {
     let offset = 0;
     for (const line of src.split("\n")) {
       const trimmed = line.trim();
-      if (trimmed && !trimmed.startsWith("%") && !trimmed.startsWith("\\begin{") && !trimmed.startsWith("\\end{")) {
+      const envStart = /^\\begin\{([^}]+)\}/.exec(trimmed);
+      const opensMatrix = envStart !== null && MATRIX_ENVS.has(envStart[1]);
+      if (trimmed && !trimmed.startsWith("%") && (!trimmed.startsWith("\\begin{") || opensMatrix) && !trimmed.startsWith("\\end{")) {
         const from = offset + line.indexOf(trimmed);
         rows.push({ text: cleanRow(line), from, to: from + trimmed.length, where: "line" });
       }
@@ -6975,10 +7001,35 @@ function inferType(ctx, node) {
       return t;
     }
     case "block": {
-      const rows = node.rows.length || 1;
-      const cols = node.rows[0]?.length ?? 1;
-      for (const row of node.rows) for (const cell of row) inferType(ctx, cell);
-      return { t: "mat", r: rows, c: cols };
+      const types = /* @__PURE__ */ new Map();
+      for (const row of node.rows) for (const cell of row) types.set(cell, inferType(ctx, cell));
+      const rowsOf = (t) => t.t === "mat" ? t.r : 1;
+      const colsOf = (t) => t.t === "mat" ? t.c : 1;
+      const heights = [];
+      for (const row of node.rows) {
+        let h = null;
+        for (const cell of row) {
+          const t = types.get(cell);
+          if (!t) continue;
+          h = h === null ? rowsOf(t) : unifyDim(ctx, h, rowsOf(t), "a block row", node.span) ?? h;
+        }
+        heights.push(h ?? 1);
+      }
+      const widths = [];
+      for (let j = 0; j < (node.rows[0]?.length ?? 0); j++) {
+        let w = null;
+        for (const row of node.rows) {
+          const t = types.get(row[j]);
+          if (!t) continue;
+          w = w === null ? colsOf(t) : unifyDim(ctx, w, colsOf(t), "a block column", node.span) ?? w;
+        }
+        widths.push(w ?? 1);
+      }
+      let r = null;
+      for (const h of heights) r = r === null ? h : addDim(r, h);
+      let c = null;
+      for (const w of widths) c = c === null ? w : addDim(c, w);
+      return { t: "mat", r: r ?? 0, c: c ?? 0 };
     }
     case "raw":
       return { t: "poly" };
@@ -7250,6 +7301,12 @@ function mulDim(a, b) {
   if (typeof a === "number") return { v: `${a}*${dimName(b)}` };
   if (typeof b === "number") return { v: `${dimName(a)}*${b}` };
   return { v: `${dimName(a)}*${dimName(b)}` };
+}
+function addDim(a, b) {
+  if (typeof a === "number" && typeof b === "number") return a + b;
+  if (typeof a === "number") return { v: `${a}+${dimName(b)}` };
+  if (typeof b === "number") return { v: `${dimName(a)}+${b}` };
+  return { v: `${dimName(a)}+${dimName(b)}` };
 }
 function callType(ctx, fn, args, span) {
   const types = args.map((a) => inferType(ctx, a));
@@ -8023,7 +8080,10 @@ function checkExact(step, ctx, defs, opts, card) {
     const bound = Math.pow(d / P1, ranP1) * Math.pow(d / P2, ranP2);
     worstBound = Math.max(worstBound, bound);
   }
-  if (worstDegree === 0) {
+  const stepSymbols = /* @__PURE__ */ new Set();
+  collectSymbols(step.lhs, stepSymbols);
+  collectSymbols(step.rhs, stepSymbols);
+  if (worstDegree === 0 && stepSymbols.size > 0) {
     const message = "the degree bound of this step came out as 0 although symbols were sampled, which is an engine gap; SAMOSA claims nothing here";
     return {
       id: step.id,

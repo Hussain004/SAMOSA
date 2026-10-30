@@ -43,6 +43,23 @@ const MATH_ENVS = new Set([
   'flalign*',
 ]);
 
+/**
+ * The matrix environments. They are mathematics too, but unlike the math
+ * environments above they are a value inside a row, not a region of rows:
+ * a block matrix sits in the middle of a claim (review 4.3). When the
+ * splitter meets one it steps over it and leaves it in the row text.
+ */
+const MATRIX_ENVS = new Set([
+  'matrix',
+  'bmatrix',
+  'pmatrix',
+  'vmatrix',
+  'Bmatrix',
+  'Vmatrix',
+  'smallmatrix',
+  'cases',
+]);
+
 export function splitRows(src: string): SourceRow[] {
   const rows: SourceRow[] = [];
   const prose: string[] = [];
@@ -80,10 +97,17 @@ export function splitRows(src: string): SourceRow[] {
       const contentEnd = endIdx >= 0 ? endIdx : len;
       if (MATH_ENVS.has(envName)) {
         rows.push(...splitMathContent(src, contentStart, contentEnd, `${envName}@${beginIdx}`));
-      } else {
-        // a non math environment (a table, a figure): its content is prose
-        flushProse(src.slice(contentStart, contentEnd));
+        i = endIdx >= 0 ? endIdx + 1 : len;
+        continue;
       }
+      if (MATRIX_ENVS.has(envName)) {
+        // a block matrix is a value inside a row (review 4.3): step over it
+        // and let the bare paste of rows read the line it sits in
+        i = endIdx >= 0 ? endIdx + envName.length + 6 : len;
+        continue;
+      }
+      // a non math environment (a table, a figure): its content is prose
+      flushProse(src.slice(contentStart, contentEnd));
       i = endIdx >= 0 ? endIdx + 1 : len;
       continue;
     }
@@ -110,7 +134,11 @@ export function splitRows(src: string): SourceRow[] {
     let offset = 0;
     for (const line of src.split('\n')) {
       const trimmed = line.trim();
-      if (trimmed && !trimmed.startsWith('%') && !trimmed.startsWith('\\begin{') && !trimmed.startsWith('\\end{')) {
+      // a line may open with a block matrix, which is a value of the row
+      // (review 4.3); any other environment opening is a region already read
+      const envStart = /^\\begin\{([^}]+)\}/.exec(trimmed);
+      const opensMatrix = envStart !== null && MATRIX_ENVS.has(envStart[1]);
+      if (trimmed && !trimmed.startsWith('%') && (!trimmed.startsWith('\\begin{') || opensMatrix) && !trimmed.startsWith('\\end{')) {
         const from = offset + line.indexOf(trimmed);
         rows.push({ text: cleanRow(line), from, to: from + trimmed.length, where: 'line' });
       }

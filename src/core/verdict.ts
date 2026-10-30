@@ -770,10 +770,16 @@ function checkExact(
     worstBound = Math.max(worstBound, bound);
   }
 
-  // An exact checkmark with degree 0 is an engine gap (review 3.3): the
-  // bound would read "at most 0", which is no receipt at all. It is
-  // downgraded to ? and said so, and nothing under 0 is ever printed.
-  if (worstDegree === 0) {
+  // An exact checkmark with degree 0 over sampled symbols is an engine gap
+  // (review 3.3): the bound would read "at most 0", which is no receipt at
+  // all. It is downgraded to ? and said so, and nothing under 0 is ever
+  // printed. A step over numbers alone has no sampled symbol to lie about:
+  // the exact evaluation is a full verification, so the degree being 0 is
+  // the truth there (review 4.3).
+  const stepSymbols = new Set<string>();
+  collectSymbols(step.lhs, stepSymbols);
+  collectSymbols(step.rhs, stepSymbols);
+  if (worstDegree === 0 && stepSymbols.size > 0) {
     const message =
       'the degree bound of this step came out as 0 although symbols were sampled, which is an engine gap; SAMOSA claims nothing here';
     return {

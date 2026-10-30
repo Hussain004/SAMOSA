@@ -276,10 +276,39 @@ export function inferType(ctx: TypeContext, node: Node): Ty {
       return t;
     }
     case 'block': {
-      const rows = node.rows.length || 1;
-      const cols = node.rows[0]?.length ?? 1;
-      for (const row of node.rows) for (const cell of row) inferType(ctx, cell);
-      return { t: 'mat', r: rows, c: cols };
+      // the shape of a block is the sum of the cell shapes, not the count of
+      // the block rows and columns (review 4.3): a scalar cell is 1 by 1,
+      // and the cells of one block row agree in rows, one block column in
+      // columns
+      const types = new Map<Node, Ty>();
+      for (const row of node.rows) for (const cell of row) types.set(cell, inferType(ctx, cell));
+      const rowsOf = (t: Ty): Dim => (t.t === 'mat' ? t.r : 1);
+      const colsOf = (t: Ty): Dim => (t.t === 'mat' ? t.c : 1);
+      const heights: Dim[] = [];
+      for (const row of node.rows) {
+        let h: Dim | null = null;
+        for (const cell of row) {
+          const t = types.get(cell);
+          if (!t) continue;
+          h = h === null ? rowsOf(t) : (unifyDim(ctx, h, rowsOf(t), 'a block row', node.span) ?? h);
+        }
+        heights.push(h ?? 1);
+      }
+      const widths: Dim[] = [];
+      for (let j = 0; j < (node.rows[0]?.length ?? 0); j++) {
+        let w: Dim | null = null;
+        for (const row of node.rows) {
+          const t = types.get(row[j]);
+          if (!t) continue;
+          w = w === null ? colsOf(t) : (unifyDim(ctx, w, colsOf(t), 'a block column', node.span) ?? w);
+        }
+        widths.push(w ?? 1);
+      }
+      let r: Dim | null = null;
+      for (const h of heights) r = r === null ? h : addDim(r, h);
+      let c: Dim | null = null;
+      for (const w of widths) c = c === null ? w : addDim(c, w);
+      return { t: 'mat', r: r ?? 0, c: c ?? 0 };
     }
     case 'raw':
       return { t: 'poly' };
@@ -580,6 +609,14 @@ function mulDim(a: Dim, b: Dim): Dim {
   if (typeof a === 'number') return { v: `${a}*${dimName(b)}` };
   if (typeof b === 'number') return { v: `${dimName(a)}*${b}` };
   return { v: `${dimName(a)}*${dimName(b)}` };
+}
+
+/** The sum of two dimensions, as a block shape needs. */
+function addDim(a: Dim, b: Dim): Dim {
+  if (typeof a === 'number' && typeof b === 'number') return a + b;
+  if (typeof a === 'number') return { v: `${a}+${dimName(b)}` };
+  if (typeof b === 'number') return { v: `${dimName(a)}+${b}` };
+  return { v: `${dimName(a)}+${dimName(b)}` };
 }
 
 function callType(ctx: TypeContext, fn: string, args: Node[], span: Span): Ty {

@@ -227,16 +227,23 @@ export function diag<T>(f: Field<T>, v: Mat<T>): Mat<T> {
 
 /** Assemble a block matrix from a grid of blocks. */
 export function block<T>(rows: Mat<T>[][]): Mat<T> {
-  const R = rows.length;
-  const C = rows[0].length;
+  // the blocks of one row share their height, one column their width, and
+  // both the row heights and the column widths sum (review 4.3)
   const r = rows.reduce((s, row) => s + row[0].r, 0);
-  const c = rows.reduce((s, row) => s + row[0].c, 0);
+  const c = rows[0].reduce((s, blk) => s + blk.c, 0);
+  for (const row of rows) {
+    const h = row[0].r;
+    for (const blk of row) {
+      if (blk.r !== h) throw new DomainError('the blocks of one row do not agree in height');
+    }
+    const width = row.reduce((s, blk) => s + blk.c, 0);
+    if (width !== c) throw new DomainError('the blocks of one row do not agree in width');
+  }
   const d = new Array<T>(r * c);
   let oi = 0;
-  for (let i = 0; i < R; i++) {
+  for (const row of rows) {
     let oj = 0;
-    for (let j = 0; j < C; j++) {
-      const blk = rows[i][j];
+    for (const blk of row) {
       for (let bi = 0; bi < blk.r; bi++) {
         for (let bj = 0; bj < blk.c; bj++) {
           d[(oi + bi) * c + (oj + bj)] = blk.d[bi * blk.c + bj];
@@ -244,7 +251,7 @@ export function block<T>(rows: Mat<T>[][]): Mat<T> {
       }
       oj += blk.c;
     }
-    oi += rows[i][0].r;
+    oi += row[0].r;
   }
   return { r, c, d };
 }
