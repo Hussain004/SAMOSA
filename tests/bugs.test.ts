@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { check } from '../src/core/verdict.ts';
-import { explain } from '../src/core/index.ts';
+import { explain, explainAll } from '../src/core/index.ts';
 
 /**
  * The planted bugs of Appendix A.
@@ -109,6 +109,59 @@ describe('the repairs of the planted bugs', () => {
   it('B4 offers the missing assumption', () => {
     const fixes = fixesOf(LECTURE8, 2, DECLS_NO_SPD);
     expect(fixes.some((f) => f.includes('Q_t is symmetric'))).toBe(true);
+  });
+
+  describe('a fix is never offered for the wrong row (review 5.1)', () => {
+    // A row that does not parse used to be skipped by the explain loop, so
+    // every later fix pointed at a different row and a quick fix rewrote
+    // mathematics that was never wrong. check() and explain() build their
+    // steps with the same loop now, and the test is the one the review asks
+    // for: the fixes of row 2 are the same when row 1 is unreadable and when
+    // row 1 is not there at all.
+    const withBad = [
+      '\\begin{align*}',
+      '  A &= B) \\\\',
+      '  (A B)^\\top &= A^\\top B^\\top \\\\',
+      '  C &= A + B \\\\',
+      '  C - A &= B A',
+      '\\end{align*}',
+    ].join('\n');
+    const withoutBad = withBad.replace('  A &= B) \\\\\n', '');
+
+    it('the unreadable row is a step of its own, so no ID shifts', () => {
+      const report = check(withBad);
+      const unreadable = report.steps.find((s) => s.text?.includes('A  = B)'));
+      expect(unreadable?.verdict).toBe('unchecked');
+      expect(report.steps.find((s) => s.text?.includes('A^\\top B^\\top'))?.verdict).toBe('wrong');
+    });
+
+    it('the fixes for row 2 are identical to the fixes when row 1 is removed', () => {
+      const r1 = check(withBad);
+      const r2 = check(withoutBad);
+      const id1 = r1.steps.find((s) => s.text?.includes('A^\\top B^\\top'))!.id;
+      const id2 = r2.steps.find((s) => s.text?.includes('A^\\top B^\\top'))!.id;
+      const a1 = explainAll(withBad, {}, 8, r1).get(id1)!;
+      const a2 = explainAll(withoutBad, {}, 8, r2).get(id2)!;
+      expect(JSON.stringify(a1.fixes)).toBe(JSON.stringify(a2.fixes));
+      expect(a1.fixes.length).toBeGreaterThan(0);
+    });
+
+    it('a fix of coefficient 0, or one that changes nothing, is never offered', () => {
+      const r1 = check(withBad);
+      const fixes: string[] = [];
+      for (const step of r1.steps) {
+        if (step.verdict !== 'wrong') continue;
+        const explanation = explainAll(withBad, {}, 8, r1).get(step.id);
+        for (const fix of explanation?.fixes ?? []) {
+          fixes.push(fix.title);
+          if (fix.edit) {
+            // an edit that inserts the row it replaces is not a fix
+            expect(fix.title).not.toMatch(/off by exactly 0\b/);
+          }
+        }
+      }
+      expect(fixes.length).toBeGreaterThan(0);
+    });
   });
 });
 

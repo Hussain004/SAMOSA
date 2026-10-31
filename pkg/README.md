@@ -101,13 +101,6 @@ from the right answer, and SAMOSA says so.
   <img src="https://raw.githubusercontent.com/Hussain004/SAMOSA/master/public/gifs/gradient.webp" width="100%" alt="A gradient in the numerator layout, with the hint" />
 </p>
 
-The clips are animated WebP, so they autoplay and loop in the README. The
-full-quality recordings are also there as MP4:
-[the transposed product](https://raw.githubusercontent.com/Hussain004/SAMOSA/master/public/gifs/transpose.mp4),
-[the Kalman update](https://raw.githubusercontent.com/Hussain004/SAMOSA/master/public/gifs/kalman.mp4),
-[the layout](https://raw.githubusercontent.com/Hussain004/SAMOSA/master/public/gifs/gradient.mp4), and
-[the nineteen second tour](https://raw.githubusercontent.com/Hussain004/SAMOSA/master/public/brag.mp4).
-
 ## Quick start
 
 ```bash
