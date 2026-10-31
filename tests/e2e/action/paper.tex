@@ -1,0 +1,45 @@
+% samosa: A: n×n; B: n×n; u: n; v: n; x: n
+\documentclass{article}
+\title{Three identities of the transpose and the inverse}
+\author{A. Author}
+\begin{document}
+\begin{abstract}
+We record three identities that hold at every size, and we check each step
+of the derivations exactly.
+\end{abstract}
+
+\section{Introduction}
+Let $A$ and $B$ be square matrices of the same size, and let $u$ and $v$ be
+column vectors. We write $x$ for a column vector as well.
+
+\section{The transpose of a product}
+\begin{theorem}
+The transpose of a product keeps the order.
+\end{theorem}
+\begin{proof}
+\begin{align*}
+(A B)^\top &= B^\top A^\top
+\end{align*}
+\end{proof}
+
+\section{A transpose twice}
+\begin{theorem}
+A transpose twice is nothing.
+\end{theorem}
+\begin{proof}
+\begin{align*}
+(A^\top)^\top &= A
+\end{align*}
+\end{proof}
+
+\section{A rank one update}
+\begin{theorem}
+The inverse of a rank one update.
+\end{theorem}
+\begin{proof}
+\begin{align*}
+(A + u v^\top)^{-1} &= A^{-1} - \frac{A^{-1} u v^\top A^{-1}}{1 + v^\top A^{-1} u}
+\end{align*}
+\end{proof}
+
+\end{document}

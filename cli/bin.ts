@@ -46,7 +46,21 @@ interface Args {
     noExplain: boolean;
     /** the report goes in this file, and not on the standard output */
     output?: string;
+    /** a file with no display math fails the run, which is what the Action wants */
+    requireMath: boolean;
   };
+}
+
+/**
+ * An integer flag value, or the run stops: `--seed abc` must not become NaN
+ * and silently change the sampling (review 5.3).
+ */
+function readInt(flag: string, raw: string | undefined): number {
+  const value = Number(raw);
+  if (raw === undefined || !Number.isInteger(value)) {
+    fail(`${flag} wants an integer, and got ${raw === undefined ? 'nothing' : raw}`);
+  }
+  return value;
 }
 
 function parseArgs(argv: string[]): Args {
@@ -64,6 +78,7 @@ function parseArgs(argv: string[]): Args {
       trials: undefined,
       layout: 'denominator',
       noExplain: false,
+      requireMath: false,
     },
   };
 
@@ -87,14 +102,17 @@ function parseArgs(argv: string[]): Args {
       case '--no-explain':
         args.options.noExplain = true;
         break;
+      case '--require-math':
+        args.options.requireMath = next() !== 'false';
+        break;
       case '--output':
         args.options.output = next();
         break;
       case '--seed':
-        args.options.seed = Number(next());
+        args.options.seed = readInt('--seed', next());
         break;
       case '--trials':
-        args.options.trials = Number(next());
+        args.options.trials = readInt('--trials', next());
         break;
       case '--layout':
         args.options.layout = (next() === 'numerator' ? 'numerator' : 'denominator');
@@ -179,6 +197,7 @@ function main(): void {
   }
 
   const reports: FileReport[] = [];
+  const noMath: string[] = [];
   for (const file of files) {
     const source = file === '-' ? readFileSync(0, 'utf8') : readFileSync(file, 'utf8');
     // the checker reads the whole source itself: the rows, the `% samosa:`
@@ -203,6 +222,12 @@ function main(): void {
       }
     }
     reports.push({ file: file === '-' ? 'stdin' : file, report, line: 0, column: 0 });
+    // a file with no display math has nothing to check, which used to pass
+    // CI in silence (review 5.2)
+    if (report.steps.length === 0) {
+      process.stderr.write(`samosa: no display math in ${file === '-' ? 'stdin' : file}, nothing was checked\n`);
+      if (args.options.requireMath) noMath.push(file === '-' ? 'stdin' : file);
+    }
   }
 
   const text = (): string => {
@@ -232,9 +257,11 @@ function main(): void {
     print(text());
   }
 
-  const failing = reports.some((r) =>
-    r.report.steps.some((step) => args.options.failOn.includes(step.verdict)),
-  );
+  const failing =
+    noMath.length > 0 ||
+    reports.some((r) =>
+      r.report.steps.some((step) => args.options.failOn.includes(step.verdict)),
+    );
   process.exit(failing ? 1 : 0);
 }
 

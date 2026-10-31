@@ -142,6 +142,8 @@ export interface CheckOptions {
   trials?: number;
   budgetMs?: number;
   layout?: 'denominator' | 'numerator';
+  /** the CLI only: a file with no display math fails the run (review 5.2) */
+  requireMath?: boolean;
 }
 
 export interface Step {

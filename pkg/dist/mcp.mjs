@@ -6227,16 +6227,22 @@ function splitRows(src) {
     if (t) prose.push(t);
   };
   while (i2 < len) {
-    const beginIdx = src.indexOf("\\begin{", i2);
-    const dollarIdx = src.indexOf("$$", i2);
-    const bracketIdx = src.indexOf("\\[", i2);
-    const candidates = [beginIdx, dollarIdx, bracketIdx].filter((v) => v >= 0);
+    const ifIdx = nextOutsideComment(src, "\\iffalse", i2);
+    const beginIdx = nextOutsideComment(src, "\\begin{", i2);
+    const dollarIdx = nextOutsideComment(src, "$$", i2);
+    const bracketIdx = nextOutsideComment(src, "\\[", i2);
+    const candidates = [ifIdx, beginIdx, dollarIdx, bracketIdx].filter((v) => v >= 0);
     if (!candidates.length) {
       flushProse(src.slice(i2));
       break;
     }
     const next = Math.min(...candidates);
     flushProse(src.slice(i2, next));
+    if (next === ifIdx) {
+      const fi = endOfFalse(src, ifIdx);
+      i2 = fi >= 0 ? fi : len;
+      continue;
+    }
     if (next === beginIdx) {
       const env = readEnvName(src, beginIdx + 6);
       if (!env) {
@@ -6262,14 +6268,14 @@ function splitRows(src) {
       continue;
     }
     if (next === dollarIdx) {
-      const end2 = src.indexOf("$$", dollarIdx + 2);
+      const end2 = nextOutsideComment(src, "$$", dollarIdx + 2);
       const contentStart2 = dollarIdx + 2;
       const contentEnd2 = end2 >= 0 ? end2 : len;
       rows.push(...splitMathContent(src, contentStart2, contentEnd2, `$$@${dollarIdx}`));
       i2 = end2 >= 0 ? end2 + 2 : len;
       continue;
     }
-    const end = src.indexOf("\\]", bracketIdx + 2);
+    const end = nextOutsideComment(src, "\\]", bracketIdx + 2);
     const contentStart = bracketIdx + 2;
     const contentEnd = end >= 0 ? end : len;
     rows.push(...splitMathContent(src, contentStart, contentEnd, `\\[@${bracketIdx}`));
@@ -6296,14 +6302,76 @@ function readEnvName(src, i2) {
   if (end < 0) return null;
   return { name: src.slice(i2 + 1, end), next: end + 1 };
 }
+function inComment(src, at) {
+  const lineStart = src.lastIndexOf("\n", at - 1) + 1;
+  for (let j = lineStart; j < at; j++) {
+    if (src[j] !== "%") continue;
+    let slashes = 0;
+    for (let k = j - 1; k >= lineStart && src[k] === "\\"; k--) slashes++;
+    if (slashes % 2 === 0) return true;
+  }
+  return false;
+}
+function nextOutsideComment(src, marker, from) {
+  let at = src.indexOf(marker, from);
+  while (at >= 0 && inComment(src, at)) at = src.indexOf(marker, at + 1);
+  return at;
+}
+var IF_WORDS = /* @__PURE__ */ new Set([
+  "if",
+  "iftrue",
+  "iffalse",
+  "ifcase",
+  "ifx",
+  "ifnum",
+  "ifdim",
+  "ifodd",
+  "ifhmode",
+  "ifvmode",
+  "ifmmode",
+  "ifinner",
+  "ifvoid",
+  "ifhbox",
+  "ifvbox",
+  "ifeof",
+  "ifdefined",
+  "ifcsname",
+  "ifincsname",
+  "ifprimitive",
+  "iffontchar"
+]);
+function endOfFalse(src, at) {
+  let depth = 1;
+  let i2 = at + 8;
+  while (i2 < src.length) {
+    if (src[i2] !== "\\") {
+      i2 += 1;
+      continue;
+    }
+    const word = /^\\([a-zA-Z]+)/.exec(src.slice(i2, i2 + 40));
+    if (!word) {
+      i2 += 2;
+      continue;
+    }
+    const name = word[1];
+    if (name === "fi") {
+      depth--;
+      if (depth === 0) return i2 + word[0].length;
+    } else if (IF_WORDS.has(name)) {
+      depth++;
+    }
+    i2 += word[0].length;
+  }
+  return -1;
+}
 function findEnvEnd(src, start, envName) {
   let depth = 1;
   let i2 = start + 1;
   const open = `\\begin{${envName}}`;
   const close = `\\end{${envName}}`;
   while (i2 < src.length) {
-    const openIdx = src.indexOf(open, i2);
-    const closeIdx = src.indexOf(close, i2);
+    const openIdx = nextOutsideComment(src, open, i2);
+    const closeIdx = nextOutsideComment(src, close, i2);
     if (closeIdx < 0) return -1;
     if (openIdx >= 0 && openIdx < closeIdx) {
       depth++;
@@ -6316,6 +6384,7 @@ function findEnvEnd(src, start, envName) {
   }
   return -1;
 }
+var ROW_GROUP_ENVS = /* @__PURE__ */ new Set(["aligned", "gathered", "split"]);
 function splitMathContent(src, from, to, where) {
   const rows = [];
   const content = src.slice(from, to);
@@ -6328,13 +6397,34 @@ function splitMathContent(src, from, to, where) {
     if (ch === "\\") {
       const next = chars.slice(i2, i2 + 8).join("");
       if (next.startsWith("\\begin{")) {
+        const name = readEnvName(content, i2 + 6)?.name;
+        const open = `\\begin{${name}}`;
+        if (name && ROW_GROUP_ENVS.has(name)) {
+          for (let j = i2; j < i2 + open.length && j < content.length; j++) chars[j] = " ";
+          i2 += open.length - 1;
+          continue;
+        }
         envDepth++;
         i2 += 7;
         continue;
       }
       if (next.startsWith("\\end{")) {
+        const name = readEnvName(content, i2 + 4)?.name;
+        const close = `\\end{${name}}`;
+        if (name && ROW_GROUP_ENVS.has(name)) {
+          for (let j = i2; j < i2 + close.length && j < content.length; j++) chars[j] = " ";
+          i2 += close.length - 1;
+          continue;
+        }
         envDepth = Math.max(0, envDepth - 1);
         i2 += 5;
+        continue;
+      }
+      if (next.startsWith("\\iffalse")) {
+        const fi = endOfFalse(content, i2);
+        const stop = fi >= 0 ? fi : content.length;
+        for (let j = i2; j < stop; j++) chars[j] = " ";
+        i2 = stop - 1;
         continue;
       }
       if (next.startsWith("\\\\")) {

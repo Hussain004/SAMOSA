@@ -18,13 +18,17 @@ inputs:
     required: false
     default: 'github'
   seed:
-    description: 'The seed of the sampling, so the run is reproducible.'
+    description: 'The seed of the sampling, so the run is reproducible. Empty, and the engine uses its own default.'
     required: false
-    default: '0'
+    default: ''
   preset:
     description: 'The id of a Cookbook preset to check instead of a file.'
     required: false
     default: ''
+  require-math:
+    description: 'A file with no display math fails the run, because nothing was checked in it.'
+    required: false
+    default: 'true'
 runs:
   using: 'composite'
   steps:
@@ -41,11 +45,20 @@ runs:
         SAMOSA_FORMAT: ${{ inputs.format }}
         SAMOSA_SEED: ${{ inputs.seed }}
         SAMOSA_PRESET: ${{ inputs.preset }}
+        SAMOSA_REQUIRE_MATH: ${{ inputs.require-math }}
       run: |
         set -euo pipefail
-        args=(check "$SAMOSA_PATH" --format "$SAMOSA_FORMAT" --fail-on "$SAMOSA_FAIL_ON" --seed "$SAMOSA_SEED")
+        args=(check "$SAMOSA_PATH" --format "$SAMOSA_FORMAT" --fail-on "$SAMOSA_FAIL_ON")
+        # the seed is passed only when it is set, so the Action checks with
+        # the same seed as everything else (review 5.3)
+        if [ -n "$SAMOSA_SEED" ]; then
+          args+=(--seed "$SAMOSA_SEED")
+        fi
         if [ -n "$SAMOSA_PRESET" ]; then
           args+=(--preset "$SAMOSA_PRESET")
+        fi
+        if [ "$SAMOSA_REQUIRE_MATH" = "true" ]; then
+          args+=(--require-math)
         fi
         if [ "$SAMOSA_FORMAT" = "sarif" ]; then
           node "$GITHUB_ACTION_PATH/pkg/dist/cli.mjs" "${args[@]}" --output samosa.sarif

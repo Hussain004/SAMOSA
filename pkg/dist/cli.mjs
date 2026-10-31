@@ -6226,16 +6226,22 @@ function splitRows(src) {
     if (t) prose.push(t);
   };
   while (i < len) {
-    const beginIdx = src.indexOf("\\begin{", i);
-    const dollarIdx = src.indexOf("$$", i);
-    const bracketIdx = src.indexOf("\\[", i);
-    const candidates = [beginIdx, dollarIdx, bracketIdx].filter((v) => v >= 0);
+    const ifIdx = nextOutsideComment(src, "\\iffalse", i);
+    const beginIdx = nextOutsideComment(src, "\\begin{", i);
+    const dollarIdx = nextOutsideComment(src, "$$", i);
+    const bracketIdx = nextOutsideComment(src, "\\[", i);
+    const candidates = [ifIdx, beginIdx, dollarIdx, bracketIdx].filter((v) => v >= 0);
     if (!candidates.length) {
       flushProse(src.slice(i));
       break;
     }
     const next = Math.min(...candidates);
     flushProse(src.slice(i, next));
+    if (next === ifIdx) {
+      const fi = endOfFalse(src, ifIdx);
+      i = fi >= 0 ? fi : len;
+      continue;
+    }
     if (next === beginIdx) {
       const env = readEnvName(src, beginIdx + 6);
       if (!env) {
@@ -6261,14 +6267,14 @@ function splitRows(src) {
       continue;
     }
     if (next === dollarIdx) {
-      const end2 = src.indexOf("$$", dollarIdx + 2);
+      const end2 = nextOutsideComment(src, "$$", dollarIdx + 2);
       const contentStart2 = dollarIdx + 2;
       const contentEnd2 = end2 >= 0 ? end2 : len;
       rows.push(...splitMathContent(src, contentStart2, contentEnd2, `$$@${dollarIdx}`));
       i = end2 >= 0 ? end2 + 2 : len;
       continue;
     }
-    const end = src.indexOf("\\]", bracketIdx + 2);
+    const end = nextOutsideComment(src, "\\]", bracketIdx + 2);
     const contentStart = bracketIdx + 2;
     const contentEnd = end >= 0 ? end : len;
     rows.push(...splitMathContent(src, contentStart, contentEnd, `\\[@${bracketIdx}`));
@@ -6295,14 +6301,76 @@ function readEnvName(src, i) {
   if (end < 0) return null;
   return { name: src.slice(i + 1, end), next: end + 1 };
 }
+function inComment(src, at) {
+  const lineStart = src.lastIndexOf("\n", at - 1) + 1;
+  for (let j = lineStart; j < at; j++) {
+    if (src[j] !== "%") continue;
+    let slashes = 0;
+    for (let k = j - 1; k >= lineStart && src[k] === "\\"; k--) slashes++;
+    if (slashes % 2 === 0) return true;
+  }
+  return false;
+}
+function nextOutsideComment(src, marker, from) {
+  let at = src.indexOf(marker, from);
+  while (at >= 0 && inComment(src, at)) at = src.indexOf(marker, at + 1);
+  return at;
+}
+var IF_WORDS = /* @__PURE__ */ new Set([
+  "if",
+  "iftrue",
+  "iffalse",
+  "ifcase",
+  "ifx",
+  "ifnum",
+  "ifdim",
+  "ifodd",
+  "ifhmode",
+  "ifvmode",
+  "ifmmode",
+  "ifinner",
+  "ifvoid",
+  "ifhbox",
+  "ifvbox",
+  "ifeof",
+  "ifdefined",
+  "ifcsname",
+  "ifincsname",
+  "ifprimitive",
+  "iffontchar"
+]);
+function endOfFalse(src, at) {
+  let depth = 1;
+  let i = at + 8;
+  while (i < src.length) {
+    if (src[i] !== "\\") {
+      i += 1;
+      continue;
+    }
+    const word = /^\\([a-zA-Z]+)/.exec(src.slice(i, i + 40));
+    if (!word) {
+      i += 2;
+      continue;
+    }
+    const name = word[1];
+    if (name === "fi") {
+      depth--;
+      if (depth === 0) return i + word[0].length;
+    } else if (IF_WORDS.has(name)) {
+      depth++;
+    }
+    i += word[0].length;
+  }
+  return -1;
+}
 function findEnvEnd(src, start, envName) {
   let depth = 1;
   let i = start + 1;
   const open = `\\begin{${envName}}`;
   const close = `\\end{${envName}}`;
   while (i < src.length) {
-    const openIdx = src.indexOf(open, i);
-    const closeIdx = src.indexOf(close, i);
+    const openIdx = nextOutsideComment(src, open, i);
+    const closeIdx = nextOutsideComment(src, close, i);
     if (closeIdx < 0) return -1;
     if (openIdx >= 0 && openIdx < closeIdx) {
       depth++;
@@ -6315,6 +6383,7 @@ function findEnvEnd(src, start, envName) {
   }
   return -1;
 }
+var ROW_GROUP_ENVS = /* @__PURE__ */ new Set(["aligned", "gathered", "split"]);
 function splitMathContent(src, from, to, where) {
   const rows = [];
   const content = src.slice(from, to);
@@ -6327,13 +6396,34 @@ function splitMathContent(src, from, to, where) {
     if (ch === "\\") {
       const next = chars.slice(i, i + 8).join("");
       if (next.startsWith("\\begin{")) {
+        const name = readEnvName(content, i + 6)?.name;
+        const open = `\\begin{${name}}`;
+        if (name && ROW_GROUP_ENVS.has(name)) {
+          for (let j = i; j < i + open.length && j < content.length; j++) chars[j] = " ";
+          i += open.length - 1;
+          continue;
+        }
         envDepth++;
         i += 7;
         continue;
       }
       if (next.startsWith("\\end{")) {
+        const name = readEnvName(content, i + 4)?.name;
+        const close = `\\end{${name}}`;
+        if (name && ROW_GROUP_ENVS.has(name)) {
+          for (let j = i; j < i + close.length && j < content.length; j++) chars[j] = " ";
+          i += close.length - 1;
+          continue;
+        }
         envDepth = Math.max(0, envDepth - 1);
         i += 5;
+        continue;
+      }
+      if (next.startsWith("\\iffalse")) {
+        const fi = endOfFalse(content, i);
+        const stop = fi >= 0 ? fi : content.length;
+        for (let j = i; j < stop; j++) chars[j] = " ";
+        i = stop - 1;
         continue;
       }
       if (next.startsWith("\\\\")) {
@@ -10720,6 +10810,13 @@ function topLevel(argv) {
       break;
   }
 }
+function readInt(flag, raw) {
+  const value = Number(raw);
+  if (raw === void 0 || !Number.isInteger(value)) {
+    fail(`${flag} wants an integer, and got ${raw === void 0 ? "nothing" : raw}`);
+  }
+  return value;
+}
 function parseArgs(argv) {
   topLevel(argv);
   const args = {
@@ -10733,7 +10830,8 @@ function parseArgs(argv) {
       seed: void 0,
       trials: void 0,
       layout: "denominator",
-      noExplain: false
+      noExplain: false,
+      requireMath: false
     }
   };
   for (let i = 1; i < argv.length; i++) {
@@ -10756,14 +10854,17 @@ function parseArgs(argv) {
       case "--no-explain":
         args.options.noExplain = true;
         break;
+      case "--require-math":
+        args.options.requireMath = next() !== "false";
+        break;
       case "--output":
         args.options.output = next();
         break;
       case "--seed":
-        args.options.seed = Number(next());
+        args.options.seed = readInt("--seed", next());
         break;
       case "--trials":
-        args.options.trials = Number(next());
+        args.options.trials = readInt("--trials", next());
         break;
       case "--layout":
         args.options.layout = next() === "numerator" ? "numerator" : "denominator";
@@ -10836,6 +10937,7 @@ ${usage()}`);
 ` + usage());
   }
   const reports = [];
+  const noMath = [];
   for (const file of files) {
     const source = file === "-" ? readFileSync(0, "utf8") : readFileSync(file, "utf8");
     const report = check(source, { ...args.options });
@@ -10853,6 +10955,11 @@ ${usage()}`);
       }
     }
     reports.push({ file: file === "-" ? "stdin" : file, report, line: 0, column: 0 });
+    if (report.steps.length === 0) {
+      process.stderr.write(`samosa: no display math in ${file === "-" ? "stdin" : file}, nothing was checked
+`);
+      if (args.options.requireMath) noMath.push(file === "-" ? "stdin" : file);
+    }
   }
   const text = () => {
     switch (args.options.format) {
@@ -10876,7 +10983,7 @@ ${usage()}`);
   } else {
     print(text());
   }
-  const failing = reports.some(
+  const failing = noMath.length > 0 || reports.some(
     (r) => r.report.steps.some((step) => args.options.failOn.includes(step.verdict))
   );
   process.exit(failing ? 1 : 0);

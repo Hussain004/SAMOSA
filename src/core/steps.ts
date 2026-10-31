@@ -72,17 +72,26 @@ export function splitRows(src: string): SourceRow[] {
   };
 
   while (i < len) {
-    const beginIdx = src.indexOf('\\begin{', i);
-    const dollarIdx = src.indexOf('$$', i);
-    const bracketIdx = src.indexOf('\\[', i);
+    const ifIdx = nextOutsideComment(src, '\\iffalse', i);
+    const beginIdx = nextOutsideComment(src, '\\begin{', i);
+    const dollarIdx = nextOutsideComment(src, '$$', i);
+    const bracketIdx = nextOutsideComment(src, '\\[', i);
 
-    const candidates = [beginIdx, dollarIdx, bracketIdx].filter((v) => v >= 0);
+    const candidates = [ifIdx, beginIdx, dollarIdx, bracketIdx].filter((v) => v >= 0);
     if (!candidates.length) {
       flushProse(src.slice(i));
       break;
     }
     const next = Math.min(...candidates);
     flushProse(src.slice(i, next));
+
+    if (next === ifIdx) {
+      // a conditional that is false: TeX skips its text without reading it,
+      // so the checker does the same (review 5.2)
+      const fi = endOfFalse(src, ifIdx);
+      i = fi >= 0 ? fi : len;
+      continue;
+    }
 
     if (next === beginIdx) {
       const env = readEnvName(src, beginIdx + 6);
@@ -113,7 +122,7 @@ export function splitRows(src: string): SourceRow[] {
     }
 
     if (next === dollarIdx) {
-      const end = src.indexOf('$$', dollarIdx + 2);
+      const end = nextOutsideComment(src, '$$', dollarIdx + 2);
       const contentStart = dollarIdx + 2;
       const contentEnd = end >= 0 ? end : len;
       rows.push(...splitMathContent(src, contentStart, contentEnd, `$$@${dollarIdx}`));
@@ -122,7 +131,7 @@ export function splitRows(src: string): SourceRow[] {
     }
 
     // \[
-    const end = src.indexOf('\\]', bracketIdx + 2);
+    const end = nextOutsideComment(src, '\\]', bracketIdx + 2);
     const contentStart = bracketIdx + 2;
     const contentEnd = end >= 0 ? end : len;
     rows.push(...splitMathContent(src, contentStart, contentEnd, `\\[@${bracketIdx}`));
@@ -156,14 +165,74 @@ function readEnvName(src: string, i: number): { name: string; next: number } | n
   return { name: src.slice(i + 1, end), next: end + 1 };
 }
 
+/**
+ * True when the character at `at` sits in a `%` comment of its line.
+ *
+ * A percent that an odd number of backslashes precedes is the escaped
+ * percent, not the start of a comment.
+ */
+function inComment(src: string, at: number): boolean {
+  const lineStart = src.lastIndexOf('\n', at - 1) + 1;
+  for (let j = lineStart; j < at; j++) {
+    if (src[j] !== '%') continue;
+    let slashes = 0;
+    for (let k = j - 1; k >= lineStart && src[k] === '\\'; k--) slashes++;
+    if (slashes % 2 === 0) return true;
+  }
+  return false;
+}
+
+/** The next occurrence of a marker that is not inside a comment. */
+function nextOutsideComment(src: string, marker: string, from: number): number {
+  let at = src.indexOf(marker, from);
+  while (at >= 0 && inComment(src, at)) at = src.indexOf(marker, at + 1);
+  return at;
+}
+
+/** The conditional words that open a TeX skipping region. */
+const IF_WORDS = new Set([
+  'if', 'iftrue', 'iffalse', 'ifcase', 'ifx', 'ifnum', 'ifdim', 'ifodd',
+  'ifhmode', 'ifvmode', 'ifmmode', 'ifinner', 'ifvoid', 'ifhbox', 'ifvbox',
+  'ifeof', 'ifdefined', 'ifcsname', 'ifincsname', 'ifprimitive', 'iffontchar',
+]);
+
+/**
+ * The index just past the `\fi` that closes the `\iffalse` opened at `at`,
+ * or -1 when the conditional is never closed.
+ */
+function endOfFalse(src: string, at: number): number {
+  let depth = 1;
+  let i = at + 8;
+  while (i < src.length) {
+    if (src[i] !== '\\') {
+      i += 1;
+      continue;
+    }
+    const word = /^\\([a-zA-Z]+)/.exec(src.slice(i, i + 40));
+    if (!word) {
+      i += 2;
+      continue;
+    }
+    const name = word[1];
+    if (name === 'fi') {
+      depth--;
+      if (depth === 0) return i + word[0].length;
+    } else if (IF_WORDS.has(name)) {
+      depth++;
+    }
+    i += word[0].length;
+  }
+  return -1;
+}
+
 function findEnvEnd(src: string, start: number, envName: string): number {
   let depth = 1;
   let i = start + 1;
   const open = `\\begin{${envName}}`;
   const close = `\\end{${envName}}`;
   while (i < src.length) {
-    const openIdx = src.indexOf(open, i);
-    const closeIdx = src.indexOf(close, i);
+    const openIdx = nextOutsideComment(src, open, i);
+    const closeIdx = nextOutsideComment(src, close, i);
     if (closeIdx < 0) return -1;
     if (openIdx >= 0 && openIdx < closeIdx) {
       depth++;
@@ -176,6 +245,14 @@ function findEnvEnd(src: string, start: number, envName: string): number {
   }
   return -1;
 }
+
+/**
+ * The row groups. Inside a math region they only wrap rows: their markers
+ * carry no mathematics of their own, and their backslash backslash still
+ * separates the rows of the region. An `aligned` inside an `equation` is
+ * the common shape (review 5.2).
+ */
+const ROW_GROUP_ENVS = new Set(['aligned', 'gathered', 'split']);
 
 /**
  * Splits the content of a math region into rows.
@@ -196,13 +273,37 @@ function splitMathContent(src: string, from: number, to: number, where: string):
     if (ch === '\\') {
       const next = chars.slice(i, i + 8).join('');
       if (next.startsWith('\\begin{')) {
+        const name = readEnvName(content, i + 6)?.name;
+        const open = `\\begin{${name}}`;
+        if (name && ROW_GROUP_ENVS.has(name)) {
+          // the markers of a row group are not part of the rows
+          for (let j = i; j < i + open.length && j < content.length; j++) chars[j] = ' ';
+          i += open.length - 1;
+          continue;
+        }
         envDepth++;
         i += 7;
         continue;
       }
       if (next.startsWith('\\end{')) {
+        const name = readEnvName(content, i + 4)?.name;
+        const close = `\\end{${name}}`;
+        if (name && ROW_GROUP_ENVS.has(name)) {
+          for (let j = i; j < i + close.length && j < content.length; j++) chars[j] = ' ';
+          i += close.length - 1;
+          continue;
+        }
         envDepth = Math.max(0, envDepth - 1);
         i += 5;
+        continue;
+      }
+      if (next.startsWith('\\iffalse')) {
+        // the conditional text is not part of the rows: it is blanked, and
+        // the offsets stay where they were
+        const fi = endOfFalse(content, i);
+        const stop = fi >= 0 ? fi : content.length;
+        for (let j = i; j < stop; j++) chars[j] = ' ';
+        i = stop - 1;
         continue;
       }
       if (next.startsWith('\\\\')) {
