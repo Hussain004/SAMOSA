@@ -6379,6 +6379,37 @@ function pushRow(rows, segment, offset, where) {
 function cleanRow(text) {
   return text.replace(/\\nonumber\b/g, "").replace(/\\notag\b/g, "").replace(/\\\\\s*$/, "").trim();
 }
+function harvestProseDecls(prose) {
+  const found = [];
+  for (const line of prose) {
+    const m = line.match(/\bwhere\b\s*([\s\S]+)$/i);
+    if (!m) continue;
+    const rest = m[1];
+    for (const piece of rest.split(/[,;]\s*(?=[A-Za-z\\])/)) {
+      const t = piece.trim();
+      if (!t) continue;
+      if (/\\in\s*\\mathbb|\\succ|\\succeq|\\sim|\\top\s*\w*\s*=|:/.test(t)) {
+        found.push(t);
+      }
+    }
+  }
+  return found;
+}
+function harvestDecls(src) {
+  const comments = [];
+  const whereLines = [];
+  for (const line of src.split("\n")) {
+    const trimmed = line.trim();
+    const comment = trimmed.match(/%\s*samosa:\s*(.+)$/);
+    if (comment) {
+      comments.push(comment[1].trim());
+      continue;
+    }
+    if (!trimmed || trimmed.startsWith("%")) continue;
+    if (/\bwhere\b/i.test(trimmed)) whereLines.push(trimmed);
+  }
+  return [...comments, ...harvestProseDecls(whereLines)];
+}
 
 // src/core/decl.ts
 var PROP_WORDS = {
@@ -7697,7 +7728,8 @@ function rawReason(node) {
 }
 function analyzeSource(src, opts) {
   const rows = splitRows(src);
-  const declared = parseDeclarations(opts.decls ?? "");
+  const harvested = harvestDecls(src);
+  const declared = parseDeclarations([opts.decls ?? "", ...harvested].filter(Boolean).join("; "));
   const preset = presetDecls(opts.preset);
   const decls = mergeDecls(preset, declared.decls);
   const ctx = createContext(decls, opts.layout ?? "denominator");

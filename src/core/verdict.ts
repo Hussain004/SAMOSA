@@ -13,7 +13,7 @@ import {
 import { Sampler } from './sample.ts';
 import { rngFor, type Rng } from './prng.ts';
 import { DEFAULT_FUNCTIONS, parseRow } from './parse.ts';
-import { splitRows } from './steps.ts';
+import { splitRows, harvestDecls } from './steps.ts';
 import { parseDeclarations, type SymbolDecl } from './decl.ts';
 import { presetDecls } from './presets.ts';
 import {
@@ -253,7 +253,11 @@ export interface Source {
  */
 export function analyzeSource(src: string, opts: CheckOptions): Source {
   const rows = splitRows(src);
-  const declared = parseDeclarations(opts.decls ?? '');
+  // the declarations around the mathematics count too: the `% samosa:`
+  // comments and the where lines (review 4.7), so the CLI, the MCP server
+  // and the app all read the same source the same way
+  const harvested = harvestDecls(src);
+  const declared = parseDeclarations([opts.decls ?? '', ...harvested].filter(Boolean).join('; '));
   const preset = presetDecls(opts.preset);
   const decls = mergeDecls(preset, declared.decls);
 

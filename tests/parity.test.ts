@@ -60,4 +60,29 @@ describe('the same verdict everywhere', () => {
     const other = check(item.bugSource!, { decls: item.decls, seed: 12345 });
     expect(other.steps.map((s) => s.verdict)).toEqual(report.steps.map((s) => s.verdict));
   });
+
+  it('a source that declares its symbols in a comment is read everywhere (review 4.7)', () => {
+    // the comment used to be a CLI-only feature: the MCP server and the app
+    // passed the LaTeX straight to check() and never saw the declarations
+    const src = [
+      '% samosa: A: sym n',
+      '\\begin{align*}',
+      '  A^\\top &= A \\\\',
+      '  A^\\top A &= A^2',
+      '\\end{align*}',
+    ].join('\n');
+    const withComment = check(src);
+    const steps = withComment.steps.filter((s) => s.verdict !== 'defined');
+    // the symmetric identity holds once the comment has been read
+    for (const step of steps) {
+      expect(['ok', 'inconclusive', 'unchecked']).toContain(step.verdict);
+      expect(step.verdict).not.toBe('shape');
+      expect(step.message).not.toContain('treated as a matrix');
+    }
+    // and the same source without the comment says so honestly: the engine
+    // has to guess what A is, and flags the guess
+    const withoutComment = check(src.replace('% samosa: A: sym n\n', ''));
+    expect(withoutComment.steps.some((s) => s.verdict === 'wrong')).toBe(true);
+    expect(withoutComment.chips.some((c) => c.id === 'shape-guess')).toBe(true);
+  });
 });

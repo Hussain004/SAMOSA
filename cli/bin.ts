@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 import { readFileSync, writeFileSync } from 'node:fs';
-import { basename, extname } from 'node:path';
+import { basename } from 'node:path';
 import { check, explainAll, type CheckOptions, type Report } from '../src/core/index.ts';
-import { extractDocument } from './extract.ts';
 import { expandGlob } from './glob.ts';
 import { formatGithub, formatPretty, formatSarif } from './format.ts';
 
@@ -182,22 +181,20 @@ function main(): void {
   const reports: FileReport[] = [];
   for (const file of files) {
     const source = file === '-' ? readFileSync(0, 'utf8') : readFileSync(file, 'utf8');
-    const isTex = file === '-' ? true : extname(file) === '.tex';
-    const extraction = extractDocument(source, isTex);
-    const decls = [args.options.decls, ...extraction.decls].filter(Boolean).join('; ');
-    const rows = extraction.rows.map((r) => r.text).join('\\\\\n');
-    const report = check(rows, { ...args.options, decls });
+    // the checker reads the whole source itself: the rows, the `% samosa:`
+    // comments and the where prose (review 4.7), so the CLI sees exactly
+    // what the MCP server and the app see
+    const report = check(source, { ...args.options });
     // the line of every step, so the output can point at it
     for (const step of report.steps) {
-      const row = extraction.rows.find((r) => step.text?.startsWith(r.text));
-      step.line = row?.line ?? 0;
-      step.column = 1;
+      step.line = source.slice(0, step.span.from).split('\n').length;
+      step.column = step.span.from - source.lastIndexOf('\n', step.span.from - 1);
     }
     // The fixes and the shrunk counterexample, so the CLI says what to do and
     // not only that the step is wrong. The rows that are wrong are few, so
     // this is affordable.
     if (!args.options.noExplain) {
-      const explanations = explainAll(rows, { ...args.options, decls }, 8, report);
+      const explanations = explainAll(source, { ...args.options }, 8, report);
       for (const step of report.steps) {
         const explanation = explanations.get(step.id);
         if (!explanation) continue;

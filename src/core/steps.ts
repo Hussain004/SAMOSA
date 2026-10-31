@@ -287,12 +287,35 @@ export function harvestProseDecls(prose: string[]): string[] {
     for (const piece of rest.split(/[,;]\s*(?=[A-Za-z\\])/)) {
       const t = piece.trim();
       if (!t) continue;
-      if (/\\in\s*\\mathbb|\\succ|\\succeq|\\sim|\\top\\s*\w*\s*=/.test(t) || /:\s*fn\b/.test(t)) {
+      if (/\\in\s*\\mathbb|\\succ|\\succeq|\\sim|\\top\s*\w*\s*=|:/.test(t)) {
         found.push(t);
       }
     }
   }
   return found;
+}
+
+/**
+ * The declarations that live around the mathematics, not inside it: the
+ * `% samosa:` comments and the where lines (review 4.7).
+ *
+ * Every caller passes the raw source, so the checker itself reads these:
+ * the CLI, the MCP server and the app all see the same declarations.
+ */
+export function harvestDecls(src: string): string[] {
+  const comments: string[] = [];
+  const whereLines: string[] = [];
+  for (const line of src.split('\n')) {
+    const trimmed = line.trim();
+    const comment = trimmed.match(/%\s*samosa:\s*(.+)$/);
+    if (comment) {
+      comments.push(comment[1].trim());
+      continue;
+    }
+    if (!trimmed || trimmed.startsWith('%')) continue;
+    if (/\bwhere\b/i.test(trimmed)) whereLines.push(trimmed);
+  }
+  return [...comments, ...harvestProseDecls(whereLines)];
 }
 
 /** The span of a row inside the source. */
