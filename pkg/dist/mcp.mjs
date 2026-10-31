@@ -6524,6 +6524,10 @@ var PROP_WORDS = {
   stoch: "stoch",
   stochastic: "stoch",
   ones: "ones",
+  ident: "ident",
+  identity: "ident",
+  zero: "zero",
+  zeroes: "zero",
   pos: "pos",
   positive: "pos",
   int: "int",
@@ -6831,6 +6835,7 @@ function parseCompactItem(item, result) {
         result.decls.push(decl);
         continue;
       }
+      result.errors.push(`the type of ${name} is not read: ${type}`);
     }
     if (names.length) return true;
   }
@@ -6888,7 +6893,7 @@ function parseType(name, type) {
   }
   if (dims.length === 1) {
     const matrixish = props.some(
-      (p) => typeof p === "string" && ["sym", "spd", "psd", "orth", "rot", "diag", "triu", "tril", "skew", "idem", "proj", "stoch"].includes(p)
+      (p) => typeof p === "string" && ["sym", "spd", "psd", "orth", "rot", "diag", "triu", "tril", "skew", "idem", "proj", "stoch", "zero", "ident"].includes(p)
     );
     return {
       ...base2,
@@ -7901,7 +7906,7 @@ function analyzeSource(src, opts) {
       }
     }
   }
-  return { ctx, defs, steps };
+  return { ctx, defs, steps, declErrors: declared.errors };
 }
 function check(src, opts = {}) {
   const started = now();
@@ -7933,6 +7938,9 @@ function check(src, opts = {}) {
     const result = checkStep(step, ctx, defs, { seed, trials, budgetMs: opts.budgetMs ?? 500 }, diagnostics);
     result.text ??= step.text;
     results.push(result);
+  }
+  for (const message of source.declErrors) {
+    diagnostics.push({ severity: "warning", message, span: { from: 0, to: 0 } });
   }
   chips.push(...ctx.chips);
   return {
@@ -11184,6 +11192,7 @@ var stepSchema = z.object({
 var reportSchema = z.object({
   summary: z.string(),
   steps: z.array(stepSchema),
+  warnings: z.array(z.string()),
   shareUrl: z.string().optional()
 }).passthrough();
 function summarise(report) {
@@ -11229,6 +11238,9 @@ server.registerTool(
     );
     const structured = {
       summary: summarise(report),
+      // the declarations that could not be read, so the agent hears what the
+      // user wrote that did nothing (review 5.5)
+      warnings: report.diagnostics.filter((d) => d.severity !== "error").map((d) => d.message),
       steps: report.steps.map((step) => {
         const explanation = explanations.get(step.id);
         return {

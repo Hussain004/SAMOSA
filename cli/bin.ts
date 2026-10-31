@@ -103,7 +103,11 @@ function parseArgs(argv: string[]): Args {
         args.options.noExplain = true;
         break;
       case '--require-math':
-        args.options.requireMath = next() !== 'false';
+        // a flag without a value: the next argument belongs where it belongs
+        args.options.requireMath = true;
+        break;
+      case '--no-require-math':
+        args.options.requireMath = false;
         break;
       case '--output':
         args.options.output = next();
@@ -222,6 +226,13 @@ function main(): void {
       }
     }
     reports.push({ file: file === '-' ? 'stdin' : file, report, line: 0, column: 0 });
+    // a declaration that could not be read is a warning on the standard
+    // error, so a paper the user thought was declared is said out loud
+    // (review 5.5)
+    for (const diagnostic of report.diagnostics) {
+      if (diagnostic.severity === 'error') continue;
+      process.stderr.write(`samosa: ${diagnostic.message}\n`);
+    }
     // a file with no display math has nothing to check, which used to pass
     // CI in silence (review 5.2)
     if (report.steps.length === 0) {

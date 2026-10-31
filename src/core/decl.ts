@@ -93,6 +93,10 @@ const PROP_WORDS: Record<string, Prop> = {
   stoch: 'stoch',
   stochastic: 'stoch',
   ones: 'ones',
+  ident: 'ident',
+  identity: 'ident',
+  zero: 'zero',
+  zeroes: 'zero',
   pos: 'pos',
   positive: 'pos',
   int: 'int',
@@ -448,6 +452,10 @@ export function parseCompactItem(item: string, result: DeclResult): boolean {
         result.decls.push(decl);
         continue;
       }
+      // a type that is not read is an error, never a silence: the user
+      // declared the symbol and must hear that the word was unknown
+      // (review 5.5)
+      result.errors.push(`the type of ${name} is not read: ${type}`);
     }
     if (names.length) return true;
   }
@@ -515,9 +523,10 @@ function parseType(name: string, type: string): SymbolDecl | null {
   }
   if (dims.length === 1) {
     // one dimension means a column vector, unless the structure says matrix
-    const matrixish = props.some((p) =>
-      typeof p === 'string' &&
-      ['sym', 'spd', 'psd', 'orth', 'rot', 'diag', 'triu', 'tril', 'skew', 'idem', 'proj', 'stoch'].includes(p),
+    const matrixish = props.some(
+      (p) =>
+        typeof p === 'string' &&
+        ['sym', 'spd', 'psd', 'orth', 'rot', 'diag', 'triu', 'tril', 'skew', 'idem', 'proj', 'stoch', 'zero', 'ident'].includes(p),
     );
     return {
       ...base,

@@ -1,4 +1,8 @@
 import { readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 import { check } from '../src/core/index.ts';
@@ -80,5 +84,20 @@ describe('the command on a file with no display math', () => {
     const bad = run('tests/e2e/action/holds.tex', '--seed', 'abc');
     expect(bad.status).toBe(2);
     expect(bad.stderr).toContain('--seed');
+  });
+
+  it('a flag that takes no value leaves the arguments after it alone', () => {
+    // the Action writes the SARIF with --require-math before --output; the
+    // flag once consumed --output, the SARIF path became an input file, and
+    // no SARIF was ever written
+    const out = join(tmpdir(), `samosa-${process.pid}.sarif`);
+    const run2 = spawnSync(
+      'npx',
+      ['vite-node', 'cli/bin.ts', 'check', 'tests/e2e/action/wrong.tex', '--format', 'sarif', '--require-math', '--output', out],
+      { cwd: new URL('..', import.meta.url).pathname, encoding: 'utf8', timeout: 120_000 },
+    );
+    expect(run2.status).toBe(1);
+    expect(existsSync(out)).toBe(true);
+    rmSync(out, { force: true });
   });
 });

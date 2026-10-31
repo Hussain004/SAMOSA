@@ -308,6 +308,15 @@ export function App() {
             spellCheck={false}
             className="mt-2 h-20 w-full resize-y rounded border border-[var(--color-line)] bg-black/40 p-2 font-mono text-xs outline-none focus:border-[var(--color-gold)]"
           />
+          {report?.diagnostics.some((d) => d.severity !== 'error') && (
+            <div className="mt-1 text-[0.6875rem] text-[var(--color-gold)]">
+              {report.diagnostics
+                .filter((d) => d.severity !== 'error')
+                .map((d, i) => (
+                  <p key={i}>{d.message}</p>
+                ))}
+            </div>
+          )}
           <div className="mt-3 flex flex-wrap items-center gap-4 text-[0.6875rem] text-[var(--color-muted)]">
             <label className="flex items-center gap-2">
               seed

@@ -41,6 +41,7 @@ const reportSchema = z
   .object({
     summary: z.string(),
     steps: z.array(stepSchema),
+    warnings: z.array(z.string()),
     shareUrl: z.string().optional(),
   })
   .passthrough();
@@ -100,6 +101,9 @@ server.registerTool(
     );
     const structured = {
       summary: summarise(report),
+      // the declarations that could not be read, so the agent hears what the
+      // user wrote that did nothing (review 5.5)
+      warnings: report.diagnostics.filter((d) => d.severity !== 'error').map((d) => d.message),
       steps: report.steps.map((step) => {
         const explanation = explanations.get(step.id);
         return {

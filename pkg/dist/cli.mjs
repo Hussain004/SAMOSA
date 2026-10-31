@@ -6523,6 +6523,10 @@ var PROP_WORDS = {
   stoch: "stoch",
   stochastic: "stoch",
   ones: "ones",
+  ident: "ident",
+  identity: "ident",
+  zero: "zero",
+  zeroes: "zero",
   pos: "pos",
   positive: "pos",
   int: "int",
@@ -6830,6 +6834,7 @@ function parseCompactItem(item, result) {
         result.decls.push(decl);
         continue;
       }
+      result.errors.push(`the type of ${name} is not read: ${type}`);
     }
     if (names.length) return true;
   }
@@ -6887,7 +6892,7 @@ function parseType(name, type) {
   }
   if (dims.length === 1) {
     const matrixish = props.some(
-      (p) => typeof p === "string" && ["sym", "spd", "psd", "orth", "rot", "diag", "triu", "tril", "skew", "idem", "proj", "stoch"].includes(p)
+      (p) => typeof p === "string" && ["sym", "spd", "psd", "orth", "rot", "diag", "triu", "tril", "skew", "idem", "proj", "stoch", "zero", "ident"].includes(p)
     );
     return {
       ...base2,
@@ -7900,7 +7905,7 @@ function analyzeSource(src, opts) {
       }
     }
   }
-  return { ctx, defs, steps };
+  return { ctx, defs, steps, declErrors: declared.errors };
 }
 function check(src, opts = {}) {
   const started = now();
@@ -7932,6 +7937,9 @@ function check(src, opts = {}) {
     const result = checkStep(step, ctx, defs, { seed, trials, budgetMs: opts.budgetMs ?? 500 }, diagnostics);
     result.text ??= step.text;
     results.push(result);
+  }
+  for (const message of source.declErrors) {
+    diagnostics.push({ severity: "warning", message, span: { from: 0, to: 0 } });
   }
   chips.push(...ctx.chips);
   return {
@@ -10855,7 +10863,10 @@ function parseArgs(argv) {
         args.options.noExplain = true;
         break;
       case "--require-math":
-        args.options.requireMath = next() !== "false";
+        args.options.requireMath = true;
+        break;
+      case "--no-require-math":
+        args.options.requireMath = false;
         break;
       case "--output":
         args.options.output = next();
@@ -10955,6 +10966,11 @@ ${usage()}`);
       }
     }
     reports.push({ file: file === "-" ? "stdin" : file, report, line: 0, column: 0 });
+    for (const diagnostic of report.diagnostics) {
+      if (diagnostic.severity === "error") continue;
+      process.stderr.write(`samosa: ${diagnostic.message}
+`);
+    }
     if (report.steps.length === 0) {
       process.stderr.write(`samosa: no display math in ${file === "-" ? "stdin" : file}, nothing was checked
 `);

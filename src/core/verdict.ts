@@ -244,6 +244,8 @@ export interface Source {
   defs: Map<string, Node>;
   /** every step of the source, in order, with stable ids */
   steps: Step[];
+  /** the declarations that could not be read, one message each (review 5.5) */
+  declErrors: string[];
 }
 
 /**
@@ -361,7 +363,7 @@ export function analyzeSource(src: string, opts: CheckOptions): Source {
     }
   }
 
-  return { ctx, defs, steps };
+  return { ctx, defs, steps, declErrors: declared.errors };
 }
 
 /** Checks a derivation. This is the entry point of the whole product. */
@@ -403,6 +405,12 @@ export function check(src: string, opts: CheckOptions = {}): Report {
     // line of the file the step came from
     result.text ??= step.text;
     results.push(result);
+  }
+
+  // a declaration that could not be read is said out loud, in the same
+  // diagnostics the steps use (review 5.5)
+  for (const message of source.declErrors) {
+    diagnostics.push({ severity: 'warning', message, span: { from: 0, to: 0 } });
   }
 
   chips.push(...ctx.chips);
