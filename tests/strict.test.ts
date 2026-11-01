@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import { check } from '../src/core/verdict.ts';
 import { parseRow } from '../src/core/parse.ts';
+import { parseDeclarations } from '../src/core/decl.ts';
 
 /**
  * The rows that look right and are not.
@@ -87,5 +88,47 @@ describe('an implicit definition', () => {
     const report = check('\\begin{align*} S &= S + I \\end{align*}', { decls: 'S: spd n' });
     expect(report.steps[0].verdict).not.toBe('defined');
     expect(report.steps[0].verdict).not.toBe('ok');
+  });
+});
+
+describe('a declaration the parser does not read (review 5.5)', () => {
+  it('the words for the standing matrices are there', () => {
+    const result = parseDeclarations('Z: zero n; E: ident n; B: n by n');
+    expect(result.decls.map((d) => `${d.name}:${d.kind}`)).toEqual(['Z:matrix', 'E:matrix', 'B:matrix']);
+    expect(result.errors).toEqual([]);
+  });
+
+  it('an unknown type is an error, never a silence', () => {
+    const result = parseDeclarations('Z: zero n; A: banana n');
+    expect(result.decls.map((d) => d.name)).toEqual(['Z']);
+    expect(result.errors).toEqual(['the type of A is not read: banana n']);
+  });
+
+  it('the checker says the error out loud, in the diagnostics', () => {
+    const report = check('A^\\top = A', { decls: 'A: banana n' });
+    expect(report.diagnostics.some((d) => d.message.includes('the type of A is not read'))).toBe(true);
+    // the symbol really is undeclared, so the engine also says what it had
+    // to guess about it
+    expect(report.chips.some((c) => c.id === 'shape-guess')).toBe(true);
+  });
+
+  it('a zero on one side names the zero matrix', () => {
+    // P idempotent is singular by design, so this also needs 5.4
+    const report = check('(P - I) P = 0', { decls: 'P: idem 3' });
+    expect(report.steps[0].verdict).toBe('ok');
+  });
+
+  it('a matrix against a number that is not zero is still a shape error', () => {
+    const report = check('A = 5', { decls: 'A: n×n' });
+    expect(report.steps[0].verdict).toBe('shape');
+  });
+
+  it('a pinned dimension is used, not dropped', () => {
+    const pinned = check('A^\\top = A', { decls: 'A: sym n; n = 3' });
+    const free = check('A^\\top = A', { decls: 'A: sym n' });
+    // the pinned dimension is swept at no size, the free one at three
+    expect(pinned.steps[0].card.sizes).toEqual([{}]);
+    expect(free.steps[0].card.sizes.length).toBeGreaterThan(1);
+    expect(pinned.steps[0].verdict).toBe('ok');
   });
 });

@@ -6879,7 +6879,7 @@ function parseType(name, type) {
     break;
   }
   const rest = words.slice(i).join(" ");
-  const dimText2 = rest.replace(/[x×]/g, "\xD7");
+  const dimText2 = rest.replace(/[x×]|\bby\b/gi, "\xD7");
   const parts = dimText2.split("\xD7").map((p) => p.trim()).filter(Boolean);
   for (const p of parts) {
     const d = parseDim(p);
@@ -7047,7 +7047,7 @@ var Dims = class {
     return [...roots].sort();
   }
 };
-function createContext(decls, layout = "denominator") {
+function createContext(decls, layout = "denominator", pinned = {}) {
   const map = /* @__PURE__ */ new Map();
   for (const d of decls) map.set(d.name, d);
   for (const d of decls) {
@@ -7079,7 +7079,8 @@ function createContext(decls, layout = "denominator") {
     dimVars,
     freshCount: 0,
     bound: /* @__PURE__ */ new Set(),
-    layout
+    layout,
+    pinned
   };
 }
 function freshDim(ctx) {
@@ -7666,7 +7667,10 @@ function recipeDegree(ctx, name, props, sizes) {
 }
 function dimSize(ctx, d, sizes) {
   if (typeof d === "number") return d;
-  return sizes.get(ctx.dims.find(d.v)) ?? 3;
+  const root = ctx.dims.find(d.v);
+  const pinned = ctx.pinned[root];
+  if (pinned !== void 0) return pinned;
+  return sizes.get(root) ?? 3;
 }
 function matrixSize(ctx, node, sizes) {
   if (node.k === "sym") {
@@ -7732,7 +7736,9 @@ function collectDimVarsFor(ctx, lhs, rhs, defs) {
     if (!info) continue;
     if (info.ty.t === "mat") {
       for (const d of [info.ty.r, info.ty.c]) {
-        if (typeof d !== "number") roots.add(ctx.dims.find(d.v));
+        if (typeof d !== "number" && ctx.pinned[ctx.dims.find(d.v)] === void 0) {
+          roots.add(ctx.dims.find(d.v));
+        }
       }
     }
   }
@@ -7826,7 +7832,7 @@ function analyzeSource(src, opts) {
   const declared = parseDeclarations([opts.decls ?? "", ...harvested].filter(Boolean).join("; "));
   const preset = presetDecls(opts.preset);
   const decls = mergeDecls(preset, declared.decls);
-  const ctx = createContext(decls, opts.layout ?? "denominator");
+  const ctx = createContext(decls, opts.layout ?? "denominator", declared.pinned);
   const defs = /* @__PURE__ */ new Map();
   const definedNames = /* @__PURE__ */ new Set();
   const knownFns = new Set(decls.filter((d) => d.kind === "function").map((d) => d.name));
@@ -8389,9 +8395,22 @@ function evaluateSides(field, lhsNode, rhsNode, env, sampler) {
     const lhs = evalNode(field, lhsNode, env);
     const rhs = evalNode(field, rhsNode, env);
     const realMatrix = (v) => v.k === "m" && !(v.m.r === 1 && v.m.c === 1);
-    if (realMatrix(lhs) && rhs.k === "s" || lhs.k === "s" && realMatrix(rhs)) {
-      const message = lhs.k === "m" ? "a matrix on the left, a scalar on the right" : "a scalar on the left, a matrix on the right";
-      return { kind: "unknown", message, shape: true };
+    const zeroScalar = (v) => v.k === "s" && field.eq(v.v, field.zero);
+    if (realMatrix(lhs) && rhs.k === "s") {
+      if (zeroScalar(rhs) && lhs.k === "m") {
+        const zero = { k: "m", m: zeros(lhs.m.r, lhs.m.c, field.zero) };
+        if (valuesEqual(field, lhs, zero)) return { kind: "equal" };
+        return { kind: "different", lhs, rhs: zero, message: "the two sides are not equal" };
+      }
+      return { kind: "unknown", message: "a matrix on the left, a scalar on the right", shape: true };
+    }
+    if (lhs.k === "s" && realMatrix(rhs)) {
+      if (zeroScalar(lhs) && rhs.k === "m") {
+        const zero = { k: "m", m: zeros(rhs.m.r, rhs.m.c, field.zero) };
+        if (valuesEqual(field, zero, rhs)) return { kind: "equal" };
+        return { kind: "different", lhs: zero, rhs, message: "the two sides are not equal" };
+      }
+      return { kind: "unknown", message: "a scalar on the left, a matrix on the right", shape: true };
     }
     if (valuesEqual(field, lhs, rhs)) return { kind: "equal" };
     return { kind: "different", lhs, rhs, message: "the two sides are not equal" };
@@ -9313,6 +9332,13 @@ function runImplicationTrial(step, ctx, defs, setting, p, rng) {
   }
   if (valuesEqual(field, cl, cr)) return { kind: "ok" };
   const realMatrix = (v) => v.k === "m" && !(v.m.r === 1 && v.m.c === 1);
+  const zeroScalar = (v) => v.k === "s" && field.eq(v.v, field.zero);
+  if (realMatrix(cl) && cr.k === "s" && zeroScalar(cr) && cl.k === "m") {
+    cr = { k: "m", m: zeros(cl.m.r, cl.m.c, field.zero) };
+  }
+  if (cl.k === "s" && realMatrix(cr) && zeroScalar(cl) && cr.k === "m") {
+    cl = { k: "m", m: zeros(cr.m.r, cr.m.c, field.zero) };
+  }
   if (realMatrix(cl) && cr.k === "s" || cl.k === "s" && realMatrix(cr)) {
     return {
       kind: "unknown",

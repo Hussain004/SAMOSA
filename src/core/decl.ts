@@ -509,7 +509,7 @@ function parseType(name: string, type: string): SymbolDecl | null {
     break;
   }
   const rest = words.slice(i).join(' ');
-  const dimText = rest.replace(/[x×]/g, '×');
+  const dimText = rest.replace(/[x×]|\bby\b/gi, '×');
   const parts = dimText.split('×').map((p) => p.trim()).filter(Boolean);
   for (const p of parts) {
     const d = parseDim(p);

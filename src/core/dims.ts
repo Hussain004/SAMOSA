@@ -58,7 +58,9 @@ export function collectDimVarsFor(
     if (!info) continue;
     if (info.ty.t === 'mat') {
       for (const d of [info.ty.r, info.ty.c]) {
-        if (typeof d !== 'number') roots.add(ctx.dims.find(d.v));
+        if (typeof d !== 'number' && ctx.pinned[ctx.dims.find(d.v)] === undefined) {
+          roots.add(ctx.dims.find(d.v));
+        }
       }
     }
   }

@@ -2,7 +2,7 @@ import type { Field } from './fields/types.ts';
 import { F64Field } from './fields/f64.ts';
 import { DecField } from './fields/dec.ts';
 import { GFpField, P1, P2 } from './fields/gfp.ts';
-import { DomainError, matAdd, matInv, matMul, matSub, transpose, type Mat } from './linalg.ts';
+import { DomainError, matAdd, matInv, matMul, matSub, transpose, zeros, type Mat } from './linalg.ts';
 import {
   evalNode,
   makeEnv,
@@ -265,7 +265,7 @@ export function analyzeSource(src: string, opts: CheckOptions): Source {
   const preset = presetDecls(opts.preset);
   const decls = mergeDecls(preset, declared.decls);
 
-  const ctx = createContext(decls, opts.layout ?? 'denominator');
+  const ctx = createContext(decls, opts.layout ?? 'denominator', declared.pinned);
   const defs = new Map<string, Node>();
   const definedNames = new Set<string>();
 
@@ -1008,12 +1008,25 @@ function evaluateSides<T>(
     const lhs = evalNode(field, lhsNode, env);
     const rhs = evalNode(field, rhsNode, env);
     // a matrix compared with a scalar is not a claim about equality: it is
-    // the shapes that do not fit (review 4.4)
+    // the shapes that do not fit (review 4.4). A zero is the exception the
+    // papers rely on: `(P - I) P = 0` names the zero matrix (review 5.5).
     const realMatrix = (v: Val<T>): boolean => v.k === 'm' && !(v.m.r === 1 && v.m.c === 1);
-    if ((realMatrix(lhs) && rhs.k === 's') || (lhs.k === 's' && realMatrix(rhs))) {
-      const message =
-        lhs.k === 'm' ? 'a matrix on the left, a scalar on the right' : 'a scalar on the left, a matrix on the right';
-      return { kind: 'unknown', message, shape: true };
+    const zeroScalar = (v: Val<T>): boolean => v.k === 's' && field.eq(v.v, field.zero);
+    if (realMatrix(lhs) && rhs.k === 's') {
+      if (zeroScalar(rhs) && lhs.k === 'm') {
+        const zero = { k: 'm' as const, m: zeros<T>(lhs.m.r, lhs.m.c, field.zero) };
+        if (valuesEqual(field, lhs, zero)) return { kind: 'equal' };
+        return { kind: 'different', lhs, rhs: zero, message: 'the two sides are not equal' };
+      }
+      return { kind: 'unknown', message: 'a matrix on the left, a scalar on the right', shape: true };
+    }
+    if (lhs.k === 's' && realMatrix(rhs)) {
+      if (zeroScalar(lhs) && rhs.k === 'm') {
+        const zero = { k: 'm' as const, m: zeros<T>(rhs.m.r, rhs.m.c, field.zero) };
+        if (valuesEqual(field, zero, rhs)) return { kind: 'equal' };
+        return { kind: 'different', lhs: zero, rhs, message: 'the two sides are not equal' };
+      }
+      return { kind: 'unknown', message: 'a scalar on the left, a matrix on the right', shape: true };
     }
     if (valuesEqual(field, lhs, rhs)) return { kind: 'equal' };
     return { kind: 'different', lhs, rhs, message: 'the two sides are not equal' };
@@ -2181,8 +2194,15 @@ function runImplicationTrial(
   }
   if (valuesEqual(field, cl, cr)) return { kind: 'ok' };
   // a matrix compared with a scalar is not a wrong claim, it is one that
-  // cannot be read (review 4.4)
+  // cannot be read (review 4.4). A zero names the zero matrix (review 5.5).
   const realMatrix = (v: Val<number>): boolean => v.k === 'm' && !(v.m.r === 1 && v.m.c === 1);
+  const zeroScalar = (v: Val<number>): boolean => v.k === 's' && field.eq(v.v, field.zero);
+  if (realMatrix(cl) && cr.k === 's' && zeroScalar(cr) && cl.k === 'm') {
+    cr = { k: 'm', m: zeros(cl.m.r, cl.m.c, field.zero) };
+  }
+  if (cl.k === 's' && realMatrix(cr) && zeroScalar(cl) && cr.k === 'm') {
+    cl = { k: 'm', m: zeros(cr.m.r, cr.m.c, field.zero) };
+  }
   if ((realMatrix(cl) && cr.k === 's') || (cl.k === 's' && realMatrix(cr))) {
     return {
       kind: 'unknown',

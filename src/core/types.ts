@@ -124,11 +124,14 @@ export interface TypeContext {
   bound: Set<string>;
   /** the layout convention for gradients */
   layout: 'denominator' | 'numerator';
+  /** dimension variables a declaration pins to one value, such as `n = 3` */
+  pinned: Record<string, number>;
 }
 
 export function createContext(
   decls: SymbolDecl[],
   layout: 'denominator' | 'numerator' = 'denominator',
+  pinned: Record<string, number> = {},
 ): TypeContext {
   const map = new Map<string, SymbolDecl>();
   for (const d of decls) map.set(d.name, d);
@@ -163,6 +166,7 @@ export function createContext(
     freshCount: 0,
     bound: new Set(),
     layout,
+    pinned,
   };
 }
 
@@ -869,7 +873,12 @@ function recipeDegree(ctx: TypeContext, name: string, props: Prop[], sizes: Map<
 
 function dimSize(ctx: TypeContext, d: Dim, sizes: Map<string, number>): number {
   if (typeof d === 'number') return d;
-  return sizes.get(ctx.dims.find(d.v)) ?? 3;
+  const root = ctx.dims.find(d.v);
+  // a declaration that pins a dimension (`n = 3`) fixes it at every size,
+  // which is what the word was for (review 5.5)
+  const pinned = ctx.pinned[root];
+  if (pinned !== undefined) return pinned;
+  return sizes.get(root) ?? 3;
 }
 
 function matrixSize(ctx: TypeContext, node: Node, sizes: Map<string, number>): number {
