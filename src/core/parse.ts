@@ -93,7 +93,7 @@ export function harvestMacros(src: string): Map<string, Macro> {
     const kind = m[1];
     const operator = kind === 'DeclareMathOperator';
     let i = m.index + m[0].length;
-    let name: string | null = null;
+    let name: string;
     if (text[i] === '{') {
       const inner = readGroupText(text, i);
       if (!inner) continue;

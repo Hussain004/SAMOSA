@@ -4431,7 +4431,7 @@ function harvestMacros(src) {
     const kind = m[1];
     const operator = kind === "DeclareMathOperator";
     let i = m.index + m[0].length;
-    let name = null;
+    let name;
     if (text[i] === "{") {
       const inner2 = readGroupText(text, i);
       if (!inner2) continue;
