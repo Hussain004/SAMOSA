@@ -4390,6 +4390,154 @@ var ParseFailure = class extends Error {
 };
 
 // src/core/parse.ts
+function readGroupText(text, i) {
+  while (i < text.length && /\s/.test(text[i])) i++;
+  if (text[i] !== "{") return null;
+  let depth = 1;
+  for (let j = i + 1; j < text.length; j++) {
+    if (text[j] === "{") depth++;
+    if (text[j] === "}") {
+      depth--;
+      if (depth === 0) return { text: text.slice(i + 1, j), end: j + 1 };
+    }
+  }
+  return null;
+}
+function stripComments(src) {
+  const lines = src.split("\n");
+  const out = [];
+  for (const line of lines) {
+    let cut = -1;
+    for (let j = 0; j < line.length; j++) {
+      if (line[j] !== "%") continue;
+      let slashes = 0;
+      for (let k = j - 1; k >= 0 && line[k] === "\\"; k--) slashes++;
+      if (slashes % 2 === 0) {
+        cut = j;
+        break;
+      }
+    }
+    out.push(cut >= 0 ? line.slice(0, cut) : line);
+  }
+  return out.join("\n");
+}
+var MACRO_HEAD = /\\(?:(renewcommand|newcommand|DeclareMathOperator))\*?\s*/g;
+function harvestMacros(src) {
+  const out = /* @__PURE__ */ new Map();
+  const text = stripComments(src);
+  MACRO_HEAD.lastIndex = 0;
+  let m;
+  while (m = MACRO_HEAD.exec(text)) {
+    const kind = m[1];
+    const operator = kind === "DeclareMathOperator";
+    let i = m.index + m[0].length;
+    let name = null;
+    if (text[i] === "{") {
+      const inner2 = readGroupText(text, i);
+      if (!inner2) continue;
+      const nm = /^\\([A-Za-z]+)$/.exec(inner2.text.trim());
+      if (!nm) continue;
+      name = nm[1];
+      i = inner2.end;
+    } else if (text[i] === "\\") {
+      const nm = /^\\([A-Za-z]+)/.exec(text.slice(i));
+      if (!nm) continue;
+      name = nm[1];
+      i += nm[0].length;
+    } else {
+      continue;
+    }
+    let arity = 0;
+    const opt = /^\s*\[(\d)\]/.exec(text.slice(i));
+    if (opt) {
+      arity = Number(opt[1]);
+      i += opt[0].length;
+    }
+    const body = readGroupText(text, i);
+    if (!body) continue;
+    if (!operator && /#\d/.test(body.text) && arity === 0) continue;
+    if (PROTECTED_COMMANDS.has(name) || GREEK.has(name) || ACCENTS.has(name)) continue;
+    out.set(name, { name, arity, body: body.text.trim(), operator });
+  }
+  return out;
+}
+function expandMacroUses(tokens, macros, rowText) {
+  if (!macros?.size) return tokens;
+  const out = tokens.slice();
+  let expansions = 0;
+  for (let i = 0; i < out.length && expansions <= 64; i++) {
+    const t = out[i];
+    if (t.type !== "cmd") continue;
+    const macro = macros.get(t.value);
+    if (!macro) continue;
+    const args = [];
+    let j = i + 1;
+    let end = t.to;
+    for (let k = 0; k < macro.arity; k++) {
+      const tok = out[j];
+      if (!tok) break;
+      if (tok.type === "lbrace") {
+        let depth = 0;
+        let z = j;
+        for (; z < out.length; z++) {
+          if (out[z].type === "lbrace") depth++;
+          if (out[z].type === "rbrace") {
+            depth--;
+            if (depth === 0) break;
+          }
+        }
+        const close = out[z];
+        if (!close) break;
+        args.push(rowText.slice(tok.from, close.to).slice(1, -1));
+        end = close.to;
+        j = z + 1;
+        continue;
+      }
+      const operand2 = tok.type === "ident" || tok.type === "num" || tok.type === "cmd" || tok.type === "lparen";
+      if (!operand2) break;
+      args.push(rowText.slice(tok.from, tok.to));
+      end = tok.to;
+      j++;
+    }
+    if (args.length < macro.arity) {
+      continue;
+    }
+    const body = macro.operator ? `\\operatorname{${macro.body}}` : macro.body.replace(/#(\d)/g, (_, n) => args[Number(n) - 1] ?? "");
+    const spliced = tokenize(body).filter((tok) => tok.type !== "eof").map((tok) => ({ ...tok, from: t.from, to: end }));
+    out.splice(i, j - i, ...spliced);
+    expansions++;
+    i -= 1;
+  }
+  return out;
+}
+function blankMacroDefinitions(text) {
+  const clean = stripComments(text);
+  if (!/\\(?:renewcommand|newcommand|DeclareMathOperator)/.test(clean)) return text;
+  const chars = [...text];
+  MACRO_HEAD.lastIndex = 0;
+  let m;
+  while (m = MACRO_HEAD.exec(clean)) {
+    const start = m.index;
+    let j = m.index + m[0].length;
+    if (clean[j] === "{") {
+      const inner2 = readGroupText(clean, j);
+      if (!inner2) continue;
+      j = inner2.end;
+    } else if (clean[j] === "\\") {
+      const nm = /^\\([A-Za-z]+)/.exec(clean.slice(j));
+      if (!nm) continue;
+      j += nm[0].length;
+    } else {
+      continue;
+    }
+    const opt = /^\s*\[(\d)\]/.exec(clean.slice(j));
+    if (opt) j += opt[0].length;
+    const body = readGroupText(clean, j);
+    if (!body) continue;
+    for (let k = start; k < body.end && k < chars.length; k++) chars[k] = " ";
+  }
+  return chars.join("");
+}
 var DEFAULT_FUNCTIONS = /* @__PURE__ */ new Set([
   "exp",
   "log",
@@ -4412,6 +4560,42 @@ var DEFAULT_FUNCTIONS = /* @__PURE__ */ new Set([
   "sqrt",
   "var",
   "cov"
+]);
+var PROTECTED_COMMANDS = /* @__PURE__ */ new Set([
+  "frac",
+  "dfrac",
+  "tfrac",
+  "sqrt",
+  "nabla",
+  "partial",
+  "sum",
+  "prod",
+  "langle",
+  "rangle",
+  "mathrm",
+  "operatorname",
+  "mathsf",
+  "mathtt",
+  "mathbb",
+  "det",
+  "exp",
+  "log",
+  "ln",
+  "sin",
+  "cos",
+  "tan",
+  "tanh",
+  "sigmoid",
+  "sigma",
+  "relu",
+  "softmax",
+  "text",
+  "begin",
+  "end",
+  "left",
+  "right",
+  "overbrace",
+  "underbrace"
 ]);
 var SYMBOL_COMMANDS = /* @__PURE__ */ new Set([
   "imath",
@@ -5384,7 +5568,7 @@ var Parser = class _Parser {
       return this.parseMatrixEnv();
     }
     this.pos++;
-    return { k: "raw", text: `\\${name}`, span: { from: t.from, to: t.to } };
+    return { k: "raw", text: `unknown macro \\${name}`, span: { from: t.from, to: t.to } };
   }
   /** Reads the base of an accent: a letter, a single symbol, or a one item group. */
   parseAccentBase(accent, accentSpan) {
@@ -5973,8 +6157,10 @@ function clauseSplits(tokens) {
   clauses.push({ start: from, end: tokens.length });
   return clauses;
 }
-function parseRow(_src, rowText, offset, index, knownFns) {
-  let tokens = tokenize(rowText);
+function parseRow(_src, rowText, offset, index, knownFns, macros) {
+  const opts = { knownFns, macros };
+  let tokens = tokenize(blankMacroDefinitions(rowText));
+  tokens = expandMacroUses(tokens, macros, rowText);
   for (; ; ) {
     const at = tokens.length - 2;
     const last = tokens[at];
@@ -6017,7 +6203,7 @@ function parseRow(_src, rowText, offset, index, knownFns) {
       const first = tokens[clause.start];
       const last = tokens[clause.end - 1];
       if (!first || !last) continue;
-      const parsed = parseRow(_src, rowText.slice(first.from, last.to), offset + first.from, index, knownFns);
+      const parsed = parseRow(_src, rowText.slice(first.from, last.to), offset + first.from, index, knownFns, macros);
       if (parsed.prose) continue;
       if (parsed.error) {
         return {
@@ -6050,8 +6236,8 @@ function parseRow(_src, rowText, offset, index, knownFns) {
     let premise;
     let conclusion;
     try {
-      premise = splitAssertion(premiseTokens, knownFns);
-      conclusion = splitAssertion(conclusionTokens, knownFns);
+      premise = splitAssertion(premiseTokens, opts);
+      conclusion = splitAssertion(conclusionTokens, opts);
     } catch (error) {
       return failure(error);
     }
@@ -6078,7 +6264,7 @@ function parseRow(_src, rowText, offset, index, knownFns) {
     let rhsSeg = tokens.slice(bounds[2 * i + 2], bounds[2 * i + 3]);
     let proportionalTo;
     if (rel.relation === "propto" && rhsSeg[0]?.type === "sub") {
-      const parser = new Parser(rhsSeg, "", knownFns ? { knownFns } : {});
+      const parser = new Parser(rhsSeg, "", opts);
       const read = parser.readProportionalityVariable();
       proportionalTo = read.name;
       rhsSeg = rhsSeg.slice(read.tokens);
@@ -6086,8 +6272,8 @@ function parseRow(_src, rowText, offset, index, knownFns) {
     let lhs;
     let rhs;
     try {
-      lhs = (lhsSeg.length ? parseNode(lhsSeg, knownFns) : null) ?? void 0;
-      rhs = (rhsSeg.length ? parseNode(rhsSeg, knownFns) : null) ?? void 0;
+      lhs = (lhsSeg.length ? parseNode(lhsSeg, opts) : null) ?? void 0;
+      rhs = (rhsSeg.length ? parseNode(rhsSeg, opts) : null) ?? void 0;
     } catch (error) {
       return failure(error);
     }
@@ -6104,18 +6290,18 @@ function parseRow(_src, rowText, offset, index, knownFns) {
   }
   return { index, span: { from: offset, to: offset + rowText.length }, parts, annotation };
 }
-function splitAssertion(tokens, knownFns) {
+function splitAssertion(tokens, opts = {}) {
   const rels = findRelations(tokens);
   if (!rels.length) {
-    const node = parseNode(tokens, knownFns);
+    const node = parseNode(tokens, opts);
     if (!node) return null;
     return { lhs: node, relation: "other", relText: "", lhsSpan: node.span };
   }
   const r0 = rels[0];
   const lhsSeg = tokens.slice(0, r0.index);
   const rhsSeg = tokens.slice(r0.index + 1);
-  const lhs = (lhsSeg.length ? parseNode(lhsSeg, knownFns) : null) ?? void 0;
-  const rhs = (rhsSeg.length ? parseNode(rhsSeg, knownFns) : null) ?? void 0;
+  const lhs = (lhsSeg.length ? parseNode(lhsSeg, opts) : null) ?? void 0;
+  const rhs = (rhsSeg.length ? parseNode(rhsSeg, opts) : null) ?? void 0;
   return {
     lhs,
     relation: r0.relation,
@@ -6125,9 +6311,9 @@ function splitAssertion(tokens, knownFns) {
     rhsSpan: rhs?.span
   };
 }
-function parseNode(tokens, knownFns) {
+function parseNode(tokens, opts = {}) {
   if (!tokens.length) return null;
-  const parser = new Parser(tokens, "", knownFns ? { knownFns } : {});
+  const parser = new Parser(tokens, "", opts);
   const node = parser.parseExpression();
   let rest = parser.pos;
   while (rest < tokens.length && !tokens[rest].value) rest++;
@@ -7836,11 +8022,12 @@ function analyzeSource(src, opts) {
   const defs = /* @__PURE__ */ new Map();
   const definedNames = /* @__PURE__ */ new Set();
   const knownFns = new Set(decls.filter((d) => d.kind === "function").map((d) => d.name));
+  const macros = harvestMacros(src);
   const steps = [];
   let previousRhs;
   let rowIndex = 0;
   for (const row of rows) {
-    const parsed = parseRow(src, row.text, row.from, rowIndex, knownFns);
+    const parsed = parseRow(src, row.text, row.from, rowIndex, knownFns, macros);
     rowIndex++;
     if (parsed.error) {
       steps.push({

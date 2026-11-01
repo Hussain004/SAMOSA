@@ -12,7 +12,7 @@ import {
 } from './evaluate.ts';
 import { Sampler } from './sample.ts';
 import { rngFor, type Rng } from './prng.ts';
-import { DEFAULT_FUNCTIONS, parseRow } from './parse.ts';
+import { DEFAULT_FUNCTIONS, harvestMacros, parseRow } from './parse.ts';
 import { splitRows, harvestDecls } from './steps.ts';
 import { parseDeclarations, type SymbolDecl } from './decl.ts';
 import { presetDecls } from './presets.ts';
@@ -270,12 +270,15 @@ export function analyzeSource(src: string, opts: CheckOptions): Source {
   const definedNames = new Set<string>();
 
   const knownFns = new Set<string>(decls.filter((d) => d.kind === 'function').map((d) => d.name));
+  // the macros the paper defines, so `\newcommand` and
+  // `\DeclareMathOperator` mean what the author wrote (review 5.6)
+  const macros = harvestMacros(src);
   const steps: Step[] = [];
   let previousRhs: Node | undefined;
   let rowIndex = 0;
 
   for (const row of rows) {
-    const parsed = parseRow(src, row.text, row.from, rowIndex, knownFns);
+    const parsed = parseRow(src, row.text, row.from, rowIndex, knownFns, macros);
     rowIndex++;
     if (parsed.error) {
       // a row SAMOSA did not read is a row it did not check, and it says so

@@ -19,6 +19,215 @@ import { ParseFailure, type Assertion, type Node, type Op, type ParsedRow, type 
 export interface ParseOptions {
   /** names that are functions, so that f(x) is an application and not a product */
   knownFns?: Set<string>;
+  /** the macros a source defines, by name without the backslash (review 5.6) */
+  macros?: Map<string, Macro>;
+}
+
+/**
+ * A macro a paper defines, with `\newcommand` or `\DeclareMathOperator`.
+ *
+ * The body is the raw text of the definition, with the parameters still in
+ * it as `#1` to `#9`. An operator is the `\DeclareMathOperator` kind: it is
+ * read as `\operatorname`, so `\Tr` behaves the way `\operatorname{Tr}`
+ * would.
+ */
+export interface Macro {
+  name: string;
+  arity: number;
+  body: string;
+  operator: boolean;
+}
+
+/** One balanced `{...}` group of a string, spaces before it skipped. */
+function readGroupText(text: string, i: number): { text: string; end: number } | null {
+  while (i < text.length && /\s/.test(text[i])) i++;
+  if (text[i] !== '{') return null;
+  let depth = 1;
+  for (let j = i + 1; j < text.length; j++) {
+    if (text[j] === '{') depth++;
+    if (text[j] === '}') {
+      depth--;
+      if (depth === 0) return { text: text.slice(i + 1, j), end: j + 1 };
+    }
+  }
+  return null;
+}
+
+/** The source without the comments, which is where the macros live. */
+function stripComments(src: string): string {
+  const lines = src.split('\n');
+  const out: string[] = [];
+  for (const line of lines) {
+    let cut = -1;
+    for (let j = 0; j < line.length; j++) {
+      if (line[j] !== '%') continue;
+      let slashes = 0;
+      for (let k = j - 1; k >= 0 && line[k] === '\\'; k--) slashes++;
+      if (slashes % 2 === 0) {
+        cut = j;
+        break;
+      }
+    }
+    out.push(cut >= 0 ? line.slice(0, cut) : line);
+  }
+  return out.join('\n');
+}
+
+const MACRO_HEAD = /\\(?:(renewcommand|newcommand|DeclareMathOperator))\*?\s*/g;
+
+/**
+ * The macros a source defines.
+ *
+ * `\newcommand{\norm}[1]{\lVert #1 \rVert}` and
+ * `\DeclareMathOperator{\Tr}{Tr}` are the shapes the plan promised, and the
+ * two are what this reads (review 5.6). A macro that redefines a command
+ * SAMOSA already knows is ignored, so a paper cannot change what `\det`
+ * means under the checker.
+ */
+export function harvestMacros(src: string): Map<string, Macro> {
+  const out = new Map<string, Macro>();
+  const text = stripComments(src);
+  MACRO_HEAD.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = MACRO_HEAD.exec(text))) {
+    const kind = m[1];
+    const operator = kind === 'DeclareMathOperator';
+    let i = m.index + m[0].length;
+    let name: string | null = null;
+    if (text[i] === '{') {
+      const inner = readGroupText(text, i);
+      if (!inner) continue;
+      const nm = /^\\([A-Za-z]+)$/.exec(inner.text.trim());
+      if (!nm) continue;
+      name = nm[1];
+      i = inner.end;
+    } else if (text[i] === '\\') {
+      const nm = /^\\([A-Za-z]+)/.exec(text.slice(i));
+      if (!nm) continue;
+      name = nm[1];
+      i += nm[0].length;
+    } else {
+      continue;
+    }
+    let arity = 0;
+    const opt = /^\s*\[(\d)\]/.exec(text.slice(i));
+    if (opt) {
+      arity = Number(opt[1]);
+      i += opt[0].length;
+    }
+    const body = readGroupText(text, i);
+    if (!body) continue;
+    // parameters without their count are not read: `\def` style, which this
+    // does not promise
+    if (!operator && /#\d/.test(body.text) && arity === 0) continue;
+    // a macro that redefines a command SAMOSA reads itself is not taken:
+    // the checker keeps its own meaning of `\det`
+    if (PROTECTED_COMMANDS.has(name) || GREEK.has(name) || ACCENTS.has(name)) continue;
+    out.set(name, { name, arity, body: body.text.trim(), operator });
+  }
+  return out;
+}
+
+/**
+ * Splices the expansion of every macro use into the token stream.
+ *
+ * The pass is token level, so the parser reads the body where the use
+ * stood: the postfix `^2` of `\norm{x}^2` lands on the body the same way it
+ * lands on `\|x\|^2`, and the arguments of `\Tr(AB)` are read by the body
+ * the way they are read by `\operatorname{Tr}` (review 5.6). Every token of
+ * the expansion carries the span of the use, because that is where the
+ * mathematics the reader sees sits.
+ */
+function expandMacroUses(tokens: Token[], macros: Map<string, Macro> | undefined, rowText: string): Token[] {
+  if (!macros?.size) return tokens;
+  const out = tokens.slice();
+  let expansions = 0;
+  for (let i = 0; i < out.length && expansions <= 64; i++) {
+    const t = out[i];
+    if (t.type !== 'cmd') continue;
+    const macro = macros.get(t.value);
+    if (!macro) continue;
+    // the arguments, the way LaTeX reads them: a group, or the next operand
+    const args: string[] = [];
+    let j = i + 1;
+    let end = t.to;
+    for (let k = 0; k < macro.arity; k++) {
+      const tok = out[j];
+      if (!tok) break;
+      if (tok.type === 'lbrace') {
+        let depth = 0;
+        let z = j;
+        for (; z < out.length; z++) {
+          if (out[z].type === 'lbrace') depth++;
+          if (out[z].type === 'rbrace') {
+            depth--;
+            if (depth === 0) break;
+          }
+        }
+        const close = out[z];
+        if (!close) break;
+        args.push(rowText.slice(tok.from, close.to).slice(1, -1));
+        end = close.to;
+        j = z + 1;
+        continue;
+      }
+      const operand = tok.type === 'ident' || tok.type === 'num' || tok.type === 'cmd' || tok.type === 'lparen';
+      if (!operand) break;
+      args.push(rowText.slice(tok.from, tok.to));
+      end = tok.to;
+      j++;
+    }
+    if (args.length < macro.arity) {
+      // the use is malformed: it stays, and the parser names it
+      continue;
+    }
+    const body = macro.operator
+      ? `\\operatorname{${macro.body}}`
+      : macro.body.replace(/#(\d)/g, (_, n: string) => args[Number(n) - 1] ?? '');
+    const spliced = tokenize(body)
+      .filter((tok) => tok.type !== 'eof')
+      .map((tok) => ({ ...tok, from: t.from, to: end }));
+    out.splice(i, j - i, ...spliced);
+    expansions++;
+    // the spliced tokens are read in place, so a macro inside a body
+    // expands too
+    i -= 1;
+  }
+  return out;
+}
+
+/**
+ * Blanks the macro definitions a row itself carries, so a definition written
+ * in the middle of the mathematics parses as nothing and the offsets of the
+ * row stay where they were.
+ */
+function blankMacroDefinitions(text: string): string {
+  const clean = stripComments(text);
+  if (!/\\(?:renewcommand|newcommand|DeclareMathOperator)/.test(clean)) return text;
+  const chars = [...text];
+  MACRO_HEAD.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = MACRO_HEAD.exec(clean))) {
+    const start = m.index;
+    let j = m.index + m[0].length;
+    if (clean[j] === '{') {
+      const inner = readGroupText(clean, j);
+      if (!inner) continue;
+      j = inner.end;
+    } else if (clean[j] === '\\') {
+      const nm = /^\\([A-Za-z]+)/.exec(clean.slice(j));
+      if (!nm) continue;
+      j += nm[0].length;
+    } else {
+      continue;
+    }
+    const opt = /^\s*\[(\d)\]/.exec(clean.slice(j));
+    if (opt) j += opt[0].length;
+    const body = readGroupText(clean, j);
+    if (!body) continue;
+    for (let k = start; k < body.end && k < chars.length; k++) chars[k] = ' ';
+  }
+  return chars.join('');
 }
 
 export const DEFAULT_FUNCTIONS = new Set([
@@ -43,6 +252,18 @@ export const DEFAULT_FUNCTIONS = new Set([
   'sqrt',
   'var',
   'cov',
+]);
+
+/**
+ * The commands SAMOSA reads itself, which a macro cannot redefine: a paper
+ * does not change what `\det` means under the checker.
+ */
+const PROTECTED_COMMANDS = new Set([
+  'frac', 'dfrac', 'tfrac', 'sqrt', 'nabla', 'partial', 'sum', 'prod',
+  'langle', 'rangle', 'mathrm', 'operatorname', 'mathsf', 'mathtt', 'mathbb',
+  'det', 'exp', 'log', 'ln', 'sin', 'cos', 'tan', 'tanh', 'sigmoid', 'sigma',
+  'relu', 'softmax', 'text', 'begin', 'end', 'left', 'right', 'overbrace',
+  'underbrace',
 ]);
 
 /** Commands that name a symbol rather than an operation. */
@@ -1185,9 +1406,10 @@ export class Parser {
       return this.parseMatrixEnv();
     }
 
+    // A macro the paper defined, but SAMOSA does not know, is named.
     // unknown command
     this.pos++;
-    return { k: 'raw', text: `\\${name}`, span: { from: t.from, to: t.to } };
+    return { k: 'raw', text: `unknown macro \\${name}`, span: { from: t.from, to: t.to } };
   }
 
   /** Reads the base of an accent: a letter, a single symbol, or a one item group. */
@@ -1882,8 +2104,13 @@ export function parseRow(
   offset: number,
   index: number,
   knownFns?: Set<string>,
+  macros?: Map<string, Macro>,
 ): ParsedRow {
-  let tokens = tokenize(rowText);
+  const opts: ParseOptions = { knownFns, macros };
+  // a macro definition that sits in the middle of the mathematics is not
+  // mathematics; it is blanked, and the offsets stay where they were
+  let tokens = tokenize(blankMacroDefinitions(rowText));
+  tokens = expandMacroUses(tokens, macros, rowText);
   // A display row often ends in the punctuation of the sentence around it:
   // "... = 0," or "... = 1;". It is not part of the claim. The tokenizer
   // ends its list with an eof, so the punctuation is just before it.
@@ -1936,7 +2163,7 @@ export function parseRow(
       const first = tokens[clause.start];
       const last = tokens[clause.end - 1];
       if (!first || !last) continue;
-      const parsed = parseRow(_src, rowText.slice(first.from, last.to), offset + first.from, index, knownFns);
+      const parsed = parseRow(_src, rowText.slice(first.from, last.to), offset + first.from, index, knownFns, macros);
       if (parsed.prose) continue;
       if (parsed.error) {
         return {
@@ -1976,8 +2203,8 @@ export function parseRow(
     let premise: Assertion | null;
     let conclusion: Assertion | null;
     try {
-      premise = splitAssertion(premiseTokens, knownFns);
-      conclusion = splitAssertion(conclusionTokens, knownFns);
+      premise = splitAssertion(premiseTokens, opts);
+      conclusion = splitAssertion(conclusionTokens, opts);
     } catch (error) {
       return failure(error);
     }
@@ -2009,7 +2236,7 @@ export function parseRow(
 
     // \propto_x says which variable the proportionality is taken in
     if (rel.relation === 'propto' && rhsSeg[0]?.type === 'sub') {
-      const parser = new Parser(rhsSeg, '', knownFns ? { knownFns } : {});
+      const parser = new Parser(rhsSeg, '', opts);
       const read = parser.readProportionalityVariable();
       proportionalTo = read.name;
       rhsSeg = rhsSeg.slice(read.tokens);
@@ -2018,8 +2245,8 @@ export function parseRow(
     let lhs: Node | undefined;
     let rhs: Node | undefined;
     try {
-      lhs = (lhsSeg.length ? parseNode(lhsSeg, knownFns) : null) ?? undefined;
-      rhs = (rhsSeg.length ? parseNode(rhsSeg, knownFns) : null) ?? undefined;
+      lhs = (lhsSeg.length ? parseNode(lhsSeg, opts) : null) ?? undefined;
+      rhs = (rhsSeg.length ? parseNode(rhsSeg, opts) : null) ?? undefined;
     } catch (error) {
       return failure(error);
     }
@@ -2039,18 +2266,18 @@ export function parseRow(
 }
 
 /** Splits a token slice at its first relation into an assertion. */
-function splitAssertion(tokens: Token[], knownFns?: Set<string>): Assertion | null {
+function splitAssertion(tokens: Token[], opts: ParseOptions = {}): Assertion | null {
   const rels = findRelations(tokens);
   if (!rels.length) {
-    const node = parseNode(tokens, knownFns);
+    const node = parseNode(tokens, opts);
     if (!node) return null;
     return { lhs: node, relation: 'other', relText: '', lhsSpan: node.span };
   }
   const r0 = rels[0];
   const lhsSeg = tokens.slice(0, r0.index);
   const rhsSeg = tokens.slice(r0.index + 1);
-  const lhs = (lhsSeg.length ? parseNode(lhsSeg, knownFns) : null) ?? undefined;
-  const rhs = (rhsSeg.length ? parseNode(rhsSeg, knownFns) : null) ?? undefined;
+  const lhs = (lhsSeg.length ? parseNode(lhsSeg, opts) : null) ?? undefined;
+  const rhs = (rhsSeg.length ? parseNode(rhsSeg, opts) : null) ?? undefined;
   return {
     lhs,
     relation: r0.relation,
@@ -2068,9 +2295,9 @@ function splitAssertion(tokens: Token[], knownFns?: Set<string>): Assertion | nu
  * a row with a stray bracket in it is a row SAMOSA did not read, and it has
  * to say so instead of checking the part in front of the bracket.
  */
-function parseNode(tokens: Token[], knownFns?: Set<string>): Node | null {
+function parseNode(tokens: Token[], opts: ParseOptions = {}): Node | null {
   if (!tokens.length) return null;
-  const parser = new Parser(tokens, '', knownFns ? { knownFns } : {});
+  const parser = new Parser(tokens, '', opts);
   const node = parser.parseExpression();
   // the tokens that carry nothing are not left over, they are the spaces
   let rest = parser.pos;
