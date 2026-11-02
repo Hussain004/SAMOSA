@@ -5,7 +5,7 @@
  * three of them always give the same verdict for the same input.
  */
 
-export { check, sizeSettings, ENGINE_VERSION, DEFAULT_SEED, analyzeSource } from './verdict.ts';
+export { check, sizeSettings, ENGINE_VERSION, DEFAULT_SEED, analyzeSource, numericDelta } from './verdict.ts';
 export type {
   CheckOptions,
   Counterexample,

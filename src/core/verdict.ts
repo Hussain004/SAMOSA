@@ -1800,7 +1800,7 @@ function checkNumeric(
 
 type NumericRun = { delta: number; shapeMessage?: string } | 'domain' | null;
 
-function numericDelta<T>(
+export function numericDelta<T>(
   ctx: TypeContext,
   defs: Map<string, Node>,
   step: Step,

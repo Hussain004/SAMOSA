@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { check } from '../src/core/verdict.ts';
+import { check, analyzeSource, numericDelta } from '../src/core/index.ts';
+import { F64Field } from '../src/core/fields/f64.ts';
 import { IDENTITIES } from '../corpus/cookbook/identities.ts';
 import { allMutants } from '../corpus/cookbook/mutants.ts';
+import { rngFor } from '../src/core/prng.ts';
 
 /**
  * The Cookbook.
@@ -118,6 +120,32 @@ describe('the cookbook', () => {
     // and the engine never calls a mutant right: a miss is a step it could
     // not decide, not a step it thinks holds
     expect(missed.every((m) => m.verdict !== 'ok')).toBe(true);
+  });
+
+  it('the harmless mutants hold under the float64 oracle', () => {
+    // the one missing piece of the second audit: an independent oracle, over
+    // float64 at n = 3 and a tolerance of 1e-9, has to agree with the engine on
+    // every mutant the catalog calls harmless, or the engine called it right
+    // by luck and the catalogue is a lie
+    for (const mutant of allMutants(IDENTITIES)) {
+      const identity = IDENTITIES.find((i) => i.id === mutant.id);
+      if (!identity) continue;
+      const parsed = analyzeSource(mutant.source, { decls: identity.decls });
+      const step = parsed.steps.find((s) => s.row === mutant.row);
+      if (!step || step.verdict !== 'ok') continue;
+      const run = numericDelta(
+        parsed.ctx,
+        parsed.defs,
+        step,
+        new Map([['n', 3]]),
+        rngFor(0, 'cookbook-oracle', mutant.id),
+        0,
+        new F64Field(),
+      );
+      if (run === null || run === 'domain') continue;
+      expect(run.shapeMessage, `${mutant.id} row ${mutant.row}`).toBeUndefined();
+      expect(run.delta, `${mutant.id} row ${mutant.row}`).toBeLessThanOrEqual(1e-9);
+    }
   });
 
   it('the README carries the numbers the engine runs', () => {
