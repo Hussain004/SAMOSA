@@ -11,6 +11,15 @@
  */
 
 import generated from './generated.json';
+import TEX from './generated-tex.json';
+
+/** The math of the landing page, rendered at build time. */
+const RENDERED_TEX = TEX as {
+  bugs: string[];
+  menu: Record<string, string>;
+  fix: { term: string; edit: string };
+  counterexample: { names: Record<string, string> };
+};
 
 export type DemoEvent =
   | { kind: 'user'; text: string; pauseMs?: number }
@@ -148,6 +157,7 @@ export const MOCKS = {
     values: josephWrong.counterexample?.values ?? {},
     derived: josephWrong.counterexample?.derived ?? {},
     dims: josephWrong.counterexample?.dims ?? {},
+    names: RENDERED_TEX.counterexample.names,
   },
   fix: {
     title: josephWrong.fixTitle,

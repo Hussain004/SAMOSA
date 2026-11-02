@@ -382,38 +382,37 @@ function Features() {
 }
 
 function CounterexampleMock() {
+  const names = MOCKS.counterexample.names;
+  const lines: string[] = [];
+  const show = (texName: string, value: number[] | number) => {
+    if (typeof value === 'number') {
+      lines.push(`${texName} = ${value}`);
+      return;
+    }
+    const size = Math.max(1, Math.round(Math.sqrt(value.length)));
+    lines.push(`${texName} =`);
+    for (let i = 0; i < value.length; i += size) {
+      lines.push(`  [ ${value.slice(i, i + size).join(', ')} ]`);
+    }
+  };
+  for (const [name, value] of Object.entries(MOCKS.counterexample.values)) {
+    show(names[name] ?? name, value);
+  }
+  for (const [name, value] of Object.entries(MOCKS.counterexample.derived)) {
+    show(`${names[name] ?? name} (computed)`, value);
+  }
+
   return (
     <Mock>
       <MockLine tone="bad">
         ✗ row {MOCKS.counterexample.row} · the two sides are not equal
       </MockLine>
-      <pre className="mt-2 whitespace-pre-wrap break-words text-[0.6875rem] leading-relaxed text-[var(--color-muted)]">
-        {formatValues(MOCKS.counterexample.values, MOCKS.counterexample.derived)}
-      </pre>
+      <pre
+        className="mt-2 whitespace-pre-wrap break-words text-[0.6875rem] leading-relaxed text-[var(--color-muted)]"
+        dangerouslySetInnerHTML={{ __html: lines.join('\n') }}
+      />
     </Mock>
   );
-}
-
-/** The values of a counterexample, as the engine found them. */
-function formatValues(
-  values: Record<string, number[] | number>,
-  derived: Record<string, number[] | number>,
-): string {
-  const lines: string[] = [];
-  const show = (name: string, value: number[] | number) => {
-    if (typeof value === 'number') {
-      lines.push(`${name} = ${value}`);
-      return;
-    }
-    const size = Math.max(1, Math.round(Math.sqrt(value.length)));
-    lines.push(`${name} =`);
-    for (let i = 0; i < value.length; i += size) {
-      lines.push(`  [ ${value.slice(i, i + size).join(', ')} ]`);
-    }
-  };
-  for (const [name, value] of Object.entries(values)) show(name, value);
-  for (const [name, value] of Object.entries(derived)) show(`${name} (computed)`, value);
-  return lines.join('\n');
 }
 
 function FixMock() {

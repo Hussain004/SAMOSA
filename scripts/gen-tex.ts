@@ -63,6 +63,8 @@ export interface GeneratedTex {
   menu: Record<string, string>;
   /** the fix of the Joseph bug, as the feature card shows it */
   fix: { term: string; edit: string };
+  /** the symbols a counterexample names, as the feature card shows them */
+  counterexample: { names: Record<string, string> };
 }
 
 /** The text of one row of an align block, with the alignment marks removed. */
@@ -86,10 +88,23 @@ export function generateTex(): GeneratedTex {
   const bug = MENU.find((item) => item.id === 'joseph')?.bugSource ?? '';
   const row = firstRowOf(bug, joseph.wrongRow);
   const edit = row ? `${row} \\htmlClass{fix-add}{${term}}` : '';
+  // The symbols a counterexample names are shown with the same KaTeX the fix
+  // uses, so the reader sees the math and not the spelling of the name.
+  const names: Record<string, string> = {};
+  const counterexample = joseph.counterexample as
+    | { values?: Record<string, unknown>; derived?: Record<string, unknown> }
+    | undefined;
+  const named = counterexample
+    ? [...Object.keys(counterexample.values ?? {}), ...Object.keys(counterexample.derived ?? {})]
+    : [];
+  for (const name of [...new Set(named)]) {
+    names[name] = tex(name);
+  }
   return {
     bugs: BUGS.map(tex),
     menu,
     fix: { term: tex(term), edit: edit ? katex.renderToString(edit, { throwOnError: false, trust: true, strict: 'ignore', output: 'html' }) : '' },
+    counterexample: { names },
   };
 }
 
