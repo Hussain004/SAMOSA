@@ -105,7 +105,7 @@ from the right answer, and SAMOSA says so.
 
 ```bash
 # the web app
-npx samosa-math check paper.tex
+https://samosa-math.vercel.app/app
 
 # the CLI
 npx samosa-math check paper.tex --format sarif
