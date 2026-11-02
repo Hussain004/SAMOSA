@@ -84,4 +84,30 @@ describe('the NumPy snippet', () => {
     expect(printed.some((x) => Number(x) !== 0)).toBe(true);
     expect(engine.some((x) => Number(x) !== 0)).toBe(true);
   });
+
+  it('the exponential is written for real, not as zero', () => {
+    const src = '\\begin{align*} \\exp(a + b) &= \\exp(a) + \\exp(b) \\end{align*}';
+    const report = check(src, { decls: 'a, b: scalar' });
+    const wrong = report.steps.find((s) => s.verdict === 'wrong');
+    expect(wrong).toBeDefined();
+    const counterexample = explain(src, wrong!.id, { decls: 'a, b: scalar' }).counterexample;
+    expect(counterexample).toBeDefined();
+    const numpy = counterexample!.numpy;
+    // the printer writes the exponential, it does not print a zero
+    expect(numpy).toContain('_exp(');
+    expect(numpy).toContain('import math');
+    expect(numpy).toContain('math.exp(float(x))');
+  });
+
+  it('the printer refuses what it cannot write, instead of writing a fake', () => {
+    const src = '\\begin{align*} \\sqrt{S} &= S \\end{align*}';
+    const report = check(src, { decls: 'S: spd n' });
+    const wrong = report.steps.find((s) => s.verdict === 'wrong');
+    expect(wrong).toBeDefined();
+    const counterexample = explain(src, wrong!.id, { decls: 'S: spd n' }).counterexample;
+    expect(counterexample).toBeDefined();
+    // the matrix square root is a matrix thing the snippet translator does
+    // not write, so the snippet refuses rather than inventing a number
+    expect(counterexample!.numpy).toContain('cannot be written in NumPy');
+  });
 });

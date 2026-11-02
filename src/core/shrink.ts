@@ -11,7 +11,7 @@ import { type Val } from './value.ts';
 import type { TypeContext } from './types.ts';
 import type { Prop } from './decl.ts';
 import { dimSizeOf } from './types.ts';
-import { NUMPY_PRELUDE, numpyExpression, numpyNames, symbolsOf } from './numpy.ts';
+import { NUMPY_PRELUDE, numpyExpression, numpyNames, symbolsOf, type NumpyNames } from './numpy.ts';
 
 /**
  * Counterexample shrinking.
@@ -458,18 +458,42 @@ export function toNumpy(
     for (const name of defined) {
       const node = defs.get(name);
       if (!node) continue;
-      lines.push(`${names.map.get(name)} = ${numpyExpression(node, ctx, names)}`);
+      const defText = numpySide(node, ctx, names);
+      if (defText === null) {
+        lines.push('# a definition the printer cannot write in NumPy');
+      } else {
+        lines.push(`${names.map.get(name)} = ${defText}`);
+      }
     }
   }
 
   lines.push('');
   lines.push('# the two sides of the step, with these values');
-  lines.push(`lhs = ${numpyExpression(lhsNode, ctx, names)}`);
-  lines.push(`rhs = ${numpyExpression(rhsNode, ctx, names)}`);
-  lines.push('print(lhs - rhs)');
+  const lhsText = numpySide(lhsNode, ctx, names);
+  const rhsText = numpySide(rhsNode, ctx, names);
+  if (lhsText === null || rhsText === null) {
+    // the printer refused the expression, so the snippet says so instead of
+    // printing a difference the engine never computed
+    lines.push('# the expression of this step cannot be written in NumPy');
+  } else {
+    lines.push(`lhs = ${lhsText}`);
+    lines.push(`rhs = ${rhsText}`);
+    lines.push('print(lhs - rhs)');
+  }
   lines.push('');
   lines.push('# the values above are the ones SAMOSA found; the two sides differ with them');
   return lines.join('\n');
+}
+
+/**
+ * The NumPy text of one expression, or null when the printer refuses it.
+ */
+function numpySide(node: Node, ctx: TypeContext, names: NumpyNames): string | null {
+  try {
+    return numpyExpression(node, ctx, names);
+  } catch {
+    return null;
+  }
 }
 
 /** The shape of a symbol, in the sizes the instance was found at. */

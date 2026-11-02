@@ -112,7 +112,10 @@ export function numpyExpression(node: Node, ctx: TypeContext, names: NumpyNames)
     }
     case 'sym': {
       const name = names.map.get(node.name);
-      return name ?? `Fraction(0)`;
+      // the printer refuses what it cannot name, it never invents a number
+      // the engine did not compute (review 3.1 of the second audit)
+      if (!name) throw new Error(`no snippet for \\${node.name}`);
+      return name;
     }
     case 'op': {
       const args = node.args.map((a) => numpyExpression(a, ctx, names));
@@ -153,10 +156,16 @@ export function numpyExpression(node: Node, ctx: TypeContext, names: NumpyNames)
           return `_diag(${args[0]})`;
         case 'abs':
           return `_abs(${args[0]})`;
-        case 'sqrtm':
+        case 'sqrtm': {
+          // the matrix square root is a matrix thing, and a matrix the
+          // printer cannot name is refused rather than squared here
+          if (isMatrixType(ctx, node.args[0])) {
+            throw new Error(`no snippet for the matrix square root of \\${node.args[0].k === 'sym' ? node.args[0].name : node.op}`);
+          }
           return `_sqrtm(${args[0]})`;
+        }
         default:
-          return `Fraction(0)`;
+          throw new Error(`no snippet for the operator ${node.op}`);
       }
     }
     case 'call': {
@@ -165,12 +174,17 @@ export function numpyExpression(node: Node, ctx: TypeContext, names: NumpyNames)
       if (node.fn === 'det') return `_det(${args[0]})`;
       if (node.fn === 'frob') return `_frob(${args[0]})`;
       if (node.fn === 'norm2') return `(${args[0]}) * (${args[0]})`;
-      if (node.fn === 'sqrtm') return `_sqrtm(${args[0]})`;
+      if (node.fn === 'sqrtm') {
+        if (isMatrixType(ctx, node.args[0])) {
+          throw new Error(`no snippet for the matrix square root of \\${node.args[0].k === 'sym' ? node.args[0].name : node.fn}`);
+        }
+        return `_sqrtm(${args[0]})`;
+      }
       if (node.fn === 'exp') return `(_exp(${args[0]}))`;
-      return `Fraction(0)`;
+      throw new Error(`no snippet for \\${node.fn}`);
     }
     default:
-      return `Fraction(0)`;
+      throw new Error('no snippet for this kind of expression');
   }
 }
 
@@ -212,6 +226,7 @@ export function symbolsOf(node: Node | undefined, into: Set<string> = new Set())
  * numbers are exact.
  */
 export const NUMPY_PRELUDE = `from fractions import Fraction
+import math
 import numpy as np
 
 
@@ -268,9 +283,12 @@ def _abs(a):
 
 
 def _sqrtm(a):
-    return _inv(a) if len(a) == 1 else a
+    if len(a) == 1:
+        return np.array([[math.sqrt(float(a[0][0]))]], dtype=object)
+    raise ValueError("the matrix square root of a bigger matrix is not written here")
 
 
 def _exp(a):
-    return Fraction(0)
+    values = np.atleast_1d(a)
+    return np.array([math.exp(float(x)) for x in values], dtype=object)
 `;
