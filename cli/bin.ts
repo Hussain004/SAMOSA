@@ -53,12 +53,20 @@ interface Args {
 
 /**
  * An integer flag value, or the run stops: `--seed abc` must not become NaN
- * and silently change the sampling (review 5.3).
+ * and silently change the sampling (review 5.3). The ranges are the ones
+ * the engine itself has: a seed is 32 bits, and the trials are a small
+ * count (review 5.9).
  */
-function readInt(flag: string, raw: string | undefined): number {
+const MAX_SEED = 0xffffffff;
+const MAX_TRIALS = 1024;
+
+function readInt(flag: string, raw: string | undefined, min: number, max: number): number {
   const value = Number(raw);
   if (raw === undefined || !Number.isInteger(value)) {
     fail(`${flag} wants an integer, and got ${raw === undefined ? 'nothing' : raw}`);
+  }
+  if (value < min || value > max) {
+    fail(`${flag} wants an integer between ${min} and ${max}, and got ${value}`);
   }
   return value;
 }
@@ -113,10 +121,10 @@ function parseArgs(argv: string[]): Args {
         args.options.output = next();
         break;
       case '--seed':
-        args.options.seed = readInt('--seed', next());
+        args.options.seed = readInt('--seed', next(), 0, MAX_SEED);
         break;
       case '--trials':
-        args.options.trials = readInt('--trials', next());
+        args.options.trials = readInt('--trials', next(), 1, MAX_TRIALS);
         break;
       case '--layout':
         args.options.layout = (next() === 'numerator' ? 'numerator' : 'denominator');

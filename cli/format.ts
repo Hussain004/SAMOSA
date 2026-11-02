@@ -71,7 +71,21 @@ export function summaryLine(report: Report): string {
   if (counts.unchecked) parts.push(`${counts.unchecked} unchecked`);
   if (counts.ok) parts.push(`${counts.ok} ok`);
   if (counts.defined) parts.push(`${counts.defined} defined`);
-  return `${ICONS.wrong} ${parts.join(' · ')} · ${report.ms} ms`;
+  // the icon is the worst verdict of the run, so a green run does not wear
+  // the cross of a red one (review 5.9). A run with no steps at all has
+  // nothing checked, and it asks.
+  const worst = counts.wrong
+    ? 'wrong'
+    : counts.shape
+      ? 'shape'
+      : counts.inconclusive
+        ? 'inconclusive'
+        : counts.unchecked || report.steps.length === 0
+          ? 'unchecked'
+          : counts.ok
+            ? 'ok'
+            : 'defined';
+  return `${ICONS[worst]} ${parts.join(' · ')} · ${report.ms} ms`;
 }
 
 /** The SARIF output, version 2.1.0. */

@@ -82,6 +82,28 @@ const DEFAULT_SETTINGS: Settings = {
   snackMode: false,
 };
 
+/**
+ * The settings of a share link, with every number and word clamped.
+ *
+ * The link is data from outside, so it is read the way the CLI reads a
+ * flag: a seed is a 32 bit integer, the trials are a small positive count,
+ * the layout is one of the two words, and anything else is dropped rather
+ * than merged (review 5.9).
+ */
+export function clampSettings(raw: unknown): Partial<Settings> {
+  const out: Partial<Settings> = {};
+  if (!raw || typeof raw !== 'object') return out;
+  const s = raw as Record<string, unknown>;
+  if (typeof s.seed === 'number' && Number.isInteger(s.seed)) out.seed = s.seed >>> 0;
+  if (typeof s.trials === 'number' && Number.isInteger(s.trials) && s.trials >= 1 && s.trials <= 1024) {
+    out.trials = s.trials;
+  }
+  if (s.layout === 'denominator' || s.layout === 'numerator') out.layout = s.layout;
+  if (typeof s.preset === 'string') out.preset = s.preset;
+  if (typeof s.snackMode === 'boolean') out.snackMode = s.snackMode;
+  return out;
+}
+
 let worker: Worker | null = null;
 let pending = 0;
 /** the timer of the request that is running, and when it started */
@@ -296,12 +318,15 @@ export const useApp = create<AppState>((set, get) => ({
       useApp.setState({ linkError: 'this link is broken, so the default derivation was loaded' });
       return;
     }
-    const settings = { ...DEFAULT_SETTINGS, ...(payload.settings ?? {}) } as Settings;
+    // the settings of a link are clamped, the way the flags of the CLI are
+    // range checked: a hand made link cannot set the seed to a NaN or the
+    // layout to a word the app does not know (review 5.9)
+    const settings = { ...DEFAULT_SETTINGS, ...clampSettings(payload.settings) } as Settings;
     // a link carries the declarations as well, so the derivation is checked
     // the way it was checked when the link was made
-    if (payload.decls) settings.decls = payload.decls;
+    if (typeof payload.decls === 'string' && payload.decls) settings.decls = payload.decls;
     set({
-      source: payload.src ?? '',
+      source: typeof payload.src === 'string' ? payload.src : '',
       settings,
       shareHash: hash,
       error: null,

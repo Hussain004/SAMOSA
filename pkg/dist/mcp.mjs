@@ -6614,7 +6614,8 @@ function splitMathContent(src, from, to, where) {
         continue;
       }
       if (next.startsWith("\\\\")) {
-        if (braceDepth === 0 && envDepth === 0) {
+        if (envDepth === 0 && (braceDepth === 0 || bracesStayOpen(content, i2, braceDepth))) {
+          braceDepth = 0;
           const seg2 = chars.slice(rowStart, i2).join("");
           pushRow(rows, seg2, from + rowStart, where);
           rowStart = i2 + 2;
@@ -6644,6 +6645,23 @@ function splitMathContent(src, from, to, where) {
   const seg = chars.slice(rowStart).join("");
   pushRow(rows, seg, from + rowStart, where);
   return rows;
+}
+function bracesStayOpen(content, at, depth) {
+  let d = depth;
+  for (let j = at + 2; j < content.length; j++) {
+    const ch = content[j];
+    if (ch === "\\") {
+      if (content[j + 1] === "\\") return true;
+      j++;
+      continue;
+    }
+    if (ch === "{") d++;
+    else if (ch === "}") {
+      d--;
+      if (d <= 0) return false;
+    }
+  }
+  return true;
 }
 function pushRow(rows, segment, offset, where) {
   const text = cleanRow(segment);
@@ -11421,6 +11439,7 @@ function encodeShare(payload) {
   const compressed = deflateSync(strToU8(json), { level: 9 });
   return bytesToBase64Url(compressed);
 }
+var SHARE_MAX_BYTES = 8 * 1024;
 function shareLink(base2, payload) {
   const root = base2.replace(/\/+$/, "");
   return `${root}/app/#${SHARE_VERSION}.${encodeShare(payload)}`;
@@ -11490,7 +11509,7 @@ server.registerTool(
       latex: z.string().describe("the derivation, as a LaTeX align block or as plain rows"),
       declarations: z.string().optional().describe("the declarations, in the compact syntax"),
       preset: z.string().optional().describe("one of the presets"),
-      seed: z.number().int().optional()
+      seed: z.number().int().min(0).max(4294967295).optional()
     },
     outputSchema: reportSchema
   },

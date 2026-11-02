@@ -32,10 +32,24 @@ export function encodeShare(payload: SharePayload): string {
   return bytesToBase64Url(compressed);
 }
 
+/**
+ * The cap on the size of a decoded payload, in bytes.
+ *
+ * A share link carries a derivation, not a bomb: a fragment that inflates
+ * to more than this is a broken link, and the reader says so instead of
+ * spending the memory (review 5.9).
+ */
+export const SHARE_MAX_BYTES = 8 * 1024;
+
 /** Decodes the fragment of a share link. */
 export function decodeShare(hash: string): SharePayload {
   const compressed = base64UrlToBytes(hash);
-  return JSON.parse(strFromU8(inflateSync(compressed))) as SharePayload;
+  // the inflate is capped: the buffer is one byte over the cap, so a
+  // payload that needs more comes back truncated and is rejected by the
+  // length check below
+  const bytes = inflateSync(compressed, { out: new Uint8Array(SHARE_MAX_BYTES + 1) });
+  if (bytes.length > SHARE_MAX_BYTES) throw new Error('the payload is over the cap of 8 KB');
+  return JSON.parse(strFromU8(bytes)) as SharePayload;
 }
 
 /**

@@ -6613,7 +6613,8 @@ function splitMathContent(src, from, to, where) {
         continue;
       }
       if (next.startsWith("\\\\")) {
-        if (braceDepth === 0 && envDepth === 0) {
+        if (envDepth === 0 && (braceDepth === 0 || bracesStayOpen(content, i, braceDepth))) {
+          braceDepth = 0;
           const seg2 = chars.slice(rowStart, i).join("");
           pushRow(rows, seg2, from + rowStart, where);
           rowStart = i + 2;
@@ -6643,6 +6644,23 @@ function splitMathContent(src, from, to, where) {
   const seg = chars.slice(rowStart).join("");
   pushRow(rows, seg, from + rowStart, where);
   return rows;
+}
+function bracesStayOpen(content, at, depth) {
+  let d = depth;
+  for (let j = at + 2; j < content.length; j++) {
+    const ch = content[j];
+    if (ch === "\\") {
+      if (content[j + 1] === "\\") return true;
+      j++;
+      continue;
+    }
+    if (ch === "{") d++;
+    else if (ch === "}") {
+      d--;
+      if (d <= 0) return false;
+    }
+  }
+  return true;
 }
 function pushRow(rows, segment, offset, where) {
   const text = cleanRow(segment);
@@ -10985,7 +11003,8 @@ function summaryLine(report) {
   if (counts.unchecked) parts.push(`${counts.unchecked} unchecked`);
   if (counts.ok) parts.push(`${counts.ok} ok`);
   if (counts.defined) parts.push(`${counts.defined} defined`);
-  return `${ICONS.wrong} ${parts.join(" \xB7 ")} \xB7 ${report.ms} ms`;
+  const worst = counts.wrong ? "wrong" : counts.shape ? "shape" : counts.inconclusive ? "inconclusive" : counts.unchecked || report.steps.length === 0 ? "unchecked" : counts.ok ? "ok" : "defined";
+  return `${ICONS[worst]} ${parts.join(" \xB7 ")} \xB7 ${report.ms} ms`;
 }
 function formatSarif(reports) {
   const results = [];
@@ -11088,10 +11107,15 @@ function topLevel(argv) {
       break;
   }
 }
-function readInt(flag, raw) {
+var MAX_SEED = 4294967295;
+var MAX_TRIALS = 1024;
+function readInt(flag, raw, min2, max2) {
   const value = Number(raw);
   if (raw === void 0 || !Number.isInteger(value)) {
     fail(`${flag} wants an integer, and got ${raw === void 0 ? "nothing" : raw}`);
+  }
+  if (value < min2 || value > max2) {
+    fail(`${flag} wants an integer between ${min2} and ${max2}, and got ${value}`);
   }
   return value;
 }
@@ -11142,10 +11166,10 @@ function parseArgs(argv) {
         args.options.output = next();
         break;
       case "--seed":
-        args.options.seed = readInt("--seed", next());
+        args.options.seed = readInt("--seed", next(), 0, MAX_SEED);
         break;
       case "--trials":
-        args.options.trials = readInt("--trials", next());
+        args.options.trials = readInt("--trials", next(), 1, MAX_TRIALS);
         break;
       case "--layout":
         args.options.layout = next() === "numerator" ? "numerator" : "denominator";

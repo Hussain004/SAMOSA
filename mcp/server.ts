@@ -81,7 +81,7 @@ server.registerTool(
       latex: z.string().describe('the derivation, as a LaTeX align block or as plain rows'),
       declarations: z.string().optional().describe('the declarations, in the compact syntax'),
       preset: z.string().optional().describe('one of the presets'),
-      seed: z.number().int().optional(),
+      seed: z.number().int().min(0).max(0xffffffff).optional(),
     },
     outputSchema: reportSchema,
   },

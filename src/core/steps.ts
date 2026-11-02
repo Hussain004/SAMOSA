@@ -307,7 +307,11 @@ function splitMathContent(src: string, from: number, to: number, where: string):
         continue;
       }
       if (next.startsWith('\\\\')) {
-        if (braceDepth === 0 && envDepth === 0) {
+        if (envDepth === 0 && (braceDepth === 0 || bracesStayOpen(content, i, braceDepth))) {
+          // a group that never closes recovers here: one unclosed `{` does
+          // not swallow the rest of the derivation into one unreadable row
+          // (review 5.9)
+          braceDepth = 0;
           const seg = chars.slice(rowStart, i).join('');
           pushRow(rows, seg, from + rowStart, where);
           rowStart = i + 2;
@@ -337,6 +341,32 @@ function splitMathContent(src: string, from: number, to: number, where: string):
   const seg = chars.slice(rowStart).join('');
   pushRow(rows, seg, from + rowStart, where);
   return rows;
+}
+
+/**
+ * Whether the braces open at this separator stay open past the next one.
+ *
+ * A group that closes before the next `\\` owns the separator, the way
+ * `\substack{a \\ b}` does. A group that does not close is an unclosed `{`,
+ * and the row recovers at the separator instead of swallowing the rest of
+ * the derivation (review 5.9).
+ */
+function bracesStayOpen(content: string, at: number, depth: number): boolean {
+  let d = depth;
+  for (let j = at + 2; j < content.length; j++) {
+    const ch = content[j];
+    if (ch === '\\') {
+      if (content[j + 1] === '\\') return true;
+      j++;
+      continue;
+    }
+    if (ch === '{') d++;
+    else if (ch === '}') {
+      d--;
+      if (d <= 0) return false;
+    }
+  }
+  return true;
 }
 
 function pushRow(rows: SourceRow[], segment: string, offset: number, where: string) {
