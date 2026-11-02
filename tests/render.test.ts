@@ -34,4 +34,14 @@ describe('a fix, written back as LaTeX', () => {
     // no fix may write a product in a brace with a power on it
     for (const fix of fixes) expect(fix.edit.insert).not.toMatch(/\{[A-Z] [A-Z]\}\^\\top/);
   });
+
+  it('offers a fix of the right hand side above a fix that edits the claim', () => {
+    const src = String.raw`\begin{align*}(A B)^\top &= A^\top B^\top\end{align*}`;
+    const report = check(src, { decls: 'A: n×n; B: n×n' });
+    const fixes = explain(src, report.steps[0].id, { decls: 'A: n×n; B: n×n' }).fixes;
+    expect(fixes.length).toBeGreaterThan(0);
+    // the fix that repairs the derivation edits the right side, so it is the
+    // one offered first, and it says which side it changes
+    expect(fixes[0].title).toContain('change the right side to');
+  });
 });

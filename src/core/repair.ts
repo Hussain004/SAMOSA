@@ -88,11 +88,21 @@ export function repairs(
     (a, b) =>
       priority(a) - priority(b) ||
       // a fix of the right hand side is a fix of the derivation, so it comes
-      // before a fix of the claim
-      (a.side ?? 'rhs').localeCompare(b.side ?? 'rhs') ||
+      // before a fix of the left hand side that edits the claim
+      compareSide(a.side, b.side) ||
       editSize(a) - editSize(b),
   );
   return deduped.slice(0, 3);
+}
+
+/** The order of the sides a fix can change, most derivation-like first. */
+function compareSide(a: 'lhs' | 'rhs' | undefined, b: 'lhs' | 'rhs' | undefined): number {
+  const as = a ?? 'rhs';
+  const bs = b ?? 'rhs';
+  if (as === bs) return 0;
+  // the right hand side is where a mistake in the derivation usually sits,
+  // so it is offered first (review 3.1 of the second audit, item 2.4)
+  return as === 'rhs' ? -1 : 1;
 }
 
 /** The order the kinds of fix are offered in. */
@@ -357,7 +367,10 @@ function mutationRepairs(sh: RepairCtx): Fix[] {
         if (!holdsWith(sh, side, candidate)) continue;
         out.push({
           kind: 'mutation',
-          title: mutation.title,
+          // the fix says which side it changes, the derivation comes before
+          // the claim in the reading order of a person (review 3.1, item 2.4)
+          title:
+            side === 'rhs' ? `change the right side to ${mutation.title}` : `change the left side to ${mutation.title}`,
           edit: { span: original.span, insert: renderNode(candidate) },
           verified: true,
           detail: renderNode(candidate),

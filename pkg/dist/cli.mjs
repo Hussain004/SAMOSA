@@ -10315,10 +10315,16 @@ function repairs(ctx, lhs, rhs, defs, seed, dimVars, kind) {
   }
   deduped.sort(
     (a, b) => priority(a) - priority(b) || // a fix of the right hand side is a fix of the derivation, so it comes
-    // before a fix of the claim
-    (a.side ?? "rhs").localeCompare(b.side ?? "rhs") || editSize(a) - editSize(b)
+    // before a fix of the left hand side that edits the claim
+    compareSide(a.side, b.side) || editSize(a) - editSize(b)
   );
   return deduped.slice(0, 3);
+}
+function compareSide(a, b) {
+  const as = a ?? "rhs";
+  const bs = b ?? "rhs";
+  if (as === bs) return 0;
+  return as === "rhs" ? -1 : 1;
 }
 function priority(fix) {
   switch (fix.kind) {
@@ -10533,7 +10539,9 @@ function mutationRepairs(sh) {
         if (!holdsWith(sh, side, candidate)) continue;
         out.push({
           kind: "mutation",
-          title: mutation.title,
+          // the fix says which side it changes, the derivation comes before
+          // the claim in the reading order of a person (review 3.1, item 2.4)
+          title: side === "rhs" ? `change the right side to ${mutation.title}` : `change the left side to ${mutation.title}`,
           edit: { span: original.span, insert: renderNode(candidate) },
           verified: true,
           detail: renderNode(candidate),
