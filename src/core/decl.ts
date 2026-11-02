@@ -493,9 +493,16 @@ function parseType(name: string, type: string): SymbolDecl | null {
   const words = type.split(/\s+/);
   const props: Prop[] = [];
   const dims: Dim[] = [];
+  // the kind word: `positive scalar` is a scalar that is positive, and the
+  // word `scalar` names the kind, never a dimension (review 5.7)
+  let scalarKind = false;
   let i = 0;
   for (; i < words.length; i++) {
     const w = words[i].toLowerCase();
+    if (w === 'scalar' || w === 'number') {
+      scalarKind = true;
+      continue;
+    }
     if (w === 'rank') {
       const k = parseDim(words[++i] ?? '');
       if (k === null) return null;
@@ -508,6 +515,7 @@ function parseType(name: string, type: string): SymbolDecl | null {
     }
     break;
   }
+  if (scalarKind) return { ...base, kind: 'scalar', props };
   const rest = words.slice(i).join(' ');
   const dimText = rest.replace(/[x×]|\bby\b/gi, '×');
   const parts = dimText.split('×').map((p) => p.trim()).filter(Boolean);

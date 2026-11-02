@@ -7050,9 +7050,14 @@ function parseType(name, type) {
   const words = type.split(/\s+/);
   const props = [];
   const dims = [];
+  let scalarKind = false;
   let i2 = 0;
   for (; i2 < words.length; i2++) {
     const w = words[i2].toLowerCase();
+    if (w === "scalar" || w === "number") {
+      scalarKind = true;
+      continue;
+    }
     if (w === "rank") {
       const k = parseDim(words[++i2] ?? "");
       if (k === null) return null;
@@ -7065,6 +7070,7 @@ function parseType(name, type) {
     }
     break;
   }
+  if (scalarKind) return { ...base2, kind: "scalar", props };
   const rest = words.slice(i2).join(" ");
   const dimText2 = rest.replace(/[x×]|\bby\b/gi, "\xD7");
   const parts = dimText2.split("\xD7").map((p) => p.trim()).filter(Boolean);
@@ -10015,7 +10021,7 @@ function searchSmallIntegers(sh, range, seed) {
       const info = ctx.symbols.get(name);
       if (!info) continue;
       if (info.ty.t === "scalar") {
-        const n = Math.floor(rng() * (2 * range + 1)) - range;
+        const n = info.props.includes("pos") ? 1 + Math.floor(rng() * range) : Math.floor(rng() * (2 * range + 1)) - range;
         values.set(name, { k: "s", v: field.fromRational(n, 1) });
         continue;
       }
@@ -10060,6 +10066,37 @@ function smallMatrix(field, r, c, props, rng, range) {
     }
     return { r, c, d: d2.map((x2) => field.fromRational(x2, 1)) };
   }
+  if (has("unit")) {
+    const d2 = new Array(r * c).fill(0);
+    const den = new Array(r * c).fill(1);
+    for (let j = 0; j < c; j++) {
+      if (r === 1) {
+        d2[j] = 1;
+        continue;
+      }
+      const first = rng() < 0.5;
+      const sign2 = rng() < 0.5 ? -1 : 1;
+      const p = j % r;
+      const q = (j + 1) % r;
+      d2[p * c + j] = sign2 * (first ? 3 : 4);
+      den[p * c + j] = 5;
+      d2[q * c + j] = sign2 * (first ? 4 : 3);
+      den[q * c + j] = 5;
+    }
+    return { r, c, d: d2.map((x2, i2) => field.fromRational(x2, den[i2])) };
+  }
+  if (has("stoch")) {
+    const d2 = new Array(r * c).fill(0);
+    for (let i2 = 0; i2 < r; i2++) {
+      let sum2 = 0;
+      for (let j = 0; j < c - 1; j++) {
+        d2[i2 * c + j] = entry();
+        sum2 += d2[i2 * c + j];
+      }
+      d2[i2 * c + c - 1] = 1 - sum2;
+    }
+    return { r, c, d: d2.map((x2) => field.fromRational(x2, 1)) };
+  }
   const d = new Array(r * c).fill(0);
   for (let i2 = 0; i2 < r; i2++) {
     for (let j = 0; j < c; j++) {
@@ -10070,6 +10107,10 @@ function smallMatrix(field, r, c, props, rng, range) {
         d[i2 * c + j] = i2 === j ? 0 : i2 < j ? entry() : -d[j * c + i2];
       } else if (has("diag")) {
         d[i2 * c + j] = i2 === j ? entry() : 0;
+      } else if (has("triu")) {
+        d[i2 * c + j] = i2 <= j ? entry() : 0;
+      } else if (has("tril")) {
+        d[i2 * c + j] = i2 >= j ? entry() : 0;
       } else if (has("ident")) {
         d[i2 * c + j] = i2 === j ? 1 : 0;
       } else if (has("zero")) {
@@ -10087,6 +10128,8 @@ function smallMatrix(field, r, c, props, rng, range) {
 }
 function equal(field, a, b) {
   if (a.k === "s" && b.k === "s") return field.eq(a.v, b.v);
+  if (a.k === "m" && b.k === "s" && a.m.r === 1 && a.m.c === 1) return field.eq(a.m.d[0], b.v);
+  if (a.k === "s" && b.k === "m" && b.m.r === 1 && b.m.c === 1) return field.eq(a.v, b.m.d[0]);
   if (a.k === "m" && b.k === "m") {
     if (a.m.r !== b.m.r || a.m.c !== b.m.c) return false;
     for (let i2 = 0; i2 < a.m.d.length; i2++) if (!field.eq(a.m.d[i2], b.m.d[i2])) return false;

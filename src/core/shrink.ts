@@ -169,7 +169,11 @@ function searchSmallIntegers(sh: ShrinkCtx, range: number, seed: number): Shrunk
       const info = ctx.symbols.get(name);
       if (!info) continue;
       if (info.ty.t === 'scalar') {
-        const n = Math.floor(rng() * (2 * range + 1)) - range;
+        // a positive scalar is drawn positive, so the structure the
+        // declaration names survives the shrinking (review 5.7)
+        const n = info.props.includes('pos')
+          ? 1 + Math.floor(rng() * range)
+          : Math.floor(rng() * (2 * range + 1)) - range;
         values.set(name, { k: 's', v: field.fromRational(n, 1) });
         continue;
       }
@@ -236,6 +240,44 @@ function smallMatrix(
     return { r, c, d: d.map((x) => field.fromRational(x, 1)) };
   }
 
+  if (has('unit')) {
+    // Pythagorean triples: (3/5, 4/5) is the smallest one, and the fifths
+    // are exact over the decimals, so every column is a unit vector a
+    // person can read (review 5.7). The signs and the order are drawn, so
+    // two unit symbols are not always the same vector.
+    const d = new Array<number>(r * c).fill(0);
+    const den = new Array<number>(r * c).fill(1);
+    for (let j = 0; j < c; j++) {
+      if (r === 1) {
+        d[j] = 1;
+        continue;
+      }
+      const first = rng() < 0.5;
+      const sign = rng() < 0.5 ? -1 : 1;
+      const p = j % r;
+      const q = (j + 1) % r;
+      d[p * c + j] = sign * (first ? 3 : 4);
+      den[p * c + j] = 5;
+      d[q * c + j] = sign * (first ? 4 : 3);
+      den[q * c + j] = 5;
+    }
+    return { r, c, d: d.map((x, i) => field.fromRational(x, den[i])) };
+  }
+  if (has('stoch')) {
+    // the rows are drawn and the last column of each row is whatever closes
+    // the sum at exactly one, so every entry stays a small integer and
+    // every row sums to one (review 5.7)
+    const d = new Array<number>(r * c).fill(0);
+    for (let i = 0; i < r; i++) {
+      let sum = 0;
+      for (let j = 0; j < c - 1; j++) {
+        d[i * c + j] = entry();
+        sum += d[i * c + j];
+      }
+      d[i * c + c - 1] = 1 - sum;
+    }
+    return { r, c, d: d.map((x) => field.fromRational(x, 1)) };
+  }
   const d = new Array<number>(r * c).fill(0);
   for (let i = 0; i < r; i++) {
     for (let j = 0; j < c; j++) {
@@ -247,6 +289,10 @@ function smallMatrix(
         d[i * c + j] = i === j ? 0 : i < j ? entry() : -d[j * c + i];
       } else if (has('diag')) {
         d[i * c + j] = i === j ? entry() : 0;
+      } else if (has('triu')) {
+        d[i * c + j] = i <= j ? entry() : 0;
+      } else if (has('tril')) {
+        d[i * c + j] = i >= j ? entry() : 0;
       } else if (has('ident')) {
         d[i * c + j] = i === j ? 1 : 0;
       } else if (has('zero')) {
@@ -265,6 +311,11 @@ function smallMatrix(
 
 function equal<T>(field: Field<T>, a: Val<T>, b: Val<T>): boolean {
   if (a.k === 's' && b.k === 's') return field.eq(a.v, b.v);
+  // a 1 by 1 matrix and a scalar are the same thing, the way the verdict
+  // reads them, or a side that holds shows up as a counterexample with a
+  // difference of zero
+  if (a.k === 'm' && b.k === 's' && a.m.r === 1 && a.m.c === 1) return field.eq(a.m.d[0], b.v);
+  if (a.k === 's' && b.k === 'm' && b.m.r === 1 && b.m.c === 1) return field.eq(a.v, b.m.d[0]);
   if (a.k === 'm' && b.k === 'm') {
     if (a.m.r !== b.m.r || a.m.c !== b.m.c) return false;
     for (let i = 0; i < a.m.d.length; i++) if (!field.eq(a.m.d[i], b.m.d[i])) return false;
