@@ -6,6 +6,7 @@ import { MOCKS } from './demo-scripts.ts';
 import { openApp } from './open-transition.ts';
 import { FontSizeControl } from '../font-size.tsx';
 import TEX from './generated-tex.json';
+import ANNOUNCEMENTS from './generated-announcements.json';
 
 /**
  * The landing page.
@@ -1003,24 +1004,8 @@ function Install() {
   );
 }
 
-/** The same entries as CHANGELOG.md. */
-const CHANGELOG = [
-  {
-    date: '2026-10-21',
-    title: 'The first release',
-    body: 'The engine, the app, the CLI, the MCP server and sixteen derivations.',
-  },
-  {
-    date: '2026-10-21',
-    title: 'The Joseph form',
-    body: 'The Kalman update, with its two planted bugs.',
-  },
-  {
-    date: '2026-10-21',
-    title: 'Dual numbers',
-    body: 'Gradients and Hessians, checked exactly over a finite field.',
-  },
-];
+/** The same entries as CHANGELOG.md, written by the generator. */
+const CHANGELOG = ANNOUNCEMENTS as Array<{ date: string; version: string; body: string }>;
 
 function Changelog() {
   return (
@@ -1029,9 +1014,9 @@ function Changelog() {
         <h2 className="text-sm tracking-[0.2em] text-[var(--color-faint)]">ANNOUNCEMENTS</h2>
         <div className="mt-6 grid gap-4 md:grid-cols-3">
           {CHANGELOG.map((entry) => (
-            <div key={entry.title} className="rounded border border-[var(--color-line)] bg-[var(--color-panel)] p-4">
+            <div key={entry.version} className="rounded border border-[var(--color-line)] bg-[var(--color-panel)] p-4">
               <span className="text-[0.6875rem] text-[var(--color-faint)]">{entry.date}</span>
-              <h3 className="mt-1 text-[0.875rem]">{entry.title}</h3>
+              <h3 className="mt-1 text-[0.875rem]">SAMOSA {entry.version}</h3>
               <p className="mt-1 text-[0.75rem] leading-relaxed text-[var(--color-muted)]">{entry.body}</p>
             </div>
           ))}
