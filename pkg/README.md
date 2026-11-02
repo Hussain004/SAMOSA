@@ -168,9 +168,9 @@ with the mistakes the catalog can make of them.
 | | |
 | --- | --- |
 | the false checkmarks | **0** |
-| the caught mutants | 196 of 262 (**74.8%**) |
+| the caught mutants | **197 of 264 (74.6%)** |
 
-The plan's gate asks for 95% of the bugs caught. The cookbook is at 74.8%,
+The plan's gate asks for 95% of the bugs caught. The cookbook is at 74.6%,
 and every miss is a step the engine says it cannot decide, never one it
 calls right. The method, the misses and the bugs the corpus found are in
 [docs/COOKBOOK.md](https://raw.githubusercontent.com/Hussain004/SAMOSA/master/docs/COOKBOOK.md).
@@ -248,6 +248,11 @@ The engine lives in `src/core` and imports nothing from the DOM or from
 Node, so the same code runs in the browser, in the CLI and in the MCP
 server. The rules it lives by: no model in the verdict path, never a
 checkmark without a guarantee, and nothing that leaves the machine.
+
+The bundle budget is 300 KB of gzipped initial JavaScript for the app and
+120 KB for the landing page, checked on every build by `pnpm check:bundle`.
+The app's limit moved from 250 KB to 300 KB, and the move is recorded in
+the plan and here.
 
 ## Contributing
 

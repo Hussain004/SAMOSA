@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { check } from '../src/core/verdict.ts';
 import { IDENTITIES } from '../corpus/cookbook/identities.ts';
 import { allMutants } from '../corpus/cookbook/mutants.ts';
@@ -117,5 +118,34 @@ describe('the cookbook', () => {
     // and the engine never calls a mutant right: a miss is a step it could
     // not decide, not a step it thinks holds
     expect(missed.every((m) => m.verdict !== 'ok')).toBe(true);
+  });
+
+  it('the README carries the numbers the engine runs', () => {
+    // the numbers in the README are copy, so they get a guard like the one
+    // for the generated demo: the engine runs, the README reads
+    let caught = 0;
+    let harmless = 0;
+    const missed: Array<{ where: string; verdict: string }> = [];
+    for (const mutant of allMutants(IDENTITIES)) {
+      const identity = IDENTITIES.find((i) => i.id === mutant.id);
+      if (!identity) continue;
+      const report = check(mutant.source, { decls: identity.decls });
+      const step = report.steps.find((s) => s.row === mutant.row);
+      if (!step) continue;
+      if (CATCHES.includes(step.verdict)) {
+        caught++;
+        continue;
+      }
+      if (step.verdict === 'ok') {
+        harmless++;
+        continue;
+      }
+      missed.push({ where: `${identity.id} row ${mutant.row} (${mutant.rule})`, verdict: step.verdict });
+    }
+    const total = caught + harmless + missed.length;
+    const rate = (caught / total) * 100;
+    const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+    expect(readme).toContain(`${caught} of ${total}`);
+    expect(readme).toContain(`${rate.toFixed(1)}%`);
   });
 });

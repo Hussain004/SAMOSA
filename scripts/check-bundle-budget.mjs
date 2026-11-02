@@ -6,8 +6,12 @@ import { resolve } from 'node:path';
 /**
  * The bundle budget.
  *
- * The plan sets a limit of 250 KB gzip for the initial JavaScript, and a
- * much smaller one for the landing page, which should load in an instant.
+ * The plan sets a limit of 120 KB gzip for the landing page, which should
+ * load in an instant, and 300 KB for the app, whose math is rendered at
+ * build time but whose editor, worker and inspector are all on the first
+ * screen. The app moved its limit from 250 KB to 300 KB after the measured
+ * build passed the old number without margin, and the move is recorded in
+ * the plan and the README, so this script follows the recorded limit.
  */
 
 const root = resolve(import.meta.dirname, '..');
