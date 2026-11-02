@@ -113,23 +113,36 @@ export function explainAll(
 ): Map<string, Explanation> {
   const out = new Map<string, Explanation>();
   const parsed = analyzeSource(src, opts);
-  const deadline = Date.now() + (opts.budgetMs ?? 4000);
+  // the explanations share one budget of evaluations, so the same source
+  // gives the same explanations on a slow machine and on a fast one
+  // (review 5.8)
+  const spent = { n: 0 };
   let count = 0;
   for (const step of parsed.steps) {
     if (count >= limit) break;
-    if (Date.now() > deadline) break;
+    if (spent.n >= EXPLAIN_ATTEMPTS) break;
     if (!step.lhs || !step.rhs) continue;
     if (step.relation !== '=') continue;
     const verdict = report?.steps.find((s) => s.id === step.id)?.verdict;
     if (verdict && verdict !== 'wrong' && verdict !== 'shape') continue;
-    out.set(step.id, explainStep(parsed, step, opts));
+    out.set(step.id, explainStep(parsed, step, opts, spent));
     count++;
   }
   return out;
 }
 
+/**
+ * The budget of the counterexample search of one step, in evaluations and
+ * not in milliseconds (review 5.8). A wall clock would make the
+ * counterexample a card shows depend on the speed of the machine.
+ */
+const CEX_ATTEMPTS = 480;
+
+/** The total counterexample budget of a whole explanation pass. */
+const EXPLAIN_ATTEMPTS = 2000;
+
 /** The fixes and the counterexample of one step. */
-function explainStep(source: Source, step: Step, opts: CheckOptions): Explanation {
+function explainStep(source: Source, step: Step, opts: CheckOptions, spent: { n: number } = { n: 0 }): Explanation {
   const { ctx, defs } = source;
   if (!step.lhs || !step.rhs) return { fixes: [] };
 
@@ -144,20 +157,27 @@ function explainStep(source: Source, step: Step, opts: CheckOptions): Explanatio
   // a person reads is the one that still breaks the step with the fewest
   // numbers in it.
   let counterexample: ShrunkInstance | undefined;
-  const deadline = Date.now() + 600;
   for (const size of [1, 2, 3]) {
     const sizes = new Map<string, number>();
     // the sizes are keyed by the root of the dimension variable, the way the
     // evaluator looks them up
     for (const v of dimVars) sizes.set(ctx.dims.find(v), size);
-    const left = Math.max(50, deadline - Date.now());
     try {
-      counterexample = shrinkCounterexample(ctx, step.lhs, step.rhs, defs, sizes, opts.seed ?? 0x5a305a, left) ?? undefined;
+      counterexample = shrinkCounterexample(
+        ctx,
+        step.lhs,
+        step.rhs,
+        defs,
+        sizes,
+        opts.seed ?? 0x5a305a,
+        Math.max(40, CEX_ATTEMPTS - spent.n),
+        spent,
+      ) ?? undefined;
     } catch {
       counterexample = undefined;
     }
     if (counterexample) break;
-    if (Date.now() > deadline) break;
+    if (spent.n >= CEX_ATTEMPTS) break;
   }
 
   return { fixes, counterexample };

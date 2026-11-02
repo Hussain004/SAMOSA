@@ -8133,7 +8133,7 @@ function check(src, opts = {}) {
     });
   }
   for (const step of steps) {
-    const result = checkStep(step, ctx, defs, { seed, trials, budgetMs: opts.budgetMs ?? 500 }, diagnostics);
+    const result = checkStep(step, ctx, defs, { seed, trials }, diagnostics);
     result.text ??= step.text;
     results.push(result);
   }
@@ -9948,8 +9948,7 @@ def _exp(a):
 `;
 
 // src/core/shrink.ts
-function shrinkCounterexample(ctx, lhs, rhs, defs, sizes, seed, budgetMs = 200) {
-  const started = Date.now();
+function shrinkCounterexample(ctx, lhs, rhs, defs, sizes, seed, maxAttempts = 160, spent = { n: 0 }) {
   const names = [...ctx.symbols.keys()].filter((name) => {
     const info = ctx.symbols.get(name);
     return info && !defs.has(name) && (info.ty.t === "mat" || info.ty.t === "scalar");
@@ -9965,9 +9964,9 @@ function shrinkCounterexample(ctx, lhs, rhs, defs, sizes, seed, budgetMs = 200) 
     propOf: (name) => ctx.symbols.get(name)?.props ?? []
   };
   for (const range of [2, 5]) {
-    const candidate = searchSmallIntegers(shrinkCtx, range, seed);
+    const candidate = searchSmallIntegers(shrinkCtx, range, seed, spent, maxAttempts);
     if (candidate) return candidate;
-    if (Date.now() - started > budgetMs) break;
+    if (spent.n >= maxAttempts) break;
   }
   const field = new GFpField(2147483647);
   const sampler = new Sampler(field, rngFor(seed, "shrink"));
@@ -10010,11 +10009,13 @@ function derivedValues(field, env, defs) {
   }
   return out;
 }
-function searchSmallIntegers(sh, range, seed) {
+function searchSmallIntegers(sh, range, seed, spent, maxAttempts) {
   const field = new DecField(50);
   const rng = rngFor(seed, "small", range);
   const { ctx, sizes } = sh;
   for (let attempt = 0; attempt < 40; attempt++) {
+    spent.n++;
+    if (spent.n > maxAttempts) return null;
     const values = /* @__PURE__ */ new Map();
     for (const name of sh.symbolNames) {
       const info = ctx.symbols.get(name);
@@ -10242,18 +10243,17 @@ function literal(value, shape) {
 
 // src/core/repair.ts
 var CANDIDATE_LIMIT = 300;
-var BUDGET_MS = 150;
+var BUDGET_EVALS = 1200;
 function repairs(ctx, lhs, rhs, defs, seed, dimVars, kind) {
-  const started = Date.now();
-  const sh = { ctx, lhs, rhs, defs, seed, dimVars };
+  const sh = { ctx, lhs, rhs, defs, seed, dimVars, spent: { n: 0 } };
   const out = [];
   const shape = kind === "shape" ? shapeRepairs(sh) : [];
   out.push(...shape);
-  if (Date.now() - started > BUDGET_MS) return out;
+  if (sh.spent.n > BUDGET_EVALS) return out;
   out.push(...mutationRepairs(sh));
-  if (Date.now() - started > BUDGET_MS) return out;
+  if (sh.spent.n > BUDGET_EVALS) return out;
   out.push(...assumptionRepairs(sh));
-  if (Date.now() - started > BUDGET_MS) return out;
+  if (sh.spent.n > BUDGET_EVALS) return out;
   out.push(...residualRepairs(sh));
   const deduped = [];
   const seen = /* @__PURE__ */ new Set();
@@ -10513,6 +10513,7 @@ function holdsWith(sh, side, candidate) {
         env,
         sampler
       );
+      sh.spent.n++;
       if (sides.kind !== "equal") return false;
     } catch {
       return false;
@@ -10650,8 +10651,10 @@ function typeChecks(sh, rhs) {
     for (const [n, value] of values.entries()) if (value) env.values.set(n, value);
     try {
       evalNode(field, rhs, env);
+      sh.spent.n++;
       return true;
     } catch {
+      sh.spent.n++;
       return false;
     }
   }
@@ -10673,6 +10676,7 @@ function residualRepairs(sh) {
     try {
       const l = evalNode(field, sh.lhs, env);
       const r = evalNode(field, sh.rhs, env);
+      sh.spent.n += 2;
       if (l.k !== "m" || r.k !== "m") return out;
       const d = l.m.d.map((x, i) => field.sub(x, r.m.d[i]));
       samples.push({ env, diff: d });
@@ -10683,6 +10687,7 @@ function residualRepairs(sh) {
   if (samples.length < 2) return out;
   const terms = candidateTerms(sh);
   for (const [text, term] of terms) {
+    sh.spent.n++;
     const scale = matchesScale(field, term, samples);
     if (scale === null || scale === 0) continue;
     const patched = {
@@ -10795,21 +10800,23 @@ function scaleText(scale) {
 function explainAll(src, opts = {}, limit = 8, report) {
   const out = /* @__PURE__ */ new Map();
   const parsed = analyzeSource(src, opts);
-  const deadline = Date.now() + (opts.budgetMs ?? 4e3);
+  const spent = { n: 0 };
   let count = 0;
   for (const step of parsed.steps) {
     if (count >= limit) break;
-    if (Date.now() > deadline) break;
+    if (spent.n >= EXPLAIN_ATTEMPTS) break;
     if (!step.lhs || !step.rhs) continue;
     if (step.relation !== "=") continue;
     const verdict = report?.steps.find((s) => s.id === step.id)?.verdict;
     if (verdict && verdict !== "wrong" && verdict !== "shape") continue;
-    out.set(step.id, explainStep(parsed, step, opts));
+    out.set(step.id, explainStep(parsed, step, opts, spent));
     count++;
   }
   return out;
 }
-function explainStep(source, step, opts) {
+var CEX_ATTEMPTS = 480;
+var EXPLAIN_ATTEMPTS = 2e3;
+function explainStep(source, step, opts, spent = { n: 0 }) {
   const { ctx, defs } = source;
   if (!step.lhs || !step.rhs) return { fixes: [] };
   inferType(ctx, step.lhs);
@@ -10818,18 +10825,25 @@ function explainStep(source, step, opts) {
   const kind = step.relation === "=" ? "wrong" : "shape";
   const fixes = repairs(ctx, step.lhs, step.rhs, defs, opts.seed ?? 5910618, dimVars, kind);
   let counterexample;
-  const deadline = Date.now() + 600;
   for (const size of [1, 2, 3]) {
     const sizes = /* @__PURE__ */ new Map();
     for (const v of dimVars) sizes.set(ctx.dims.find(v), size);
-    const left = Math.max(50, deadline - Date.now());
     try {
-      counterexample = shrinkCounterexample(ctx, step.lhs, step.rhs, defs, sizes, opts.seed ?? 5910618, left) ?? void 0;
+      counterexample = shrinkCounterexample(
+        ctx,
+        step.lhs,
+        step.rhs,
+        defs,
+        sizes,
+        opts.seed ?? 5910618,
+        Math.max(40, CEX_ATTEMPTS - spent.n),
+        spent
+      ) ?? void 0;
     } catch {
       counterexample = void 0;
     }
     if (counterexample) break;
-    if (Date.now() > deadline) break;
+    if (spent.n >= CEX_ATTEMPTS) break;
   }
   return { fixes, counterexample };
 }

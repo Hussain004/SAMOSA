@@ -26,7 +26,17 @@ import type { Prop } from './decl.ts';
  */
 
 const CANDIDATE_LIMIT = 300;
-const BUDGET_MS = 150;
+
+/**
+ * The repair budget, in evaluations and not in milliseconds (review 5.8).
+ *
+ * A wall clock makes the fixes a person sees depend on the speed of the
+ * machine: a slow runner silently drops the families that come last. The
+ * count is a safety net over families that are already count bounded, so a
+ * normal step is never cut short and any cut lands in the same place
+ * everywhere.
+ */
+const BUDGET_EVALS = 1200;
 
 interface RepairCtx {
   ctx: TypeContext;
@@ -35,6 +45,8 @@ interface RepairCtx {
   defs: Map<string, Node>;
   seed: number;
   dimVars: string[];
+  /** the evaluations spent so far, shared by the four families */
+  spent: { n: number };
 }
 
 /** The repairs for one step. */
@@ -47,19 +59,18 @@ export function repairs(
   dimVars: string[],
   kind: 'wrong' | 'shape',
 ): Fix[] {
-  const started = Date.now();
-  const sh: RepairCtx = { ctx, lhs, rhs, defs, seed, dimVars };
+  const sh: RepairCtx = { ctx, lhs, rhs, defs, seed, dimVars, spent: { n: 0 } };
   const out: Fix[] = [];
 
   const shape = kind === 'shape' ? shapeRepairs(sh) : [];
   out.push(...shape);
-  if (Date.now() - started > BUDGET_MS) return out;
+  if (sh.spent.n > BUDGET_EVALS) return out;
 
   out.push(...mutationRepairs(sh));
-  if (Date.now() - started > BUDGET_MS) return out;
+  if (sh.spent.n > BUDGET_EVALS) return out;
 
   out.push(...assumptionRepairs(sh));
-  if (Date.now() - started > BUDGET_MS) return out;
+  if (sh.spent.n > BUDGET_EVALS) return out;
 
   out.push(...residualRepairs(sh));
 
@@ -378,6 +389,7 @@ function holdsWith(sh: RepairCtx, side: 'lhs' | 'rhs', candidate: Node): boolean
         env,
         sampler,
       );
+      sh.spent.n++;
       if (sides.kind !== 'equal') return false;
     } catch {
       return false;
@@ -563,8 +575,10 @@ function typeChecks(sh: RepairCtx, rhs: Node): boolean {
     for (const [n, value] of values.entries()) if (value) env.values.set(n, value);
     try {
       evalNode(field, rhs, env);
+      sh.spent.n++;
       return true;
     } catch {
+      sh.spent.n++;
       return false;
     }
   }
@@ -603,6 +617,7 @@ function residualRepairs(sh: RepairCtx): Fix[] {
     try {
       const l = evalNode(field, sh.lhs, env);
       const r = evalNode(field, sh.rhs, env);
+      sh.spent.n += 2;
       if (l.k !== 'm' || r.k !== 'm') return out;
       const d = l.m.d.map((x, i) => field.sub(x, r.m.d[i]));
       samples.push({ env, diff: d });
@@ -615,6 +630,7 @@ function residualRepairs(sh: RepairCtx): Fix[] {
   const terms = candidateTerms(sh);
 
   for (const [text, term] of terms) {
+    sh.spent.n++;
     const scale = matchesScale(field, term, samples);
     if (scale === null || scale === 0) continue;
     // the patched row is checked like any other candidate, so the fix that is

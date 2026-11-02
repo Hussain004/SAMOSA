@@ -68,9 +68,10 @@ export function shrinkCounterexample(
   defs: Map<string, Node>,
   sizes: Map<string, number>,
   seed: number,
-  budgetMs = 200,
+  maxAttempts = 160,
+  /** the attempts spent so far, shared by the callers that budget a whole step */
+  spent: { n: number } = { n: 0 },
 ): ShrunkInstance | null {
-  const started = Date.now();
   // A symbol the derivation defines is not an input: it is computed from the
   // definitions, so sampling it would give an instance that does not satisfy
   // the derivation at all.
@@ -90,11 +91,13 @@ export function shrinkCounterexample(
     propOf: (name) => ctx.symbols.get(name)?.props ?? [],
   };
 
-  // 1. small integer instances
+  // 1. small integer instances. The budget is a count of evaluations and not
+  // a wall clock: the counterexample a card shows may not depend on the
+  // speed of the machine (review 5.8).
   for (const range of [2, 5]) {
-    const candidate = searchSmallIntegers(shrinkCtx, range, seed);
+    const candidate = searchSmallIntegers(shrinkCtx, range, seed, spent, maxAttempts);
     if (candidate) return candidate;
-    if (Date.now() - started > budgetMs) break;
+    if (spent.n >= maxAttempts) break;
   }
 
   // 2. the finite field instance, with the entries pulled towards zero
@@ -155,7 +158,13 @@ function derivedValues<T>(
   return out;
 }
 
-function searchSmallIntegers(sh: ShrinkCtx, range: number, seed: number): ShrunkInstance | null {
+function searchSmallIntegers(
+  sh: ShrinkCtx,
+  range: number,
+  seed: number,
+  spent: { n: number },
+  maxAttempts: number,
+): ShrunkInstance | null {
   // The search runs over the decimals, so the numbers a person reads are the
   // ones they wrote: an inverse of five is a fifth and not a residue of
   // nineteen billion.
@@ -164,6 +173,8 @@ function searchSmallIntegers(sh: ShrinkCtx, range: number, seed: number): Shrunk
   const { ctx, sizes } = sh;
 
   for (let attempt = 0; attempt < 40; attempt++) {
+    spent.n++;
+    if (spent.n > maxAttempts) return null;
     const values = new Map<string, Val<Decimal>>();
     for (const name of sh.symbolNames) {
       const info = ctx.symbols.get(name);

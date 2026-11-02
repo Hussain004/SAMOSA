@@ -140,7 +140,6 @@ export interface CheckOptions {
   preset?: string;
   seed?: number;
   trials?: number;
-  budgetMs?: number;
   layout?: 'denominator' | 'numerator';
   /** the CLI only: a file with no display math fails the run (review 5.2) */
   requireMath?: boolean;
@@ -403,7 +402,7 @@ export function check(src: string, opts: CheckOptions = {}): Report {
   }
 
   for (const step of steps) {
-    const result = checkStep(step, ctx, defs, { seed, trials, budgetMs: opts.budgetMs ?? 500 }, diagnostics);
+    const result = checkStep(step, ctx, defs, { seed, trials }, diagnostics);
     // every result carries the text of its row, so a caller can point at the
     // line of the file the step came from
     result.text ??= step.text;
@@ -453,7 +452,6 @@ function now(): number {
 interface StepOptions {
   seed: number;
   trials: number;
-  budgetMs: number;
 }
 
 function checkStep(
