@@ -10,8 +10,12 @@ Everything runs in the browser:
 * the source, the declarations and the settings never leave the page;
 * a share link keeps the whole thing in the fragment of the URL, which the
   browser does not send to the server;
-* the only network request the page makes is the star count on the GitHub
-  API, once, and it is cached in `localStorage` for an hour.
+* the page carries a content security policy, served by the host, that
+  allows connections to itself only. The browser refuses anything else, so
+  even a bug in the page could not send the derivation anywhere. The
+  referrer policy is `no-referrer`, so the address bar never tells anyone
+  where a link was opened from;
+* the page makes no network request other than the page itself.
 
 There is no account, no backend and no database. There is nothing to log,
 because there is no server to log it.
@@ -51,5 +55,3 @@ dashboard. Nothing in the app depends on it.
   it, like any other page.
 * A share link contains the derivation. It is in the URL, so treat it like
   any other link you send to somebody.
-* The star count comes from the GitHub API, and the request says which
-  repository it is about.
