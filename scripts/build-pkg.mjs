@@ -13,6 +13,10 @@ const root = resolve(import.meta.dirname, '..');
 const out = resolve(root, 'pkg/dist');
 mkdirSync(out, { recursive: true });
 
+// the version the builds speak, read from the package manifest, so a release
+// cannot drift from the code that was released
+const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'));
+
 const shared = {
   bundle: true,
   format: 'esm',
@@ -22,6 +26,10 @@ const shared = {
   sourcemap: false,
   legalComments: 'none',
   logLevel: 'info',
+  define: {
+    SAMOSA_VERSION: JSON.stringify(pkg.version),
+    SAMOSA_ENGINE_VERSION: JSON.stringify(pkg.version),
+  },
 };
 
 await build({
@@ -40,7 +48,6 @@ await build({
 });
 
 // the package manifest
-const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'));
 writeFileSync(
   resolve(root, 'pkg/package.json'),
   `${JSON.stringify(

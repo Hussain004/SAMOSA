@@ -13,7 +13,9 @@ import { shareLink } from '../src/core/share.ts';
  * the share link a human can open to see the same thing.
  */
 
-const VERSION = '1.0.1';
+/** The build replaced the version it read from the package manifest. */
+declare const SAMOSA_VERSION: string | undefined;
+const VERSION = typeof SAMOSA_VERSION === 'string' ? SAMOSA_VERSION : '1.0.1';
 
 const server = new McpServer({ name: 'samosa', version: VERSION });
 

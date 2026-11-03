@@ -1,5 +1,5 @@
 import { build } from 'esbuild';
-import { chmodSync, mkdirSync } from 'node:fs';
+import { chmodSync, mkdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 /**
@@ -12,6 +12,8 @@ import { resolve } from 'node:path';
 const root = resolve(import.meta.dirname, '..');
 const out = resolve(root, 'pkg/dist');
 mkdirSync(out, { recursive: true });
+
+const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'));
 
 await build({
   entryPoints: [resolve(root, 'cli/bin.ts')],
@@ -26,6 +28,9 @@ await build({
     '@unified-latex/unified-latex-util-environments',
   ],
   logLevel: 'info',
+  define: {
+    SAMOSA_VERSION: JSON.stringify(pkg.version),
+  },
 });
 
 chmodSync(resolve(out, 'cli.mjs'), 0o755);

@@ -69,7 +69,11 @@ runs:
     - name: 'Upload the results'
       # the upload runs even when the check fails, or the report of the
       # failure would be lost
+      # the caller runs this action with the permission the upload needs,
+      # security-events: write, and on a private repository that is also
+      # code scanning, because the SARIF of a private repo is not an
+      # artefact the public code scanning picks up on its own
       if: always() && inputs.format == 'sarif'
-      uses: github/codeql-action/upload-sarif@v3
+      uses: github/codeql-action/upload-sarif@v4
       with:
         sarif_file: samosa.sarif

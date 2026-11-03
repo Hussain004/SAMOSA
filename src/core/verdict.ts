@@ -40,7 +40,9 @@ import type { Dim, Prop } from './decl.ts';
  * non-commutativity, structure and shape all come for free.
  */
 
-export const ENGINE_VERSION = '1.0.1';
+/** The build replaced the version it read from the package manifest. */
+declare const SAMOSA_ENGINE_VERSION: string | undefined;
+export const ENGINE_VERSION = typeof SAMOSA_ENGINE_VERSION === 'string' ? SAMOSA_ENGINE_VERSION : '1.0.1';
 export const DEFAULT_SEED = 0x5a305a;
 
 export type Verdict = 'ok' | 'wrong' | 'shape' | 'inconclusive' | 'unchecked' | 'defined';
