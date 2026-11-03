@@ -7287,6 +7287,7 @@ function createContext(decls, layout = "denominator", pinned = {}) {
     symbols: /* @__PURE__ */ new Map(),
     chips: [],
     errors: [],
+    shapeConflicts: [],
     dimVars,
     freshCount: 0,
     bound: /* @__PURE__ */ new Set(),
@@ -7326,6 +7327,7 @@ function unifyDim(ctx, a, b, what, span) {
       message: `${what}: the sizes ${av} and ${bv} do not match`,
       span
     });
+    ctx.shapeConflicts.push({ what, a: av, b: bv });
   }
   ctx.dims.union(av, bv);
   return a;
@@ -8269,6 +8271,7 @@ function checkStep(step, ctx, defs, opts, diagnostics) {
     unifyShapes(ctx, lhsTy, rhsTy, step.span);
   }
   const allErrors = ctx.errors.splice(0, ctx.errors.length);
+  const shapeConflicts = ctx.shapeConflicts.splice(0, ctx.shapeConflicts.length);
   const shapeErrors = allErrors.filter((e) => e.kind !== "unknown-function");
   const unknownFn = allErrors.find((e) => e.kind === "unknown-function");
   if (shapeErrors.length && transposed) {
@@ -8278,6 +8281,13 @@ function checkStep(step, ctx, defs, opts, diagnostics) {
     for (const error of shapeErrors) {
       diagnostics.push({ severity: "error", message: error.message, span: error.span, stepId: step.id });
     }
+    const dimVars = collectDimVars(ctx, step, defs);
+    const settings = sizeSettings(dimVars);
+    const witness = settings.filter(
+      (s) => shapeConflicts.every(({ a, b }) => s.get(a) !== s.get(b))
+    );
+    const shown = (witness.length ? witness : settings).slice(0, 3);
+    const sizes = shown.map((s) => Object.fromEntries(s));
     return {
       id: step.id,
       row: step.row,
@@ -8286,7 +8296,7 @@ function checkStep(step, ctx, defs, opts, diagnostics) {
       rhsSpan: step.rhs.span,
       relation: step.relation,
       verdict: "shape",
-      card: base2,
+      card: { ...base2, sizes, assumptions: collectAssumptions(ctx, step) },
       message: shapeErrors[0].message,
       reason: shapeErrors.map((e) => e.message).join("; "),
       annotation: step.annotation

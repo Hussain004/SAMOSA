@@ -116,6 +116,8 @@ export interface TypeContext {
   symbols: Map<string, SymbolInfo>;
   chips: Chip[];
   errors: ShapeError[];
+  /** the declared dimensions that clashed, so the card can show a size that does not fit */
+  shapeConflicts: Array<{ what: string; a: string; b: string }>;
   /** the dimension variables that the step uses */
   dimVars: string[];
   /** fresh dimension names, for the undeclared symbols */
@@ -162,6 +164,7 @@ export function createContext(
     symbols: new Map(),
     chips: [],
     errors: [],
+    shapeConflicts: [],
     dimVars,
     freshCount: 0,
     bound: new Set(),
@@ -216,6 +219,9 @@ export function unifyDim(ctx: TypeContext, a: Dim, b: Dim, what: string, span: S
       message: `${what}: the sizes ${av} and ${bv} do not match`,
       span,
     });
+    // the card of the shape verdict shows the sizes that do not fit, not an
+    // example that accidentally agrees
+    ctx.shapeConflicts.push({ what, a: av, b: bv });
   }
   ctx.dims.union(av, bv);
   return a;

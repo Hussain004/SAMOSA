@@ -554,6 +554,7 @@ function checkStep(
     unifyShapes(ctx, lhsTy, rhsTy, step.span);
   }
   const allErrors = ctx.errors.splice(0, ctx.errors.length);
+  const shapeConflicts = ctx.shapeConflicts.splice(0, ctx.shapeConflicts.length);
   // an unknown function is not a shape claim (review 4.4): SAMOSA cannot
   // read the name, so the row is ? and never a shape error
   const shapeErrors = allErrors.filter((e) => e.kind !== 'unknown-function');
@@ -567,6 +568,15 @@ function checkStep(
     for (const error of shapeErrors) {
       diagnostics.push({ severity: 'error', message: error.message, span: error.span, stepId: step.id });
     }
+    // the card shows the sizes that do not fit: the assignments where the
+    // clashing dimensions differ, never one where they agree
+    const dimVars = collectDimVars(ctx, step, defs);
+    const settings = sizeSettings(dimVars);
+    const witness = settings.filter((s) =>
+      shapeConflicts.every(({ a, b }) => s.get(a) !== s.get(b)),
+    );
+    const shown = (witness.length ? witness : settings).slice(0, 3);
+    const sizes = shown.map((s) => Object.fromEntries(s) as Record<string, number>);
     return {
       id: step.id,
       row: step.row,
@@ -575,7 +585,7 @@ function checkStep(
       rhsSpan: step.rhs.span,
       relation: step.relation,
       verdict: 'shape',
-      card: base,
+      card: { ...base, sizes, assumptions: collectAssumptions(ctx, step) },
       message: shapeErrors[0].message,
       reason: shapeErrors.map((e) => e.message).join('; '),
       annotation: step.annotation,

@@ -123,6 +123,18 @@ describe('a declaration the parser does not read (review 5.5)', () => {
     expect(report.steps[0].verdict).toBe('shape');
   });
 
+  it('a shape error carries the sizes that do not fit', () => {
+    // the card used to show an assignment where the shapes agreed, which
+    // cannot witness the mismatch; every size on the card must not fit
+    const report = check('(A B)^\\top = A^\\top B^\\top', { decls: 'A: m×n; B: n×m' });
+    expect(report.steps[0].verdict).toBe('shape');
+    const sizes = report.steps[0].card.sizes;
+    expect(sizes.length).toBeGreaterThan(0);
+    for (const size of sizes) {
+      expect(size.m).not.toBe(size.n);
+    }
+  });
+
   it('a pinned dimension is used, not dropped', () => {
     const pinned = check('A^\\top = A', { decls: 'A: sym n; n = 3' });
     const free = check('A^\\top = A', { decls: 'A: sym n' });
