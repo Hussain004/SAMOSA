@@ -228,7 +228,7 @@ export function App() {
   }, [report]);
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto bg-[var(--color-ink)] text-[var(--color-text)]">
+    <main className="flex h-full flex-col overflow-y-auto bg-[var(--color-ink)] text-[var(--color-text)]">
       <header className="flex shrink-0 items-center gap-3 border-b border-[var(--color-line)] px-4 py-2.5">
         <a href="/" className="flex items-center gap-2 text-sm text-[var(--color-gold)]">
           <span className="text-lg leading-none">∇</span>
@@ -582,7 +582,7 @@ export function App() {
       </footer>
 
       <CommandPalette commands={commands} open={paletteOpen} onClose={() => setPaletteOpen(false)} />
-    </div>
+    </main>
   );
 }
 

@@ -39,27 +39,6 @@ export function Landing() {
 }
 
 function Header() {
-  const [stars, setStars] = useState<number | null>(null);
-
-  useEffect(() => {
-    const cached = localStorage.getItem('samosa:stars');
-    if (cached) {
-      setStars(Number(cached));
-      return;
-    }
-    // the star count is fetched once and cached for an hour
-    fetch('https://api.github.com/repos/Hussain004/SAMOSA')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (data && typeof data.stargazers_count === 'number') {
-          setStars(data.stargazers_count);
-          localStorage.setItem('samosa:stars', String(data.stargazers_count));
-          localStorage.setItem('samosa:stars:at', String(Date.now()));
-        }
-      })
-      .catch(() => {});
-  }, []);
-
   return (
     <header className="sticky top-0 z-30 border-b border-[var(--color-line)] bg-[var(--color-bar)] backdrop-blur-md">
       <div className="mx-auto flex max-w-[1560px] items-center gap-4 px-6 lg:px-10 py-4 sm:gap-6">
@@ -92,7 +71,7 @@ function Header() {
             rel="noreferrer"
             className="hidden whitespace-nowrap hover:text-[var(--color-text)] sm:inline"
           >
-            ★ GitHub{stars && stars >= 50 ? ` ${stars}` : ''}
+            ★ GitHub
           </a>
           <FontSizeControl className="hidden sm:flex" />
           <ThemeToggle />
@@ -529,11 +508,15 @@ function Divider() {
         {bubbles.map((bubble, i) => (
           <div
             key={bubble}
-            className={`flex items-center gap-2 transition-opacity duration-500 ${
-              i === active ? 'opacity-100' : 'opacity-55'
-            }`}
+            className="flex items-center gap-2"
           >
-            <PixelSamosa state={states[i]} />
+            {/* the inactive sprite dims, the text stays at full contrast */}
+            <div
+              className={`transition-opacity duration-500 ${i === active ? 'opacity-100' : 'opacity-55'}`}
+              aria-hidden="true"
+            >
+              <PixelSamosa state={states[i]} />
+            </div>
             <span className="rounded-full border border-[var(--color-line)] px-3 py-1 text-[0.75rem] text-[var(--color-muted)]">
               {bubble}
             </span>

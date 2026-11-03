@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { check } from '../src/core/index.ts';
 import { decodeShare, encodeShare, readShareLink, shareLink } from '../src/core/share.ts';
+import { MENU } from '../corpus/menu.ts';
 
 /**
  * The share codec.
@@ -43,6 +44,18 @@ describe('the share codec', () => {
     const after = check(payload.src, { decls: payload.decls });
     expect(after.steps.map((s) => s.verdict)).toEqual(before.steps.map((s) => s.verdict));
     expect(after.steps[0].verdict).toBe('wrong');
+  });
+
+  it('every menu item round trips through a share link', () => {
+    // G5 opens on 100% of the Menu, not on one example of it
+    for (const item of MENU) {
+      const link = shareLink('https://samosa-math.vercel.app', { src: item.source, decls: item.decls });
+      const payload = readShareLink(link);
+      expect(payload?.src, item.id).toBe(item.source);
+      expect(payload?.decls, item.id).toBe(item.decls);
+      const report = check(payload!.src, { decls: payload!.decls });
+      expect(report.steps.length, item.id).toBeGreaterThan(0);
+    }
   });
 
   it('says nothing about a link it cannot read', () => {
