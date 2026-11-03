@@ -162,18 +162,22 @@ set the parser cannot close, and the macros the authors define themselves.
 The method, the correction and the full list of what stops the rest are in
 [docs/COVERAGE.md](docs/COVERAGE.md).
 
+<!-- gen:cookbook -->
 And the Cookbook: 48 identities in matrix algebra, calculus and stochastics,
 with the mistakes the catalog can make of them.
 
 | | |
 | --- | --- |
 | the false checkmarks | **0** |
+| the identities SAMOSA cannot check | **10** |
 | the caught mutants | **197 of 264 (74.6%)** |
+| the harmless mutants, where the mistake changes nothing | **31** |
 
 The plan's gate asks for 95% of the bugs caught. The cookbook is at 74.6%,
 and every miss is a step the engine says it cannot decide, never one it
-calls right. The method, the misses and the bugs the corpus found are in
-[docs/COOKBOOK.md](docs/COOKBOOK.md).
+calls right. The method, the misses and the 36 gaps the corpus found are
+in [docs/COOKBOOK.md](docs/COOKBOOK.md).
+<!-- /gen:cookbook -->
 
 ## What it cannot do
 

@@ -39,6 +39,8 @@ jobs:
         run: BENCH_TOLERANCE=3 pnpm bench
       - name: The cookbook has no false checkmark
         run: pnpm check:corpus
+      - name: The README Cookbook numbers are what the engine says
+        run: pnpm gen:readme && git diff --exit-code README.md
       - name: The demo of the landing page is what the engine says
         run: pnpm gen:demo && git diff --exit-code src/landing/generated.json
       - name: The math of the landing page is rendered
