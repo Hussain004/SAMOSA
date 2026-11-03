@@ -4,6 +4,8 @@ import { SourceEditor } from './SourceEditor.tsx';
 import { RenderedRows } from './RenderedRows.tsx';
 import { Inspector } from './Inspector.tsx';
 import { CommandPalette, Menu, PresetList, type Command } from './Menu.tsx';
+import { DeclarationsStrip } from './Declarations.tsx';
+import { canonicalizeSymbol } from '../core/index.ts';
 import { exportJson, exportMarkdown, exportLatex } from './export.ts';
 import { MENU } from '../../corpus/menu.ts';
 import { VERDICT_LABEL } from './verdicts.ts';
@@ -11,6 +13,27 @@ import { FontSizeControl, applyFontScale, readFontScale, stepFontScale } from '.
 
 const HEADER_BUTTON =
   'rounded border border-[var(--color-line)] px-2 py-1 text-[0.6875rem] text-[var(--color-muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-text)]';
+
+/**
+ * Set the declaration of a symbol, keeping the others.
+ *
+ * One declaration per symbol: a symbol that is declared again replaces what
+ * was said about it before, the way `declare` reads in the panel.
+ */
+function declareSymbol(current: string, name: string, type: string): string {
+  const wanted = canonicalizeSymbol(name);
+  const kept = current
+    .split(';')
+    .map((segment) => segment.trim())
+    .filter(Boolean)
+    .filter((segment) => {
+      const match = segment.match(/^(.+?)\s*:/);
+      if (!match) return true;
+      return !match[1].split(',').some((n) => canonicalizeSymbol(n.trim()) === wanted);
+    });
+  kept.push(`${name}: ${type}`);
+  return kept.join('; ');
+}
 
 export function App() {
   const {
@@ -129,6 +152,13 @@ export function App() {
     copy(url);
   }, [copy, settings, source]);
 
+  const declare = useCallback(
+    (name: string, type: string) => {
+      setSettings({ decls: declareSymbol(settings.decls, name, type) });
+    },
+    [setSettings, settings.decls],
+  );
+
   // The header actions are the same on a wide screen and in the panel that
   // the phone opens, so they are written once.
   const headerActions = useMemo(
@@ -198,7 +228,7 @@ export function App() {
   }, [report]);
 
   return (
-    <div className="flex h-full flex-col bg-[var(--color-ink)] text-[var(--color-text)]">
+    <div className="flex h-full flex-col overflow-y-auto bg-[var(--color-ink)] text-[var(--color-text)]">
       <header className="flex shrink-0 items-center gap-3 border-b border-[var(--color-line)] px-4 py-2.5">
         <a href="/" className="flex items-center gap-2 text-sm text-[var(--color-gold)]">
           <span className="text-lg leading-none">∇</span>
@@ -312,7 +342,7 @@ export function App() {
       </div>
 
       {showSettings && (
-        <div className="border-b border-[var(--color-line)] bg-[var(--color-panel)] px-4 py-3">
+        <div className="max-h-72 shrink-0 overflow-y-auto border-b border-[var(--color-line)] bg-[var(--color-panel)] px-4 py-3">
           <h3 className="pane-title">presets</h3>
           <div className="mt-2">
             <PresetList onPick={(id) => setSettings({ preset: id })} />
@@ -396,7 +426,14 @@ export function App() {
         </div>
       )}
 
-      <div className="min-h-0 flex-1 grid-cols-1 grid-rows-1 md:grid md:grid-cols-2">
+      <DeclarationsStrip
+        decls={settings.decls}
+        chips={report?.chips ?? []}
+        onDeclare={declare}
+        onEdit={() => setShowSettings(true)}
+      />
+
+      <div className="min-h-[280px] flex-1 grid-cols-1 grid-rows-1 md:grid md:grid-cols-2">
         <section
           className={`${
             mobilePane === 'source' ? 'flex' : 'hidden'

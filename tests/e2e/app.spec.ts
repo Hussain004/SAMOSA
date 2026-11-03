@@ -193,6 +193,26 @@ test('the landing runs under the content security policy', async ({ page }) => {
   expect(['light', 'dark']).toContain(theme);
 });
 
+test('the declarations are in the open', async ({ page }) => {
+  // the strip above the panes shows what the check ran with, not behind a button
+  const strip = page.getByText('declarations', { exact: true });
+  await expect(strip).toBeVisible();
+  await expect(page.getByText('Q_t: spd m')).toBeVisible();
+});
+
+test('a guessed symbol is declared with one click', async ({ page }) => {
+  await type(page, String.raw`\begin{align*}
+S S^\top &= I
+\end{align*}`);
+  // the checker guesses the symbol is a matrix, and says so in the strip
+  await expect(page.getByText('guessed').first()).toBeVisible();
+  // one click declares it and the check re-runs
+  await page.getByRole('button', { name: 'spd n' }).click();
+  await expect(page.getByText('S: spd n', { exact: true })).toBeVisible();
+  // and the guess is gone, because the declaration took its place
+  await expect(page.getByText('guessed')).toHaveCount(0);
+});
+
 test('the app works on a phone', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/app/');
