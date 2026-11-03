@@ -1,10 +1,22 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type Connect, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { resolve } from 'node:path';
 
+/** The local preview server serves the same clean urls as the host. */
+const cleanUrls: Plugin = {
+  name: 'clean-urls-preview',
+  configurePreviewServer(server) {
+    const redirectApp: Connect.NextHandleFunction = (req, _res, next) => {
+      if (req.url?.split('?')[0] === '/app') req.url = '/app/';
+      next();
+    };
+    server.middlewares.use(redirectApp);
+  },
+};
+
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), cleanUrls],
 
   build: {
     target: 'es2022',
