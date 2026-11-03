@@ -160,6 +160,39 @@ test('nothing leaves the browser', async ({ page }) => {
   expect(outside).toEqual([]);
 });
 
+test('the app runs under the content security policy', async ({ page }) => {
+  const response = await page.goto('/app/');
+  const csp = response.headers()['content-security-policy'];
+  expect(csp).toBeTruthy();
+  expect(csp).toContain("default-src 'self'");
+  expect(csp).toContain("script-src 'self'");
+  expect(csp).toContain('style-src');
+  expect(csp).toContain('img-src');
+  expect(csp).toContain('font-src');
+  expect(csp).toContain("connect-src 'self'");
+  expect(csp).toContain('frame-ancestors');
+  expect(response.headers()['referrer-policy']).toBe('no-referrer');
+
+  // the boot script is a file, so script-src 'self' allows it, and it ran
+  // before React mounted: the theme is on the document, not the body
+  const theme = await page.evaluate(() => document.documentElement.dataset.theme);
+  expect(['light', 'dark']).toContain(theme);
+});
+
+test('the landing runs under the content security policy', async ({ page }) => {
+  const response = await page.goto('/');
+  const csp = response.headers()['content-security-policy'];
+  expect(csp).toBeTruthy();
+  expect(csp).toContain("default-src 'self'");
+  expect(csp).toContain("script-src 'self'");
+  expect(csp).toContain('style-src');
+
+  // the boot script is a file, so script-src 'self' allows it, and it ran
+  // before the first paint
+  const theme = await page.evaluate(() => document.documentElement.dataset.theme);
+  expect(['light', 'dark']).toContain(theme);
+});
+
 test('the app works on a phone', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/app/');

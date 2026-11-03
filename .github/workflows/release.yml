@@ -28,7 +28,7 @@ jobs:
       - run: pnpm build:pkg
 
       - name: Publish to npm
-        run: pnpm publish --access public
+        run: pnpm publish --access public --provenance
         working-directory: pkg
 
       - name: Create the GitHub release

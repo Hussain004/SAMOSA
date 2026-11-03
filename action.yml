@@ -32,6 +32,12 @@ inputs:
 runs:
   using: 'composite'
   steps:
+    - name: 'Set up Node'
+      # the bundle runs on the node of the runner, so the action does not
+      # rely on whatever node happens to be there
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22'
     - name: 'Check the derivation'
       # The inputs arrive as environment variables, never interpolated into
       # the script: an input is data, and data must not become code.
