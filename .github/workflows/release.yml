@@ -27,7 +27,13 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build:pkg
 
+      # npm needs one of two things, both of them the owner's: trusted
+      # publishing for this package on npmjs.com (no token at all), or an
+      # NPM_TOKEN secret on the repository. With neither, the publish fails
+      # loudly here, which is correct.
       - name: Publish to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: pnpm publish --access public --provenance
         working-directory: pkg
 
