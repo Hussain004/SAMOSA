@@ -412,8 +412,12 @@ interface Guess {
 function guessType(ctx: TypeContext, name: string, base: string): Guess {
   // I, 0 and the ones vector take the shape of whatever they are used with
   if (base === 'I' && !name.includes('_')) {
+    // the identity is square, so both sides of it carry the same fresh dim:
+    // an identity never meets a product it cannot join, and det of it is a
+    // square matrix like any other
+    const d = freshDim(ctx);
     return {
-      ty: { t: 'mat', r: freshDim(ctx), c: freshDim(ctx) },
+      ty: { t: 'mat', r: d, c: d },
       props: ['ident'],
       assumption: 'I is the identity matrix',
     };

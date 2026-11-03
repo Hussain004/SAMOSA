@@ -7464,8 +7464,9 @@ function baseLetter(name) {
 }
 function guessType(ctx, name, base2) {
   if (base2 === "I" && !name.includes("_")) {
+    const d = freshDim(ctx);
     return {
-      ty: { t: "mat", r: freshDim(ctx), c: freshDim(ctx) },
+      ty: { t: "mat", r: d, c: d },
       props: ["ident"],
       assumption: "I is the identity matrix"
     };
