@@ -7,6 +7,8 @@ export interface RenderedProps {
   /** the whole source, so the spans of a step can be sliced */
   source: string;
   report: Report | null;
+  /** a check is running: show a placeholder, not an empty state, on first paint */
+  busy: boolean;
   selectedStep: string | null;
   onSelectStep: (id: string) => void;
   hoverStep: string | null;
@@ -28,6 +30,7 @@ export interface RenderedProps {
 export function RenderedRows({
   source,
   report,
+  busy,
   selectedStep,
   onSelectStep,
   hoverStep,
@@ -37,6 +40,21 @@ export function RenderedRows({
   revealed,
 }: RenderedProps) {
   if (!report || report.steps.length === 0) {
+    // on the first paint there is nothing to say yet, so the page does not
+    // say it wrong: the rows arrive with the first check, and until then
+    // the pane holds a quiet placeholder
+    if (busy) {
+      return (
+        <div className="flex h-full flex-col justify-center gap-3 p-8" aria-busy="true">
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              className="h-6 w-full max-w-xl animate-pulse rounded bg-[var(--color-panel)]"
+            />
+          ))}
+        </div>
+      );
+    }
     return (
       <div className="flex h-full items-center justify-center p-8 text-center text-sm text-[var(--color-faint)]">
         <div>

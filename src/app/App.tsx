@@ -345,7 +345,12 @@ export function App() {
         <div className="max-h-72 shrink-0 overflow-y-auto border-b border-[var(--color-line)] bg-[var(--color-panel)] px-4 py-3">
           <h3 className="pane-title">presets</h3>
           <div className="mt-2">
-            <PresetList onPick={(id) => setSettings({ preset: id })} />
+            <PresetList
+              onPick={(id) => {
+                setSettings({ preset: id });
+                setShowSettings(false);
+              }}
+            />
           </div>
           <h3 className="pane-title mt-4">declarations</h3>
           <textarea
@@ -464,6 +469,7 @@ export function App() {
             <RenderedRows
               source={source}
               report={report}
+              busy={busy}
               selectedStep={selectedStep}
               onSelectStep={(id) => {
                 select(id);
