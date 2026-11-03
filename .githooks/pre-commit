@@ -8,5 +8,5 @@ node scripts/gen-demo.ts --write > /dev/null
 node scripts/gen-tex.ts --write > /dev/null
 node scripts/gen-readme.ts --write > /dev/null
 # the build output is tracked, so it is added even though "dist" is ignored
-git add -f pkg/dist pkg/README.md
+git add -f pkg/dist pkg/README.md pkg/package.json
 git add src/landing/generated.json src/landing/generated-tex.json README.md
