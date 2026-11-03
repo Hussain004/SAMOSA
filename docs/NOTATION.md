@@ -42,6 +42,8 @@ the functions you declared.
 | `A^\dagger` | the pseudo inverse, numeric mode only |
 | `P^+`, `x^*` | a label, folded into the name |
 | `x_{k\|k-1}` | part of the name |
+| `\sqrt[k]{x}` | the k-th root, the index of the square root is the root |
+| `\begin{bmatrix} … \end{bmatrix}` | a block matrix, the blocks are its rows |
 | `\|A\|_F` | the Frobenius norm |
 | `\|A\|` | the spectral norm, with a chip |
 
@@ -98,11 +100,22 @@ The types are:
 | `n` | a column vector of size n |
 | `n×m` | a matrix |
 | `scalar` | a number |
-| `pos` | a positive number |
+| `pos` | a strictly positive number, over the reals |
 | `int` | an integer |
 | `fn n→1` | a function |
-| `sym n`, `spd n`, `psd n`, `orth n`, `diag n`, `triu n`, `tril n`, `skew n`, `idem n`, `proj n`, `unit n`, `stoch n` | a matrix with that structure |
+| `sym n`, `spd n`, `psd n`, `orth n`, `rot n`, `diag n`, `triu n`, `tril n`, `skew n`, `idem n`, `proj n`, `unit n`, `stoch n` | a matrix with that structure |
 | `rank 3 n×n` | a matrix of that rank |
+
+`orth n` is the orthogonal group O(n), the matrices whose transpose is
+their inverse; `rot n` is the spelling for the rotations, the orthogonal
+matrices with determinant one.
+
+`ident n`, `zero n`, `ones n`, `unit n` and `stoch n` are matrices of that
+size, so `ident n` is the n by n identity, `zero n` the zero matrix, `ones n`
+the matrix of ones, `unit n` a unit vector and `stoch n` a stochastic matrix.
+A `pos` symbol is a strictly positive number, so over the reals the sampler
+draws a small positive magnitude; over a finite field no number is positive,
+so there it draws a field element.
 
 The LaTeX forms are read as well:
 

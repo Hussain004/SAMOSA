@@ -64,6 +64,15 @@ symbol has degree one, a product adds the degrees, an inverse of an n by n
 matrix has numerator degree `dD + (n-1) dN`, and so on. The card on every
 checkmark shows the worst bound over the sizes that were tested.
 
+The rules, for the operators people actually write:
+
+* the degree of a determinant is the degree of the entries times the size;
+* the degree of a trace is the degree of an entry;
+* a derivative lowers the degree by one per dimension it differentiates
+  with respect to;
+* a block matrix has the degree of its largest block, and the rules of the
+  blocks it contains.
+
 The usual bound for the Kalman push-through identity, at the three default
 sizes, is below 10^-46 per size.
 
@@ -146,7 +155,11 @@ sides agree to more than 12 digits, at 50 digits with decimal.js.
 
 A checkmark in numeric mode has no probability bound, because there is no
 finite field to bound it with. The card says how many instances and how many
-digits, and that is all it can honestly say.
+digits, and that is all it can honestly say. That is the third honest caveat:
+a numeric checkmark rests on the instances that were sampled, at the sizes
+and the trials the card names, over the float64 pass and the 50 digit pass
+that followed it. It is a screening conclusion, not a proof, and the bound it
+offers is the difference that was not found.
 
 ## Definitions, chains and implications
 
