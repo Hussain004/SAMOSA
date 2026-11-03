@@ -211,7 +211,7 @@ export function TypedDemo() {
       </div>
 
       <div className="flex items-center justify-between border-t border-[var(--color-line)] px-3 py-1.5 text-[0.625rem] text-[var(--color-faint)]">
-        <span>exact · seed 5A305A · ✓ 12/12</span>
+        <span>exact · seed 5910618 · ✓ 12/12</span>
         <span>{paused ? 'paused' : 'the demo loops'}</span>
       </div>
 

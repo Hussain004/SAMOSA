@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApp, shareUrl, runCheck, DEFAULT_SOURCE } from './store.ts';
 import { SourceEditor } from './SourceEditor.tsx';
 import { RenderedRows } from './RenderedRows.tsx';
@@ -98,6 +98,20 @@ export function App() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [report, selectedStep, select, reroll]);
+
+  // A first run has no row picked, and the inspector would sit on its empty
+  // state. The first row that does not hold is the one its card is for, so a
+  // check opens on the row worth reading instead of on a hint.
+  const appliedFor = useRef<unknown>(null);
+  useEffect(() => {
+    if (selectedStep) return;
+    const steps = report?.steps ?? [];
+    const first = steps.find((s) => s.verdict !== 'ok') ?? steps[0] ?? null;
+    if (!first) return;
+    if (appliedFor.current === report) return;
+    appliedFor.current = report;
+    select(first.id);
+  }, [report, selectedStep, select]);
 
   const copy = useCallback((text: string) => {
     void navigator.clipboard?.writeText(text);
