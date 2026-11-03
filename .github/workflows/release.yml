@@ -36,9 +36,17 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           version="${GITHUB_REF_NAME#v}"
-          body="$(awk -v version="$version" '
-            BEGIN { in_section = 0 }
-            /^## \[/{ in_section = ($0 ~ ("\\[" version "]")) }
+          # the section of the tag in the changelog, or the Unreleased
+          # section when the tag was cut before the file was renamed
+          section="$(awk -v version="$version" '
+            /^## \[/{ in_section = ($0 ~ ("\\[" version "]")); next }
             in_section { print }
           ' CHANGELOG.md)"
-          gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes "$body"
+          if [ -z "$section" ]; then
+            section="$(awk '
+              /^## \[Unreleased\]/{ in_section = 1; next }
+              /^## \[/{ exit }
+              in_section { print }
+            ' CHANGELOG.md)"
+          fi
+          gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes "$section"

@@ -1,5 +1,10 @@
 [
   {
+    "date": "2026-11-03",
+    "version": "1.1.0",
+    "body": "The checker is stricter about what it will call right, the browser enforces"
+  },
+  {
     "date": "2026-10-23",
     "version": "1.0.1",
     "body": "The parser reads the whole row, and the measurement is corrected."

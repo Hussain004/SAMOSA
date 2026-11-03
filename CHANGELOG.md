@@ -4,6 +4,69 @@ All notable changes to SAMOSA. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 follows [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-11-03
+
+The checker is stricter about what it will call right, the browser enforces
+nothing leaving the page, and the release is built from the manifest.
+
+### Added
+
+- The `% samosa:` comments and the where lines are read by the CLI, the MCP
+  server, the app and the checker alike, so a declaration travels with the
+  text.
+- The macros a paper defines are expanded: `\newcommand` and
+  `\DeclareMathOperator` mean what the author wrote.
+- Declarations for `zero`, `ones` and `ident`, and sizes can be pinned with
+  `n = 3`; an unknown type is an error that says so, never a silence.
+- The declarations are in the open in the app: a strip above the panes
+  shows what the check ran with, and a symbol the checker had to guess is
+  declared with one click.
+- The content security policy and `Referrer-Policy: no-referrer` are served
+  by the host, so the browser, not just the test, refuses what would leave
+  the page; boot scripts are files, so the policy needs no inline
+  allowances.
+- The matrix property tests generate typed n×n expressions, apply true
+  rewrites and mutants, and the float64 oracle backs every harmless mutant
+  the catalogue calls harmless.
+- The README Cookbook numbers are regenerated from `pnpm check:corpus`,
+  and CI fails on drift.
+- The KL of two Gaussians menu item checks its claims and carries a
+  planted bug; the rotation menu item checks `det(R) = 1` and carries one
+  too.
+
+### Fixed
+
+- The checkmarks the checker had not earned: the orth components are
+  declared, `abs` is out of exact mode, the degree rules bound det, tr,
+  derivatives and blocks, and the structured samplers (spd, orth, stoch,
+  unit, tril, triu) draw from the structure they claim.
+- The identity is square in the type system, in the sampler and in the
+  printer, so det and tr no longer meet a non-square one.
+- A shape error carries the sizes that do not fit, never an assignment
+  where the shapes happen to agree.
+- The step-ID drift between check and explain is gone: one builder builds
+  the steps for both, so a fix is never offered for the wrong row, and a
+  fix whose coefficient is 0 is never offered at all.
+- The CLI does not crash on real papers: comments, nested environments,
+  conditionals, display math and the macros the author defines.
+- The landing page makes no network request: the star count was fetched
+  from the GitHub API at runtime, and it is gone.
+- Contrast passes WCAG AA on the landing and the app, and the first paint
+  holds a placeholder instead of a wrong empty state.
+
+### Changed
+
+- Budgets are counts of evaluations, not milliseconds, so the engine does
+  the same work on any machine.
+- Fixes of the right side are offered before fixes of the claim, because a
+  fix of the derivation is the one the author wants.
+- The version the CLI, the MCP server and the engine print is read from
+  `package.json` at build time; a release cannot drift from the code that
+  was released.
+- A tag builds the package, publishes it to npm with provenance, and
+  creates the GitHub release from this file; CI runs the Cookbook, and
+  fails on drift in the README numbers.
+
 ## [1.0.1] - 2026-10-23
 
 The parser reads the whole row, and the measurement is corrected.
