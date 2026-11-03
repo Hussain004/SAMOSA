@@ -101,17 +101,19 @@ export function App() {
 
   // A first run has no row picked, and the inspector would sit on its empty
   // state. The first row that does not hold is the one its card is for, so a
-  // check opens on the row worth reading instead of on a hint.
+  // check opens on the row worth reading instead of on a hint. The spot the
+  // bug game picks its own rows, through its own guess, so it is left alone.
   const appliedFor = useRef<unknown>(null);
   useEffect(() => {
     if (selectedStep) return;
+    if (spotTheBug) return;
     const steps = report?.steps ?? [];
     const first = steps.find((s) => s.verdict !== 'ok') ?? steps[0] ?? null;
     if (!first) return;
     if (appliedFor.current === report) return;
     appliedFor.current = report;
     select(first.id);
-  }, [report, selectedStep, select]);
+  }, [report, selectedStep, select, spotTheBug]);
 
   const copy = useCallback((text: string) => {
     void navigator.clipboard?.writeText(text);
