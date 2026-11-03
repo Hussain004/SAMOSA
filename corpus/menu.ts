@@ -253,10 +253,16 @@ K &:= (R + B^\top P B)^{-1}B^\top P A \\
     id: 'rotation',
     title: 'Rotations and the cross product',
     blurb: 'R^T R = I, and the skew symmetric form of the cross product.',
-    decls: 'R: orth n',
+    decls: 'R: rot n',
     source: String.raw`\begin{align*}
 R^\top R &= I \\
-R^{-1} &= R^\top
+R^{-1} &= R^\top \\
+\det(R) &= 1
+\end{align*}`,
+    bugSource: String.raw`\begin{align*}
+R^\top R &= I \\
+R^{-1} &= R^\top \\
+\det(R) &= -1
 \end{align*}`,
   },
 ];
