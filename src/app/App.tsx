@@ -131,7 +131,15 @@ export function App() {
     if (selectedStep) return;
     if (spotTheBug) return;
     const steps = report?.steps ?? [];
-    const first = steps.find((s) => s.verdict !== 'ok') ?? steps[0] ?? null;
+    // a wrong row first, then a row SAMOSA could not settle, then the first
+    // checkmark, whose card is the receipt. A definition has no card worth
+    // opening on: "not ok" used to pick it, so a clean derivation opened on
+    // row 1, which is usually a :=
+    const first =
+      steps.find((s) => s.verdict === 'wrong' || s.verdict === 'shape') ??
+      steps.find((s) => s.verdict === 'inconclusive' || s.verdict === 'unchecked') ??
+      steps.find((s) => s.verdict === 'ok') ??
+      null;
     if (!first) return;
     if (appliedFor.current === report) return;
     appliedFor.current = report;

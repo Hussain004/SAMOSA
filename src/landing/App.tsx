@@ -59,10 +59,10 @@ function Header() {
           <a href="#install" className="hidden hover:text-[var(--color-text)] md:inline">
             Install
           </a>
-          <a href="/docs/HOW_IT_WORKS.md" className="hidden hover:text-[var(--color-text)] xl:inline">
+          <a href="/docs/HOW_IT_WORKS" className="hidden hover:text-[var(--color-text)] xl:inline">
             Docs
           </a>
-          <a href="/docs/CHANGELOG.md" className="hidden hover:text-[var(--color-text)] xl:inline">
+          <a href="/docs/CHANGELOG" className="hidden hover:text-[var(--color-text)] xl:inline">
             Changelog
           </a>
           <a
@@ -121,11 +121,11 @@ function ThemeToggle() {
 }
 
 const PHRASES = [
-  'every step, checked',
-  'counterexamples, not vibes',
-  'no AI in the verdict',
-  'runs in your browser',
-  'your agent can use it too',
+  'a verdict on every row of your align block',
+  'a wrong row comes with a counterexample and a fix',
+  'a checkmark says how it was tested, and how sure it is',
+  'no language model decides anything',
+  'it runs in this tab, and nothing is uploaded',
 ];
 
 function Hero() {
@@ -204,7 +204,7 @@ function Intro() {
     <section className="border-y border-[var(--color-line)] bg-[var(--color-panel)]">
       <div className="mx-auto max-w-[1560px] px-6 lg:px-10 py-10">
         <p className="max-w-[900px] text-[1.0625rem] leading-relaxed tracking-wide text-[var(--color-text)]">
-          I built SAMOSA because of the one line nobody checks: <em>after some algebraic manipulation, we may obtain ...</em> It reads the line, evaluates it on sampled matrices, exactly, over finite fields, and hands you the smallest counterexample when it does not hold.
+          I started SAMOSA on one line of my Mobile Robotics notes. The Kalman gain arrives with <em>after some algebraic manipulation, we may obtain ...</em>, and the algebra itself was flashed on a projector. I wanted to know if that step was right without redoing it by hand, and without asking a model that sounds equally sure either way. So SAMOSA samples matrices with the shapes and the structure you declare, evaluates both sides of every row exactly, over a finite field, and points at the row that breaks, with a counterexample small enough to check on paper.
         </p>
       </div>
     </section>
@@ -216,9 +216,8 @@ function AgentDemo() {
     <section className="dotted">
       <div className="mx-auto max-w-[1560px] px-6 lg:px-10 py-20">
         <SectionHead
-          eyebrow="the agent session"
-          title="Your agent can check its own math"
-          body="I ship an MCP server and an Agent Skill with SAMOSA, so Claude Code, Codex or Cursor can verify a derivation before they hand it to you. The verdict comes from the engine, never from the model."
+          eyebrow="your agent, checked"
+          body="Coding agents write algebra fluently, and now and then they are wrong in exactly the row that matters, with the same confidence as everywhere else. So SAMOSA ships an MCP server and an Agent Skill: the agent calls one tool, reads which row broke and why, repairs it, and checks again before it shows you anything. The model writes the math; the engine decides whether it holds."
         />
         <div className="mt-10 grid gap-8 lg:grid-cols-[1.5fr_1fr]">
           <TypedDemo />
@@ -226,22 +225,23 @@ function AgentDemo() {
             <li className="flex gap-3">
               <span className="text-[var(--color-chutney)]">›</span>
               <span>
-                <b className="text-[var(--color-text)]">The tool call is small.</b> One function, one
-                derivation, one report.
+                <b className="text-[var(--color-text)]">One tool call.</b> The derivation goes in as
+                LaTeX, and a report comes back with a verdict, a counterexample and the fixes for every
+                row.
               </span>
             </li>
             <li className="flex gap-3">
               <span className="text-[var(--color-chutney)]">›</span>
               <span>
-                <b className="text-[var(--color-text)]">The verdict is evidence.</b> Every checkmark
-                carries the sizes, the trials, the primes and the bound.
+                <b className="text-[var(--color-text)]">Evidence, not opinion.</b> A checkmark says the
+                sizes and the trials it was tested at, and an exact one the bound on it being wrong.
               </span>
             </li>
             <li className="flex gap-3">
               <span className="text-[var(--color-chutney)]">›</span>
               <span>
-                <b className="text-[var(--color-text)]">Nothing is uploaded.</b> The link that comes
-                back keeps the derivation in the fragment of the URL.
+                <b className="text-[var(--color-text)]">Nothing is uploaded.</b> The server makes no
+                network call, and the link it hands back keeps the derivation in the URL fragment.
               </span>
             </li>
           </ul>
@@ -257,8 +257,7 @@ function Tour() {
       <div className="mx-auto max-w-[1560px] px-6 lg:px-10 py-16">
         <SectionHead
           eyebrow="nineteen seconds"
-          title="The line nobody checks"
-          body="Every derivation has this moment: after some algebraic manipulation, we may obtain ... I made SAMOSA read that line, evaluate it over a finite field, and hand you a counterexample you can read."
+          body="The whole idea, once through: an agent derives the Kalman gain, one row comes back wrong, and the card shows the small matrices that break it and the noise term that was dropped."
         />
         <TourVideo />
       </div>
@@ -304,32 +303,32 @@ function TourVideo() {
 const FEATURES = [
   {
     title: 'Counterexamples',
-    body: 'Not "the numbers differ". The smallest instance that breaks the step, shrunk until it is small enough to read.',
+    body: 'Not "the numbers differ". The smallest instance that still breaks the step, often one by one, with the defined symbols computed and a NumPy snippet to run it again.',
     mock: <CounterexampleMock />,
   },
   {
     title: 'Fixes',
-    body: 'The common mistakes, tried for you: a transposed product, a missing noise term, a factor of two.',
+    body: 'The usual slips are tried for you: a transposed product, a dropped noise term, a swapped factor, a missing assumption. A fix is offered only if the row holds with it.',
     mock: <FixMock />,
   },
   {
     title: 'Shape errors',
-    body: 'When the sizes do not fit, SAMOSA says which sizes do not fit, and suggests the transpose you forgot.',
+    body: 'When the sizes do not fit you get the sizes that do not fit, and the transpose that would make them fit.',
     mock: <ShapeMock />,
   },
   {
     title: 'Gradients',
-    body: 'Gradients and Hessians are checked with dual numbers, so the layout convention is diagnosed, not guessed.',
+    body: 'Gradients and Hessians are checked with dual numbers. A gradient in the numerator layout is named as a layout slip, not reported as a wrong answer.',
     mock: <GradientMock />,
   },
   {
     title: 'Guarantees',
-    body: 'A checkmark without a bound is a guess. Every verdict carries the probability that a wrong step slipped through.',
+    body: 'A checkmark carries the sizes and the trials it was tested at. An exact one adds the primes and a computed bound on it being wrong, usually below one in 10⁴⁶; a numeric one names its digits and claims no bound.',
     mock: <GuaranteeMock />,
   },
   {
     title: 'Your pipeline',
-    body: 'A CLI, a GitHub Action and an MCP server. The same engine, so the verdicts never disagree.',
+    body: 'The app, the CLI, the GitHub Action and the MCP server run the same engine, so the same text gets the same verdict wherever you check it.',
     mock: <TerminalMock />,
   },
 ];
@@ -339,9 +338,8 @@ function Features() {
     <section className="border-y border-[var(--color-line)] bg-[var(--color-panel)]">
       <div className="mx-auto max-w-[1560px] px-6 lg:px-10 py-20">
         <SectionHead
-          eyebrow="what it does"
-          title={`${FEATURES.length} things, all of them useful`}
-          body="SAMOSA never guesses. When it does not know, it says so, and tells you what to declare."
+          eyebrow="what you get back"
+          body="Every row comes back with a verdict and its reason: ✓ it holds, ✗ it is wrong, ⊘ the shapes do not fit, ⚠ the numbers could not settle it, ? it was not read, and ≡ a definition. When SAMOSA cannot read something it says so and names the declaration that would help. It never guesses a checkmark."
         />
         <div className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map((feature) => (
@@ -595,8 +593,7 @@ function HallOfBugs() {
       <div className="mx-auto max-w-[1560px] px-6 lg:px-10">
         <SectionHead
           eyebrow="the hall of bugs"
-          title="Real mistakes, caught by a machine"
-          body="The kinds of slip that survive a proof, a review and a careful read. The catalog behind the spot-the-bug game."
+          body="Each of these looks right on a careful read, and each is wrong. A transposed product, a dropped noise term, a gradient in the wrong layout. They are the bugs planted in the menu below, and the ones the spot the bug game asks you to find."
         />
       </div>
       <div className="mt-10 flex overflow-hidden">
@@ -632,37 +629,37 @@ const DEEP_DIVES = [
     n: '01',
     title: 'Exact, not approximate',
     body: 'A step that only uses rational operations is checked over a finite field, where a wrong step survives with probability at most d/p. SAMOSA computes that d, and shows it to you.',
-    link: '/docs/HOW_IT_WORKS.md',
+    link: '/docs/HOW_IT_WORKS',
   },
   {
     n: '02',
     title: 'Gradients by dual numbers',
     body: 'A derivative is a pair, a value and a tangent. Multiply them, and the tangent chain rule comes out on its own, exactly, over the same field.',
-    link: '/docs/HOW_IT_WORKS.md',
+    link: '/docs/HOW_IT_WORKS',
   },
   {
     n: '03',
     title: 'Counterexamples that shrink',
     body: 'A counterexample over a finite field is unreadable. SAMOSA looks for a small integer instance that still breaks the step, the way a fuzzer shrinks a failing case.',
-    link: '/docs/HOW_IT_WORKS.md',
+    link: '/docs/HOW_IT_WORKS',
   },
   {
     n: '04',
     title: 'Built for agents',
     body: 'An MCP server and an Agent Skill, so your agent can check the matrix algebra before it hands the derivation to you.',
-    link: '/docs/MCP.md',
+    link: '/docs/MCP',
   },
   {
     n: '05',
     title: 'In your pipeline',
     body: 'A CLI and a GitHub Action that lint the align blocks of a paper, and fail the build when a step is wrong.',
-    link: '/docs/CLI.md',
+    link: '/docs/CLI',
   },
   {
     n: '06',
     title: 'It reads real papers',
     body: 'Of the claim rows in the display math of 36 recent papers, 56.3% parses end to end and 24.9% is read with no named unknown construct. The first measurement was lenient; this one parses the whole row, and the correction is published.',
-    link: '/docs/COVERAGE.md',
+    link: '/docs/COVERAGE',
   },
 ];
 
@@ -672,8 +669,7 @@ function DeepDives() {
       <div className="mx-auto max-w-[1560px] px-6 lg:px-10 py-20">
         <SectionHead
           eyebrow="how it works"
-          title={`${DEEP_DIVES.length} ideas, no magic`}
-          body="There is no model in the loop. There is arithmetic, a finite field and a probability bound."
+          body="There is no model in the loop. The algebra is checked over a finite field, the derivatives with dual numbers, the Gaussian expectations with a rational quadrature, and whatever is left at 50 digits. Here is each piece, and the receipt it leaves."
         />
         <div className="mt-12 space-y-16">
           {DEEP_DIVES.map((dive, i) => (
@@ -855,8 +851,7 @@ function MenuSection() {
       <div className="mx-auto max-w-[1560px] px-6 lg:px-10 py-20">
         <SectionHead
           eyebrow="the menu"
-          title={`${MENU.length} derivations to try`}
-          body="Woodbury, the Kalman update, backprop, Gaussian expectations. Each one has a planted bug, and a spot the bug game."
+          body={`${MENU.length} derivations people actually write, from Woodbury to the Riccati recursion. Each one has a correct version and a version with a planted bug. Open one to read it row by row, or play spot the bug and find the wrong row before SAMOSA does.`}
         />
         <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {MENU.map((item) => (
@@ -882,7 +877,7 @@ const TABS = [
   {
     id: 'web',
     label: 'Web',
-    body: 'Open the app, paste a derivation, read the verdicts. Everything runs in your browser, and the share link keeps it in the URL fragment.',
+    body: 'Paste a derivation or start from the menu. Declare your symbols in the strip above the source, or in a % samosa: comment, so the declarations travel with the text.',
     snippet: 'https://samosa-math.vercel.app/app',
   },
   {
@@ -931,15 +926,14 @@ function Install() {
       <div className="mx-auto max-w-[1560px] px-6 lg:px-10 py-20">
         <SectionHead
           eyebrow="install"
-          title="One click, or one line"
-          body="The web app needs nothing. The CLI and the MCP server need npm, and that is all."
+          body="The web app needs nothing. The CLI and the MCP server are one npm package, samosa-math, and the GitHub Action runs that same CLI from this repository."
         />
         <div className="mt-10 grid gap-6 md:grid-cols-2">
           <div className="panel p-5">
             <h3 className="text-sm">In your browser</h3>
             <p className="mt-2 text-[0.8125rem] leading-relaxed text-[var(--color-muted)]">
-              No account, no upload, no server. The engine runs in a worker, in the tab, and the
-              derivation never leaves the device.
+              No account and no server. The engine runs in a worker in this tab. A share link
+              keeps the derivation after the #, which a browser never sends to any server.
             </p>
             <a
               href="/app"
@@ -952,21 +946,9 @@ function Install() {
           <div className="panel p-5">
             <h3 className="text-sm">In your agent and your CI</h3>
             <p className="mt-2 text-[0.8125rem] leading-relaxed text-[var(--color-muted)]">
-              The npm package carries the CLI, the MCP server and the GitHub Action. The same engine
-              gives the same verdicts everywhere.
+              Pick your tool below and copy the one line it needs. It is the same engine in all of
+              them, so a row gets the same verdict in your editor, your agent and your CI.
             </p>
-            <div className="mt-4 flex flex-wrap gap-1.5">
-              {['npx samosa-math check paper.tex', 'claude mcp add samosa', 'uses: Hussain004/SAMOSA@v1'].map(
-                (line) => (
-                  <span
-                    key={line}
-                    className="rounded border border-[var(--color-line)] px-2 py-1 text-[0.625rem] text-[var(--color-faint)]"
-                  >
-                    {line}
-                  </span>
-                ),
-              )}
-            </div>
           </div>
         </div>
 
@@ -1039,16 +1021,16 @@ function Footer() {
           links={[
             ['The app', '/app'],
             ['The menu', '/app#menu'],
-            ['How it works', '/docs/HOW_IT_WORKS.md'],
+            ['How it works', '/docs/HOW_IT_WORKS'],
           ]}
         />
         <FooterColumn
           title="Docs"
           links={[
-            ['Notation', '/docs/NOTATION.md'],
-            ['The CLI', '/docs/CLI.md'],
-            ['The MCP server', '/docs/MCP.md'],
-            ['Privacy', '/docs/PRIVACY.md'],
+            ['Notation', '/docs/NOTATION'],
+            ['The CLI', '/docs/CLI'],
+            ['The MCP server', '/docs/MCP'],
+            ['Privacy', '/docs/PRIVACY'],
           ]}
         />
         <FooterColumn
@@ -1084,7 +1066,20 @@ function FooterColumn({ title, links }: { title: string; links: Array<[string, s
   );
 }
 
-function SectionHead({ eyebrow, title, body }: { eyebrow: string; title: string; body: string }) {
+/**
+ * The head of a section. A headline is optional: most sections say what they
+ * are about in a sentence that carries information, and then the small label
+ * is the heading of the section, so the outline of the page stays whole.
+ */
+function SectionHead({ eyebrow, title, body }: { eyebrow: string; title?: string; body: string }) {
+  if (!title) {
+    return (
+      <div>
+        <h2 className="text-[0.6875rem] font-normal tracking-[0.3em] text-[var(--color-faint)]">{eyebrow.toUpperCase()}</h2>
+        <p className="mt-4 max-w-[820px] text-[1.0625rem] leading-relaxed tracking-wide text-[var(--color-text)]">{body}</p>
+      </div>
+    );
+  }
   return (
     <div>
       <span className="text-[0.6875rem] tracking-[0.3em] text-[var(--color-faint)]">{eyebrow.toUpperCase()}</span>
