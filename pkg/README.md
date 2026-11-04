@@ -26,6 +26,11 @@
   ╱_____╲
 ```
 
+I built SAMOSA because of the one line nobody checks. You have written it
+too: *after some algebraic manipulation, we may obtain ...* — and then the
+rest of the proof rides on it. SAMOSA reads the line, evaluates it on
+sampled matrices, and tells you whether it holds.
+
 SAMOSA is a linter for math derivations. Paste a LaTeX `align` block, a
 Markdown note, or the answer a language model gave you, and every row gets
 one of these:
@@ -39,26 +44,56 @@ one of these:
 There is no language model in the verdict path. There is arithmetic, a finite
 field, and a probability bound.
 
----
+## Why a linter for math
 
-## Why SAMOSA?
-
-A derivation is a chain of small steps, and the errors are small too. A
+A derivation is a chain of small steps, and the mistakes are small too. A
 transpose in the wrong order. A dropped `+ KQKᵀ`. A factor of two from
-treating a non-symmetric matrix as symmetric. A gradient in the wrong layout.
+treating a non-symmetric matrix as symmetric. A gradient in the wrong
+layout. Each is invisible to the eye trained on the page, and each is
+fatal three pages later.
 
-The step that nobody checks is the one that says "after some algebraic
-manipulation, we may obtain ...".
-
-SAMOSA started with exactly that step. The Kalman measurement update, as it
-is usually written, says
+SAMOSA started with the Kalman measurement update, as it is usually written:
 
 > after some algebraic manipulation we may obtain K = Σ̄Cᵀ(CΣ̄Cᵀ + Q)⁻¹
 
-and that is the one line in the notes that no one ever verified. SAMOSA
-checks it, exactly, and it also finds the two ways you can get it wrong.
+That is the one line in the notes that no one ever verified. SAMOSA checks
+it, exactly, and it also finds the two ways you can get it wrong. I have
+yet to meet the paper whose derivations survive unchanged.
 
-## What it does
+## Quick start
+
+```bash
+# the web app
+https://samosa-math.vercel.app/app
+
+# the CLI
+npx samosa-math check paper.tex --format sarif
+
+# the MCP server, for Claude Code, Codex or Cursor
+claude mcp add samosa -- npx -y -p samosa-math samosa-mcp
+```
+
+No account, no server, no upload. The web app runs the engine in a worker in
+the tab, and the share link keeps the derivation in the URL fragment. The
+CLI and the MCP server make no network requests at all.
+
+Declarations go in a comment, in the compact syntax:
+
+```latex
+% samosa: x_t, \bar\mu_t: n; z_t: m; C_t: m×n; Q_t: spd m; \bar\Sigma_t: spd n
+```
+
+| | |
+| --- | --- |
+| **Web** | [samosa-math.vercel.app/app](https://samosa-math.vercel.app/app), no install |
+| **CLI** | `npm i -g samosa-math`, then `samosa check paper.tex`, or `npx samosa-math check paper.tex` |
+| **Claude Code** | `claude mcp add samosa -- npx -y -p samosa-math samosa-mcp` |
+| **Codex** | `[mcp_servers.samosa]` in `~/.codex/config.toml` |
+| **Cursor** | the `mcpServers` entry in `.cursor/mcp.json` |
+| **GitHub Action** | `- uses: Hussain004/SAMOSA@v1` |
+| **Skill** | `skill/samosa/SKILL.md` |
+
+## What it catches
 
 | | |
 | --- | --- |
@@ -69,7 +104,6 @@ checks it, exactly, and it also finds the two ways you can get it wrong.
 | **Fixes** | The common mistakes are tried for you: a transposed product, a missing noise term, a missing assumption. |
 | **Your agent** | An MCP server and an Agent Skill, so Claude Code, Codex or Cursor can check their own math. |
 | **Your pipeline** | A CLI and a GitHub Action that lint the `align` blocks of a paper. |
-| **Your machine** | Everything runs in the browser. The share link lives in the URL fragment. No account, no server, no upload. |
 
 ## See it work
 
@@ -101,25 +135,6 @@ from the right answer, and SAMOSA says so.
   <img src="https://raw.githubusercontent.com/Hussain004/SAMOSA/master/public/gifs/gradient.webp" width="100%" alt="A gradient in the numerator layout, with the hint" />
 </p>
 
-## Quick start
-
-```bash
-# the web app
-https://samosa-math.vercel.app/app
-
-# the CLI
-npx samosa-math check paper.tex --format sarif
-
-# the MCP server, for Claude Code, Codex or Cursor
-claude mcp add samosa -- npx -y -p samosa-math samosa-mcp
-```
-
-The declarations go in a comment, in the compact syntax:
-
-```latex
-% samosa: x_t, \bar\mu_t: n; z_t: m; C_t: m×n; Q_t: spd m; \bar\Sigma_t: spd n
-```
-
 ## The example
 
 ```latex
@@ -143,11 +158,11 @@ Now change one thing. Put `Q_t^{-1}` inside the inverse on the push-through
 row, and SAMOSA says the two sides are not equal, gives you the smallest
 counterexample, and tells you the term you are missing.
 
-## How much of a real paper it reads
+## What it reads, and what it does not
 
-Measured, not guessed. The display math of 36 recent papers from cs.LG,
-cs.RO and stat.ML, 1416 rows. 197 rows make no claim and are excluded; of
-the 1219 claim rows:
+Measured, not guessed. I ran SAMOSA over the display math of 36 recent
+papers from cs.LG, cs.RO and stat.ML — 1416 rows, of which 197 make no
+claim and are excluded. Of the 1219 claim rows:
 
 | | |
 | --- | --- |
@@ -181,7 +196,7 @@ in [docs/COOKBOOK.md](https://raw.githubusercontent.com/Hussain004/SAMOSA/master
 
 ## What it cannot do
 
-Being straight about the edges is part of the product:
+I would rather tell you than have you find out at hour three:
 
 - It does not prove theorems. It checks steps.
 - It does not check inequalities (`≤`), limits, or series. Those come back
@@ -201,19 +216,7 @@ regression, the softmax cross entropy, a two layer network, the variance of
 a Gaussian, the expectation of a quadratic form, the KL of two Gaussians,
 the Riccati recursion, and rotations and the cross product.
 
-## The install
-
-| | |
-| --- | --- |
-| **Web** | [samosa-math.vercel.app/app](https://samosa-math.vercel.app/app), no install |
-| **CLI** | `npm i -g samosa-math`, then `samosa check paper.tex`, or `npx samosa-math check paper.tex` |
-| **Claude Code** | `claude mcp add samosa -- npx -y -p samosa-math samosa-mcp` |
-| **Codex** | `[mcp_servers.samosa]` in `~/.codex/config.toml` |
-| **Cursor** | the `mcpServers` entry in `.cursor/mcp.json` |
-| **GitHub Action** | `- uses: Hussain004/SAMOSA@v1` |
-| **Skill** | `skill/samosa/SKILL.md` |
-
-## How it works
+## How it works, and the fine print
 
 The short version: SAMOSA never rewrites symbols. It samples the objects
 your declarations describe, with the structure they ask for, and evaluates
@@ -223,15 +226,10 @@ and shape all come for free.
 The long version, with the probability bounds and the two honest caveats,
 is in [docs/HOW_IT_WORKS.md](https://raw.githubusercontent.com/Hussain004/SAMOSA/master/docs/HOW_IT_WORKS.md).
 
-## The notation
+The full list of what a superscript means and how declarations work, in
+both the LaTeX and the compact form: [docs/NOTATION.md](https://raw.githubusercontent.com/Hussain004/SAMOSA/master/docs/NOTATION.md).
 
-[docs/NOTATION.md](https://raw.githubusercontent.com/Hussain004/SAMOSA/master/docs/NOTATION.md) has the full list: what a superscript
-means, how a symbol is named, what the relations do, and the declaration
-syntax in both the LaTeX and the compact form.
-
-## Privacy
-
-Your derivation never leaves your machine. The engine is a Web Worker in
+Your derivation never leaves your machine: the engine is a Web Worker in
 the tab, a share link keeps the derivation in the URL fragment, and the CLI
 and the MCP server make no network requests at all. See
 [docs/PRIVACY.md](https://raw.githubusercontent.com/Hussain004/SAMOSA/master/docs/PRIVACY.md).
