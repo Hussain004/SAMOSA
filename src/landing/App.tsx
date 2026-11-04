@@ -600,8 +600,18 @@ function HallOfBugs() {
         />
       </div>
       <div className="mt-10 flex overflow-hidden">
-        <div className="flex shrink-0 animate-[marquee_40s_linear_infinite] gap-8 pr-8">
-          {[...RENDERED.bugs, ...RENDERED.bugs].map((bug, i) => (
+        {/* the belt is duplicated so it is never narrower than twice the
+            window: otherwise the tail end of the loop shows a blank strip
+            on the right before it wraps (review: sometimes blank, then back) */}
+        <div className="flex shrink-0 gap-8 pr-8 animate-[marquee_40s_linear_infinite] motion-reduce:animate-none">
+          {[
+            ...RENDERED.bugs,
+            ...RENDERED.bugs,
+            ...RENDERED.bugs,
+            ...RENDERED.bugs,
+            ...RENDERED.bugs,
+            ...RENDERED.bugs,
+          ].map((bug, i) => (
             <div
               key={i}
               className="flex shrink-0 items-center gap-3 rounded border border-[var(--color-line)] bg-[var(--color-panel)] px-5 py-4"
