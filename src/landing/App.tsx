@@ -204,8 +204,7 @@ function Intro() {
     <section className="border-y border-[var(--color-line)] bg-[var(--color-panel)]">
       <div className="mx-auto max-w-[1560px] px-6 lg:px-10 py-10">
         <p className="max-w-[900px] text-[1.0625rem] leading-relaxed tracking-wide text-[var(--color-text)]">
-          SAMOSA checks every step of your derivation by evaluating it on random matrices: exactly,
-          over finite fields. Wrong steps come with the smallest counterexample and a fix.
+          I built SAMOSA because of the one line nobody checks: <em>after some algebraic manipulation, we may obtain ...</em> It reads the line, evaluates it on sampled matrices — exactly, over finite fields — and hands you the smallest counterexample when it does not hold.
         </p>
       </div>
     </section>
@@ -219,7 +218,7 @@ function AgentDemo() {
         <SectionHead
           eyebrow="the agent session"
           title="Your agent can check its own math"
-          body="SAMOSA ships an MCP server and an Agent Skill, so Claude Code, Codex or Cursor can verify a derivation before they hand it to you. The verdict comes from the engine, never from the model."
+          body="I ship an MCP server and an Agent Skill with SAMOSA, so Claude Code, Codex or Cursor can verify a derivation before they hand it to you. The verdict comes from the engine, never from the model."
         />
         <div className="mt-10 grid gap-8 lg:grid-cols-[1.5fr_1fr]">
           <TypedDemo />
@@ -259,7 +258,7 @@ function Tour() {
         <SectionHead
           eyebrow="nineteen seconds"
           title="The line nobody checks"
-          body="The moment every derivation has: after some algebraic manipulation, we may obtain. SAMOSA reads that line, evaluates it over a finite field, and brings a counterexample you can read."
+          body="Every derivation has this moment: after some algebraic manipulation, we may obtain ... I made SAMOSA read that line, evaluate it over a finite field, and hand you a counterexample you can read."
         />
         <TourVideo />
       </div>
@@ -597,7 +596,7 @@ function HallOfBugs() {
         <SectionHead
           eyebrow="the hall of bugs"
           title="Real mistakes, caught by a machine"
-          body="The kinds of slip that survive a proof, a code review and a careful read of the paper."
+          body="The kinds of slip that survive a proof, a review and a careful read. The catalog behind the spot-the-bug game."
         />
       </div>
       <div className="mt-10 flex overflow-hidden">
