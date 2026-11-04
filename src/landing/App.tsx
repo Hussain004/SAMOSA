@@ -204,7 +204,7 @@ function Intro() {
     <section className="border-y border-[var(--color-line)] bg-[var(--color-panel)]">
       <div className="mx-auto max-w-[1560px] px-6 lg:px-10 py-10">
         <p className="max-w-[900px] text-[1.0625rem] leading-relaxed tracking-wide text-[var(--color-text)]">
-          I built SAMOSA because of the one line nobody checks: <em>after some algebraic manipulation, we may obtain ...</em> It reads the line, evaluates it on sampled matrices — exactly, over finite fields — and hands you the smallest counterexample when it does not hold.
+          I built SAMOSA because of the one line nobody checks: <em>after some algebraic manipulation, we may obtain ...</em> It reads the line, evaluates it on sampled matrices, exactly, over finite fields, and hands you the smallest counterexample when it does not hold.
         </p>
       </div>
     </section>

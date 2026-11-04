@@ -27,7 +27,7 @@
 ```
 
 I built SAMOSA because of the one line nobody checks. You have written it
-too: *after some algebraic manipulation, we may obtain ...* — and then the
+too: *after some algebraic manipulation, we may obtain ...*; and then the
 rest of the proof rides on it. SAMOSA reads the line, evaluates it on
 sampled matrices, and tells you whether it holds.
 
@@ -161,7 +161,7 @@ counterexample, and tells you the term you are missing.
 ## What it reads, and what it does not
 
 Measured, not guessed. I ran SAMOSA over the display math of 36 recent
-papers from cs.LG, cs.RO and stat.ML — 1416 rows, of which 197 make no
+papers from cs.LG, cs.RO and stat.ML: 1416 rows, of which 197 make no
 claim and are excluded. Of the 1219 claim rows:
 
 | | |
