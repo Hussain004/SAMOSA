@@ -123,7 +123,7 @@ function ThemeToggle() {
 const PHRASES = [
   'a verdict on every row of your align block',
   'a wrong row comes with a counterexample and a fix',
-  'a checkmark says how it was tested, and how sure it is',
+  'every checkmark says how sure it is',
   'no language model decides anything',
   'it runs in this tab, and nothing is uploaded',
 ];
@@ -204,7 +204,7 @@ function Intro() {
     <section className="border-y border-[var(--color-line)] bg-[var(--color-panel)]">
       <div className="mx-auto max-w-[1560px] px-6 lg:px-10 py-10">
         <p className="max-w-[900px] text-[1.0625rem] leading-relaxed tracking-wide text-[var(--color-text)]">
-          I started SAMOSA on one line of my Mobile Robotics notes. The Kalman gain arrives with <em>after some algebraic manipulation, we may obtain ...</em>, and the algebra itself was flashed on a projector. I wanted to know if that step was right without redoing it by hand, and without asking a model that sounds equally sure either way. So SAMOSA samples matrices with the shapes and the structure you declare, evaluates both sides of every row exactly, over a finite field, and points at the row that breaks, with a counterexample small enough to check on paper.
+          I built SAMOSA for one line in my Mobile Robotics notes: <em>after some algebraic manipulation, we may obtain ...</em> It checks that line on sampled matrices, exactly, and shows you the row that breaks.
         </p>
       </div>
     </section>
@@ -217,7 +217,7 @@ function AgentDemo() {
       <div className="mx-auto max-w-[1560px] px-6 lg:px-10 py-20">
         <SectionHead
           eyebrow="your agent, checked"
-          body="Coding agents write algebra fluently, and now and then they are wrong in exactly the row that matters, with the same confidence as everywhere else. So SAMOSA ships an MCP server and an Agent Skill: the agent calls one tool, reads which row broke and why, repairs it, and checks again before it shows you anything. The model writes the math; the engine decides whether it holds."
+          body="Agents write algebra fluently, and are sometimes wrong in the row that matters. SAMOSA lets them check it first."
         />
         <div className="mt-10 grid gap-8 lg:grid-cols-[1.5fr_1fr]">
           <TypedDemo />
@@ -225,23 +225,21 @@ function AgentDemo() {
             <li className="flex gap-3">
               <span className="text-[var(--color-chutney)]">›</span>
               <span>
-                <b className="text-[var(--color-text)]">One tool call.</b> The derivation goes in as
-                LaTeX, and a report comes back with a verdict, a counterexample and the fixes for every
-                row.
+                <b className="text-[var(--color-text)]">One tool call.</b> LaTeX in, verdicts and
+                fixes out.
               </span>
             </li>
             <li className="flex gap-3">
               <span className="text-[var(--color-chutney)]">›</span>
               <span>
-                <b className="text-[var(--color-text)]">Evidence, not opinion.</b> A checkmark says the
-                sizes and the trials it was tested at, and an exact one the bound on it being wrong.
+                <b className="text-[var(--color-text)]">Evidence, not opinion.</b> Every checkmark says
+                how it was tested.
               </span>
             </li>
             <li className="flex gap-3">
               <span className="text-[var(--color-chutney)]">›</span>
               <span>
-                <b className="text-[var(--color-text)]">Nothing is uploaded.</b> The server makes no
-                network call, and the link it hands back keeps the derivation in the URL fragment.
+                <b className="text-[var(--color-text)]">Nothing is uploaded.</b> No network calls, ever.
               </span>
             </li>
           </ul>
@@ -257,7 +255,7 @@ function Tour() {
       <div className="mx-auto max-w-[1560px] px-6 lg:px-10 py-16">
         <SectionHead
           eyebrow="nineteen seconds"
-          body="The whole idea, once through: an agent derives the Kalman gain, one row comes back wrong, and the card shows the small matrices that break it and the noise term that was dropped."
+          body="The Kalman gain, one dropped noise term, caught."
         />
         <TourVideo />
       </div>
@@ -303,32 +301,32 @@ function TourVideo() {
 const FEATURES = [
   {
     title: 'Counterexamples',
-    body: 'Not "the numbers differ". The smallest instance that still breaks the step, often one by one, with the defined symbols computed and a NumPy snippet to run it again.',
+    body: 'The smallest instance that breaks the step, with a NumPy snippet to rerun it.',
     mock: <CounterexampleMock />,
   },
   {
     title: 'Fixes',
-    body: 'The usual slips are tried for you: a transposed product, a dropped noise term, a swapped factor, a missing assumption. A fix is offered only if the row holds with it.',
+    body: 'The usual slips are tried for you, and a fix is offered only if it holds.',
     mock: <FixMock />,
   },
   {
     title: 'Shape errors',
-    body: 'When the sizes do not fit you get the sizes that do not fit, and the transpose that would make them fit.',
+    body: 'Which sizes do not fit, and the transpose that would fix them.',
     mock: <ShapeMock />,
   },
   {
     title: 'Gradients',
-    body: 'Gradients and Hessians are checked with dual numbers. A gradient in the numerator layout is named as a layout slip, not reported as a wrong answer.',
+    body: 'Checked with dual numbers. A layout slip is named as one.',
     mock: <GradientMock />,
   },
   {
     title: 'Guarantees',
-    body: 'A checkmark carries the sizes and the trials it was tested at. An exact one adds the primes and a computed bound on it being wrong, usually below one in 10⁴⁶; a numeric one names its digits and claims no bound.',
+    body: 'Every checkmark says how it was tested. An exact one carries a bound, usually below 10⁻⁴⁶.',
     mock: <GuaranteeMock />,
   },
   {
     title: 'Your pipeline',
-    body: 'The app, the CLI, the GitHub Action and the MCP server run the same engine, so the same text gets the same verdict wherever you check it.',
+    body: 'App, CLI, Action and MCP server share one engine, so verdicts never disagree.',
     mock: <TerminalMock />,
   },
 ];
@@ -339,7 +337,7 @@ function Features() {
       <div className="mx-auto max-w-[1560px] px-6 lg:px-10 py-20">
         <SectionHead
           eyebrow="what you get back"
-          body="Every row comes back with a verdict and its reason: ✓ it holds, ✗ it is wrong, ⊘ the shapes do not fit, ⚠ the numbers could not settle it, ? it was not read, and ≡ a definition. When SAMOSA cannot read something it says so and names the declaration that would help. It never guesses a checkmark."
+          body="A verdict and a reason for every row. It never guesses a checkmark."
         />
         <div className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map((feature) => (
@@ -593,7 +591,7 @@ function HallOfBugs() {
       <div className="mx-auto max-w-[1560px] px-6 lg:px-10">
         <SectionHead
           eyebrow="the hall of bugs"
-          body="Each of these looks right on a careful read, and each is wrong. A transposed product, a dropped noise term, a gradient in the wrong layout. They are the bugs planted in the menu below, and the ones the spot the bug game asks you to find."
+          body="Each looks right on a careful read. Each is wrong."
         />
       </div>
       <div className="mt-10 flex overflow-hidden">
@@ -628,37 +626,37 @@ const DEEP_DIVES = [
   {
     n: '01',
     title: 'Exact, not approximate',
-    body: 'A step that only uses rational operations is checked over a finite field, where a wrong step survives with probability at most d/p. SAMOSA computes that d, and shows it to you.',
+    body: 'Rational steps run over a finite field, where a wrong step survives with odds at most d/p.',
     link: '/docs/HOW_IT_WORKS',
   },
   {
     n: '02',
     title: 'Gradients by dual numbers',
-    body: 'A derivative is a pair, a value and a tangent. Multiply them, and the tangent chain rule comes out on its own, exactly, over the same field.',
+    body: 'A value and a tangent, carried together. The chain rule falls out, exactly.',
     link: '/docs/HOW_IT_WORKS',
   },
   {
     n: '03',
     title: 'Counterexamples that shrink',
-    body: 'A counterexample over a finite field is unreadable. SAMOSA looks for a small integer instance that still breaks the step, the way a fuzzer shrinks a failing case.',
+    body: 'A failing case is shrunk to small integers, the way a fuzzer does it.',
     link: '/docs/HOW_IT_WORKS',
   },
   {
     n: '04',
     title: 'Built for agents',
-    body: 'An MCP server and an Agent Skill, so your agent can check the matrix algebra before it hands the derivation to you.',
+    body: 'An MCP server and an Agent Skill, so your agent checks before it answers.',
     link: '/docs/MCP',
   },
   {
     n: '05',
     title: 'In your pipeline',
-    body: 'A CLI and a GitHub Action that lint the align blocks of a paper, and fail the build when a step is wrong.',
+    body: 'Lint the align blocks of a paper, and fail the build on a wrong step.',
     link: '/docs/CLI',
   },
   {
     n: '06',
     title: 'It reads real papers',
-    body: 'Of the claim rows in the display math of 36 recent papers, 56.3% parses end to end and 24.9% is read with no named unknown construct. The first measurement was lenient; this one parses the whole row, and the correction is published.',
+    body: 'On 36 recent papers, 56.3% of claim rows parse end to end, and 24.9% read with nothing unknown.',
     link: '/docs/COVERAGE',
   },
 ];
@@ -669,7 +667,7 @@ function DeepDives() {
       <div className="mx-auto max-w-[1560px] px-6 lg:px-10 py-20">
         <SectionHead
           eyebrow="how it works"
-          body="There is no model in the loop. The algebra is checked over a finite field, the derivatives with dual numbers, the Gaussian expectations with a rational quadrature, and whatever is left at 50 digits. Here is each piece, and the receipt it leaves."
+          body="No model in the loop. Arithmetic, a finite field and a bound."
         />
         <div className="mt-12 space-y-16">
           {DEEP_DIVES.map((dive, i) => (
@@ -851,7 +849,7 @@ function MenuSection() {
       <div className="mx-auto max-w-[1560px] px-6 lg:px-10 py-20">
         <SectionHead
           eyebrow="the menu"
-          body={`${MENU.length} derivations people actually write, from Woodbury to the Riccati recursion. Each one has a correct version and a version with a planted bug. Open one to read it row by row, or play spot the bug and find the wrong row before SAMOSA does.`}
+          body={`${MENU.length} real derivations, each with a planted bug. Find it before SAMOSA does.`}
         />
         <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {MENU.map((item) => (
@@ -877,7 +875,7 @@ const TABS = [
   {
     id: 'web',
     label: 'Web',
-    body: 'Paste a derivation or start from the menu. Declare your symbols in the strip above the source, or in a % samosa: comment, so the declarations travel with the text.',
+    body: 'Paste a derivation, or start from the menu. Nothing to install.',
     snippet: 'https://samosa-math.vercel.app/app',
   },
   {
@@ -926,33 +924,9 @@ function Install() {
       <div className="mx-auto max-w-[1560px] px-6 lg:px-10 py-20">
         <SectionHead
           eyebrow="install"
-          body="The web app needs nothing. The CLI and the MCP server are one npm package, samosa-math, and the GitHub Action runs that same CLI from this repository."
+          body="The web app needs nothing. The CLI and the MCP server are one npm package."
         />
-        <div className="mt-10 grid gap-6 md:grid-cols-2">
-          <div className="panel p-5">
-            <h3 className="text-sm">In your browser</h3>
-            <p className="mt-2 text-[0.8125rem] leading-relaxed text-[var(--color-muted)]">
-              No account and no server. The engine runs in a worker in this tab. A share link
-              keeps the derivation after the #, which a browser never sends to any server.
-            </p>
-            <a
-              href="/app"
-              onClick={openApp}
-              className="mt-4 inline-block rounded bg-[var(--color-gold)] px-4 py-2 text-[0.8125rem] font-medium text-[var(--color-ink)]"
-            >
-              Open the app
-            </a>
-          </div>
-          <div className="panel p-5">
-            <h3 className="text-sm">In your agent and your CI</h3>
-            <p className="mt-2 text-[0.8125rem] leading-relaxed text-[var(--color-muted)]">
-              Pick your tool below and copy the one line it needs. It is the same engine in all of
-              them, so a row gets the same verdict in your editor, your agent and your CI.
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-8 flex flex-wrap gap-1.5">
+        <div className="mt-10 flex flex-wrap gap-1.5">
           {TABS.map((t, i) => (
             <button
               key={t.id}
