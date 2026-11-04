@@ -74,6 +74,33 @@ const TRUE_FRIENDS: Array<Item & { holds?: boolean; pending?: string }> = [
   { name: 'a horizontal block times a vertical one splits', src: String.raw`\begin{bmatrix} A & B \end{bmatrix}\begin{bmatrix} C \\ D \end{bmatrix} = AC + BD`, decls: 'A, B, C, D: n×n', holds: true },
   { name: 'the determinant reads a following environment', src: String.raw`\det\begin{bmatrix} 1 & 2 \\ 3 & 4 \end{bmatrix} = -2`, holds: true },
   { name: 'numbers alone multiply inside blocks', src: String.raw`\begin{bmatrix} 1 & 2 \\ 3 & 4 \end{bmatrix}\begin{bmatrix} 1 \\ 1 \end{bmatrix} = \begin{bmatrix} 3 \\ 7 \end{bmatrix}`, holds: true },
+  // roots and rational powers, after review 5 round 2: \sqrt[k] is the
+  // power 1/k, a fraction in a superscript is a power and never a new name,
+  // and a negative whole power is the inverse of the power
+  { name: 'a cube root of eight', src: String.raw`\sqrt[3]{8} = 2`, holds: true },
+  { name: 'a cube root keeps the sign of a negative number', src: String.raw`\sqrt[3]{-8} = -2`, holds: true },
+  { name: 'a cube root of a cube', src: String.raw`\sqrt[3]{x^3} = x`, decls: 'x: scalar', holds: true },
+  { name: 'two fractional powers add', src: String.raw`x^{1/3} x^{2/3} = x`, decls: 'x: pos', holds: true },
+  { name: 'a negative power is the inverse of the power', src: String.raw`x^{-2} = \frac{1}{x^2}`, decls: 'x: scalar', holds: true },
+  { name: 'a negative matrix power is the inverse of the power', src: String.raw`A^{-2} = A^{-1} A^{-1}`, decls: 'A: n×n', holds: true },
+  // the cross product, after review 5 round 2: \times between two vectors
+  // is the cross product, and it pins their size to 3
+  { name: 'the cross product is anticommutative', src: String.raw`a \times b = -(b \times a)`, decls: 'a, b: 3', holds: true },
+  { name: 'a cross product is orthogonal to its factor', src: String.raw`a^\top (a \times b) = 0`, decls: 'a, b: n', holds: true },
+  { name: 'the triple product expansion', src: String.raw`a \times (b \times c) = b (a^\top c) - c (a^\top b)`, decls: 'a, b, c: 3', holds: true },
+  { name: 'a rotation carries a cross product along', src: String.raw`R (a \times b) = (R a) \times (R b)`, decls: 'R: rot 3; a, b: 3', holds: true },
+  // a declared value before a parenthesis is a factor, not a function
+  { name: 'distributivity, written with a space', src: String.raw`A (B + C) = A B + A C`, decls: 'A, B, C: n×n', holds: true },
+  // the Gaussians, after review 5 round 2: a zero mean is zero, and the
+  // variance of any polynomial is E[g g^T] - E[g] E[g]^T
+  { name: 'the second moment of a centred Gaussian', src: String.raw`\mathbb{E}[x x^\top] = \Sigma`, decls: 'x ~ N(0, \\Sigma); \\Sigma: spd n', holds: true },
+  { name: 'the variance of an affine map', src: String.raw`\operatorname{Var}(A x) = A \operatorname{Var}(x) A^\top`, decls: 'x ~ N(\\mu, \\Sigma); \\mu: n; \\Sigma: spd n; A: m×n', holds: true },
+  {
+    name: 'the variance of a sum of independent Gaussians',
+    src: String.raw`\operatorname{Var}(x + y) = \operatorname{Var}(x) + \operatorname{Var}(y)`,
+    decls: 'x ~ N(\\mu, \\Sigma); y ~ N(\\nu, \\Lambda); \\mu, \\nu: n; \\Sigma, \\Lambda: spd n',
+    holds: true,
+  },
 ];
 
 /**
@@ -108,12 +135,15 @@ const FALSE_FRIENDS: Array<Item & { caught?: boolean }> = [
   { name: 'a triangular matrix does not commute with its transpose', src: String.raw`U^\top U = U U^\top`, decls: 'U: triu n×n', caught: true },
   { name: 'the log of a square is not twice the log, for a scalar', src: String.raw`\log(x^2) = 2 \log x`, decls: 'x: scalar' },
   { name: 'the exponential does not split a sum of scalars', src: String.raw`e^{a + b} = e^a + e^b`, decls: 'a: scalar; b: scalar', caught: true },
-  { name: 'a cube root is not a square root', src: String.raw`\sqrt[3]{8} = 3` },
-  // these two are true, but the root of index 3 is not read: the honest
-  // verdict is a question with the reason, never a silent square root
-  // (review 4.5)
-  { name: 'a cube root of eight is not read', src: String.raw`\sqrt[3]{8} = 2` },
-  { name: 'a cube root of a cube is not read', src: String.raw`\sqrt[3]{x^3} = x`, decls: 'x: pos' },
+  { name: 'a cube root is not a square root', src: String.raw`\sqrt[3]{8} = 3`, caught: true },
+  { name: 'two fractional powers do not multiply their exponents', src: String.raw`x^{1/3} x^{2/3} = x^{2/9}`, decls: 'x: pos', caught: true },
+  { name: 'the variance of an affine map is not taken on the other side', src: String.raw`\operatorname{Var}(A x) = A^\top \operatorname{Var}(x) A`, decls: 'x ~ N(\\mu, \\Sigma); \\mu: n; \\Sigma: spd n; A: n×n', caught: true },
+  { name: 'the second moment of a Gaussian with a mean is not its covariance', src: String.raw`\mathbb{E}[x x^\top] = \Sigma`, decls: 'x ~ N(\\mu, \\Sigma); \\mu: n; \\Sigma: spd n', caught: true },
+  { name: 'the cross product does not commute', src: String.raw`a \times b = b \times a`, decls: 'a, b: 3', caught: true },
+  { name: 'the cross product is not associative', src: String.raw`a \times (b \times c) = (a \times b) \times c`, decls: 'a, b, c: 3', caught: true },
+  { name: 'a reflection flips a cross product', src: String.raw`Q (a \times b) = (Q a) \times (Q b)`, decls: 'Q: orth 3; a, b: 3', caught: true },
+  // a matrix power other than a half is not read: a question, never a guess
+  { name: 'a cube root of a matrix is not read', src: String.raw`\Sigma^{1/3} = \Sigma`, decls: '\\Sigma: spd n' },
   { name: 'the matrix square root is not the identity', src: String.raw`\Sigma^{1/2} = I`, decls: '\\Sigma: spd n', caught: true },
   { name: 'a square of a Gaussian is not its mean', src: String.raw`E[x^2] = E[x]`, decls: 'x ~ N(\\mu, 1); \\mu: scalar', caught: true },
   { name: 'the adjugate of a product is not the product of the adjugates', src: String.raw`\operatorname{adj}(A B) = \operatorname{adj}(A)\operatorname{adj}(B)`, decls: 'A, B: n×n' },
@@ -580,6 +610,22 @@ function oracleDirection<T>(sampler: Sampler<T>, props: Prop[], r: number, c: nu
   // a free symbol, or one whose property does not restrict the line
   return g;
 }
+
+describe('the corners of the orthogonal matrices', () => {
+  // A wrong step may vanish on the rotations and not on the reflections, so
+  // only the trials drawn in the failing corner can see it. The bound has to
+  // be priced on the least drawn corner, and every corner gets the full
+  // trial count, so the card does not get weaker (review 3.1, round 2).
+  it('prices the bound on the trials of one corner, not of all of them', () => {
+    const step = check('Q^\\top Q = I', { decls: 'Q: orth n' }).steps[0];
+    expect(step.verdict).toBe(OK);
+    expect(step.card.trialsPerSize).toBeGreaterThanOrEqual(2 * 3);
+    const d = step.card.degree!;
+    const perCorner = Math.pow(d / P1, 3) * Math.pow(d / P2, 3);
+    expect(step.card.bound).toBeCloseTo(perCorner, 60);
+    expect(step.card.bound!).toBeGreaterThanOrEqual(perCorner * 0.999);
+  });
+});
 
 describe('the degree oracle', () => {
   it('every inverse free exact checkmark in the menu has an honest degree bound', () => {

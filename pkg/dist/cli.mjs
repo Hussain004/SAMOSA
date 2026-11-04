@@ -2994,6 +2994,11 @@ function isMatrixVal(val) {
 }
 
 // src/core/quadrature.ts
+var GAUSS2 = {
+  atoms: [rat(1), rat(-1)],
+  weights: [rat(1, 2), rat(1, 2)],
+  degree: 3
+};
 var GAUSS5 = {
   atoms: [rat(0), rat(1), rat(-1), rat(2), rat(-2)],
   weights: [rat(1, 2), rat(1, 6), rat(1, 6), rat(1, 12), rat(1, 12)],
@@ -3019,6 +3024,11 @@ var BERNOULLI = {
   weights: [rat(1), rat(0)],
   degree: 0
 };
+function ruleFor(rule, degree) {
+  const family = [GAUSS2, GAUSS5, GAUSS7];
+  if (!family.includes(rule)) return rule;
+  return family.find((r) => r.degree >= degree) ?? rule;
+}
 var NODE_BUDGET = 1e5;
 function degreeInVar(node, name) {
   switch (node.k) {
@@ -3034,6 +3044,7 @@ function degreeInVar(node, name) {
         case "neg":
           return degreeInVar(node.args[0], name);
         case "mul":
+        case "cross":
         case "kron":
         case "had":
           return degreeInVar(node.args[0], name) + degreeInVar(node.args[1], name);
@@ -3173,6 +3184,9 @@ function evalNode(f, node, env) {
       throw new EvalError(`no value for ${node.name}`);
     }
     case "op":
+      if (node.op === "pow" && node.args[1]?.k === "num" && node.args[1].value.d !== 1) {
+        return rationalPower(f, evalNode(f, node.args[0], env), node.args[1].value);
+      }
       return evalOp(f, node.op, node.args.map((a) => evalNode(f, a, env)), env);
     case "call": {
       if (node.fn === "var" || node.fn === "cov") {
@@ -3211,6 +3225,19 @@ function evalNode(f, node, env) {
       throw new EvalError(`unsupported construct: ${node.text}`);
   }
 }
+function rationalPower(f, base2, r) {
+  const x = scalarOf(base2);
+  if (x === null) throw new EvalError(`the matrix power ${r.n}/${r.d} is not read; only the square root is`);
+  const sign2 = f.cmp(x, f.zero);
+  if (sign2 === 0) {
+    if (r.n > 0) return scalar(f.zero);
+    throw new DomainError("a negative power of zero");
+  }
+  const magnitude = f.exp(f.mul(f.fromRational(r.n, r.d), f.log(f.abs(x))));
+  if (sign2 > 0) return scalar(magnitude);
+  if (r.d % 2 === 0) throw new DomainError("an even root of a negative number");
+  return scalar(Math.abs(r.n) % 2 === 0 ? magnitude : f.neg(magnitude));
+}
 function scalarOf(val) {
   if (isScalarVal(val)) return val.v;
   if (val.m.r === 1 && val.m.c === 1) return val.m.d[0];
@@ -3225,56 +3252,33 @@ function evalExpect(f, node, env) {
     vars.push(v);
   }
   if (!vars.length) throw new EvalError("an expectation needs a random variable");
-  const body = expectationBody(node, env);
-  for (const v of vars) {
-    const degree = degreeInVar(body, v.name);
-    if (!Number.isFinite(degree) || degree > v.rule.degree) {
-      throw new EvalError(
-        `the expectation of ${v.name} is not a polynomial of degree at most ${v.rule.degree}`
-      );
-    }
-  }
-  return evaluateExpectation(f, body, vars, (n, values) => {
-    const merged = new Map(env.values);
-    for (const [name, value] of values) merged.set(name, value);
-    return evalNode(f, n, { ...env, values: merged, memo: /* @__PURE__ */ new Map() });
-  });
-}
-function expectationBody(node, env) {
-  const arg = node.args[0];
-  if (!arg) throw new EvalError("an expectation needs something to average");
-  if (node.op === "E") return arg;
-  if (node.op === "Var") {
-    const value = arg.k === "sym" ? env.values.get(arg.name) : void 0;
-    const vector = value?.k === "m";
-    const centred = centredCopy(arg);
-    if (!vector) {
-      return { k: "op", op: "inner", args: [centred, centredCopy(arg)], span: arg.span };
-    }
-    return {
-      k: "op",
-      op: "mul",
-      args: [centred, { k: "op", op: "T", args: [centredCopy(arg)], span: arg.span }],
-      span: arg.span
-    };
-  }
-  const second = node.args[1];
+  const integrate = (body) => {
+    const sized = vars.map((v) => {
+      const degree = degreeInVar(body, v.name);
+      const rule = Number.isFinite(degree) ? ruleFor(v.rule, degree) : v.rule;
+      if (!Number.isFinite(degree) || degree > rule.degree) {
+        throw new EvalError(`the expectation of ${v.name} is not a polynomial of degree at most ${rule.degree}`);
+      }
+      return { ...v, rule };
+    });
+    return evaluateExpectation(f, body, sized, (n, values) => {
+      const merged = new Map(env.values);
+      for (const [name, value] of values) merged.set(name, value);
+      return evalNode(f, n, { ...env, values: merged, memo: /* @__PURE__ */ new Map() });
+    });
+  };
+  const first = node.args[0];
+  if (!first) throw new EvalError("an expectation needs something to average");
+  if (node.op === "E") return integrate(first);
+  const second = node.op === "Cov" ? node.args[1] : first;
   if (!second) throw new EvalError("a covariance needs two variables");
-  return {
-    k: "op",
-    op: "mul",
-    args: [centredCopy(arg), { k: "op", op: "T", args: [centredCopy(second)], span: second.span }],
-    span: arg.span
-  };
-}
-function centredCopy(node) {
-  if (node.k !== "sym") return node;
-  return {
-    k: "op",
-    op: "sub",
-    args: [node, { k: "sym", name: `__mean_${node.name}`, display: node.display, span: node.span }],
-    span: node.span
-  };
+  const transposed = { k: "op", op: "T", args: [second], span: second.span };
+  const outer = { k: "op", op: "mul", args: [first, transposed], span: node.span };
+  const both = integrate(outer);
+  const meanFirst = integrate(first);
+  const meanSecond = first === second ? meanFirst : integrate(second);
+  const product = evalOp(f, "mul", [meanFirst, evalOp(f, "T", [meanSecond], env)], env);
+  return evalOp(f, "sub", [both, product], env);
 }
 function evalOp(f, op, args, _env) {
   switch (op) {
@@ -3390,6 +3394,21 @@ function evalOp(f, op, args, _env) {
         }
       }
       return { k: "m", m: cofactors };
+    }
+    case "cross": {
+      const a = args[0];
+      const b = args[1];
+      if (isMatrixVal(a) && isMatrixVal(b) && a.m.r === 3 && a.m.c === 1 && b.m.r === 3 && b.m.c === 1) {
+        const [a1, a2, a3] = a.m.d;
+        const [b1, b2, b3] = b.m.d;
+        const d = [
+          f.sub(f.mul(a2, b3), f.mul(a3, b2)),
+          f.sub(f.mul(a3, b1), f.mul(a1, b3)),
+          f.sub(f.mul(a1, b2), f.mul(a2, b1))
+        ];
+        return { k: "m", m: { r: 3, c: 1, d } };
+      }
+      return evalOp(f, "mul", args, _env);
     }
     case "kron":
       return { k: "m", m: kron(f, requireMatrix(args[0], "a Kronecker product"), requireMatrix(args[1], "a Kronecker product")) };
@@ -4862,8 +4881,7 @@ var Parser = class _Parser {
       } else if (script.kind === "invSqrtm") {
         node = { k: "op", op: "inv", args: [{ k: "op", op: "sqrtm", args: [node], span }], span };
       } else {
-        const exp2 = { k: "num", value: ratFromDecimal(script.text ?? "2"), span: { from: node.span.from, to: script.to } };
-        node = { k: "op", op: "pow", args: [node, exp2], span };
+        node = makePower(node, powerValue(script.text ?? "2"), { from: node.span.from, to: script.to }, span);
       }
     }
     return node;
@@ -4919,7 +4937,8 @@ var Parser = class _Parser {
       const t = this.cur;
       let op = null;
       if (t.type === "op" && t.value === "*") op = "mul";
-      else if (t.type === "cmd" && (t.value === "cdot" || t.value === "times" || t.value === "ast" || t.value === "circ")) op = "mul";
+      else if (t.type === "cmd" && (t.value === "cdot" || t.value === "ast" || t.value === "circ")) op = "mul";
+      else if (t.type === "cmd" && t.value === "times") op = "cross";
       else if (t.type === "cmd" && t.value === "otimes") op = "kron";
       else if (t.type === "cmd" && t.value === "odot") op = "had";
       else if (t.type === "cmd" && t.value === "oslash") op = "had";
@@ -5013,8 +5032,7 @@ var Parser = class _Parser {
           const root = { k: "op", op: "sqrtm", args: [node], span: sup.span };
           node = { k: "op", op: "inv", args: [root], span: { from: node.span.from, to: sup.span.to } };
         } else if (classified.kind === "power") {
-          const exp2 = { k: "num", value: ratFromDecimal(classified.powerText), span: sup.span };
-          node = { k: "op", op: "pow", args: [node, exp2], span: { from: node.span.from, to: sup.span.to } };
+          node = makePower(node, powerValue(classified.powerText), sup.span, { from: node.span.from, to: sup.span.to });
         } else {
           node = {
             k: "raw",
@@ -5083,7 +5101,8 @@ var Parser = class _Parser {
         const sym = this.makeSym([], t.value, null, null, { from: t.from, to: t.to });
         const scripted = this.applyScripts(sym, [], t.value);
         const power = scripted.k === "op" && scripted.op === "pow" && scripted.args[0]?.k === "sym" ? scripted : null;
-        if (this.kind() === "lparen" && (scripted.k === "sym" || power) && this.looksLikeCall(t.value)) {
+        const scriptedName = scripted.k === "sym" ? scripted.name : power?.args[0]?.k === "sym" ? power.args[0].name : "";
+        if (this.kind() === "lparen" && (scripted.k === "sym" || power) && !this.opts.knownValues?.has(scriptedName) && this.looksLikeCall(t.value)) {
           const wasDivergence = this.inDivergence;
           this.inDivergence = DIVERGENCES.has(plainName(t.value));
           const { args, unknown } = this.parseArgs();
@@ -5374,8 +5393,13 @@ var Parser = class _Parser {
         const arg = this.kind() === "lbrace" ? this.parseGroupAsExpression() : this.parsePrimary();
         if (index) {
           const two = index.k === "num" && index.value.n === 2 && index.value.d === 1;
+          if (!two && index.k === "num" && index.value.d === 1 && index.value.n > 0) {
+            const span = { from: t.from, to: this.closingParen(t.to, [arg]) };
+            const exponent = { k: "num", value: rat(1, index.value.n), span: index.span };
+            return { k: "op", op: "pow", args: [arg, exponent], span };
+          }
           if (!two) {
-            const reason = index.k === "num" ? `the root of index ${index.value.n} is not read; only the square root is` : "the root with a symbolic index is not read; only the square root is";
+            const reason = "the root with a symbolic index is not read; only a whole number index is";
             return {
               k: "raw",
               text: reason,
@@ -5557,7 +5581,7 @@ var Parser = class _Parser {
           );
         }
         const plain = base2.name.startsWith(`\\${name}`) ? base2.name.slice(name.length + 1) : plainName(base2.name);
-        if (this.looksLikeCall(plain)) {
+        if (!this.opts.knownValues?.has(base2.name) && this.looksLikeCall(plain)) {
           const { args, unknown } = this.parseArgs();
           return this.makeCall(base2.name, base2.span.from, args, unknown);
         }
@@ -6022,6 +6046,19 @@ function describeToken(t) {
       return t.type;
   }
 }
+function makePower(base2, value, expSpan, span) {
+  if (value.d === 1 && value.n < 0) {
+    const positive = value.n === -1 ? base2 : { k: "op", op: "pow", args: [base2, { k: "num", value: rat(-value.n), span: expSpan }], span };
+    return { k: "op", op: "inv", args: [positive], span };
+  }
+  return { k: "op", op: "pow", args: [base2, { k: "num", value: rat(value.n, value.d), span: expSpan }], span };
+}
+function powerValue(text) {
+  const m = /^(-?)(\d+)\/(\d+)$/.exec(text);
+  if (!m) return ratFromDecimal(text);
+  const sign2 = m[1] ? -1 : 1;
+  return rat(sign2 * Number(m[2]), Number(m[3]));
+}
 function classifySuperscript(text) {
   const s = text.replace(/\s+/g, "");
   if (s === "\\top" || s === "T" || s === "\\mathsf{T}" || s === "\\intercal" || s === "^\\top") {
@@ -6032,6 +6069,13 @@ function classifySuperscript(text) {
   if (s === "1/2" || s === "\\frac{1}{2}" || s === "\\frac12") return { kind: "sqrtm" };
   if (s === "-1/2" || s === "-\\frac{1}{2}" || s === "-\\frac12") return { kind: "invSqrtm" };
   if (/^\d+$/.test(s)) return { kind: "power", powerText: s };
+  if (/^-\d+$/.test(s)) return { kind: "power", powerText: `${s}/1` };
+  const frac = /^(-?)(?:(\d+)\/(\d+)|\\[dt]?frac\{(\d+)\}\{(\d+)\}|\\[dt]?frac(\d)(\d))$/.exec(s);
+  if (frac) {
+    const n = frac[2] ?? frac[4] ?? frac[6];
+    const d = frac[3] ?? frac[5] ?? frac[7];
+    if (Number(d) !== 0) return { kind: "power", powerText: `${frac[1]}${n}/${d}` };
+  }
   return { kind: "label" };
 }
 function hasRelationInEnv(tokens) {
@@ -6157,8 +6201,8 @@ function clauseSplits(tokens) {
   clauses.push({ start: from, end: tokens.length });
   return clauses;
 }
-function parseRow(_src, rowText, offset, index, knownFns, macros) {
-  const opts = { knownFns, macros };
+function parseRow(_src, rowText, offset, index, knownFns, macros, knownValues) {
+  const opts = { knownFns, macros, knownValues };
   let tokens = tokenize(blankMacroDefinitions(rowText));
   tokens = expandMacroUses(tokens, macros, rowText);
   for (; ; ) {
@@ -6203,7 +6247,7 @@ function parseRow(_src, rowText, offset, index, knownFns, macros) {
       const first = tokens[clause.start];
       const last = tokens[clause.end - 1];
       if (!first || !last) continue;
-      const parsed = parseRow(_src, rowText.slice(first.from, last.to), offset + first.from, index, knownFns, macros);
+      const parsed = parseRow(_src, rowText.slice(first.from, last.to), offset + first.from, index, knownFns, macros, knownValues);
       if (parsed.prose) continue;
       if (parsed.error) {
         return {
@@ -6402,6 +6446,7 @@ var MATRIX_ENVS = /* @__PURE__ */ new Set([
   "smallmatrix",
   "cases"
 ]);
+var VERBATIM_ENVS = /* @__PURE__ */ new Set(["verbatim", "verbatim*", "lstlisting", "minted", "comment", "filecontents"]);
 function splitRows(src) {
   const rows = [];
   const prose = [];
@@ -6448,8 +6493,13 @@ function splitRows(src) {
         i = endIdx >= 0 ? endIdx + envName.length + 6 : len;
         continue;
       }
-      flushProse(src.slice(contentStart2, contentEnd2));
-      i = endIdx >= 0 ? endIdx + 1 : len;
+      if (VERBATIM_ENVS.has(envName)) {
+        flushProse(src.slice(contentStart2, contentEnd2));
+        i = endIdx >= 0 ? endIdx + 1 : len;
+        continue;
+      }
+      flushProse(src.slice(next, contentStart2));
+      i = contentStart2;
       continue;
     }
     if (next === dollarIdx) {
@@ -7291,8 +7341,13 @@ function createContext(decls, layout = "denominator", pinned = {}) {
     freshCount: 0,
     bound: /* @__PURE__ */ new Set(),
     layout,
-    pinned
+    pinned,
+    fixed: /* @__PURE__ */ new Set()
   };
+}
+function fixedSize(ctx, root) {
+  for (const k of ctx.fixed) if (ctx.dims.find(`#fixed${k}`) === root) return k;
+  return void 0;
 }
 function freshDim(ctx) {
   ctx.freshCount += 1;
@@ -7559,20 +7614,20 @@ function opType(ctx, node) {
       const a = args[0];
       return a;
     }
-    case "mul": {
+    case "cross": {
       const a = args[0];
       const b = args[1];
-      if (a.t === "poly" || b.t === "poly") return { t: "poly" };
-      if (isScalar(a) && isScalar(b)) return { t: "scalar" };
-      if (isScalar(a) && isMatrix(b)) return b;
-      if (isMatrix(a) && isScalar(b)) return a;
-      if (isMatrix(a) && isMatrix(b)) {
-        unifyDim(ctx, a.c, b.r, "in a product", node.span);
-        return { t: "mat", r: a.r, c: b.c };
+      if (isMatrix(a) && isMatrix(b) && a.c === 1 && b.c === 1) {
+        unifyDim(ctx, a.r, 3, "in a cross product", node.span);
+        unifyDim(ctx, b.r, 3, "in a cross product", node.span);
+        ctx.fixed.add(3);
+        return { t: "mat", r: 3, c: 1 };
       }
-      ctx.errors.push({ message: "these two factors do not have compatible shapes", span: node.span });
-      return { t: "poly" };
+      node.op = "mul";
+      return productType(ctx, a, b, node.span);
     }
+    case "mul":
+      return productType(ctx, args[0], args[1], node.span);
     case "div": {
       const a = args[0];
       const b = args[1];
@@ -7671,6 +7726,18 @@ function addDim(a, b) {
   if (typeof b === "number") return { v: `${dimName(a)}+${b}` };
   return { v: `${dimName(a)}+${dimName(b)}` };
 }
+function productType(ctx, a, b, span) {
+  if (a.t === "poly" || b.t === "poly") return { t: "poly" };
+  if (isScalar(a) && isScalar(b)) return { t: "scalar" };
+  if (isScalar(a) && isMatrix(b)) return b;
+  if (isMatrix(a) && isScalar(b)) return a;
+  if (isMatrix(a) && isMatrix(b)) {
+    unifyDim(ctx, a.c, b.r, "in a product", span);
+    return { t: "mat", r: a.r, c: b.c };
+  }
+  ctx.errors.push({ message: "these two factors do not have compatible shapes", span });
+  return { t: "poly" };
+}
 function callType(ctx, fn, args, span) {
   const types = args.map((a) => inferType(ctx, a));
   switch (fn) {
@@ -7679,8 +7746,12 @@ function callType(ctx, fn, args, span) {
     case "trace":
     case "norm":
     case "logdet":
-    case "var":
       return { t: "scalar" };
+    case "var": {
+      const a = types[0];
+      if (a && isMatrix(a) && !(a.c === 1 && a.r === 1)) return { t: "mat", r: a.r, c: a.r };
+      return { t: "scalar" };
+    }
     case "cov": {
       const a = types[0];
       const b = types[1];
@@ -7788,6 +7859,7 @@ function degreeOf(ctx, node, sizes, defs) {
         case "neg":
           return args[0];
         case "mul":
+        case "cross":
         case "kron":
         case "had":
           return { n: args[0].n + args[1].n, d: args[0].d + args[1].d };
@@ -7883,6 +7955,8 @@ function dimSize(ctx, d, sizes) {
   const root = ctx.dims.find(d.v);
   const pinned = ctx.pinned[root];
   if (pinned !== void 0) return pinned;
+  const fixed = fixedSize(ctx, root);
+  if (fixed !== void 0) return fixed;
   return sizes.get(root) ?? 3;
 }
 function matrixSize(ctx, node, sizes) {
@@ -7949,7 +8023,7 @@ function collectDimVarsFor(ctx, lhs, rhs, defs) {
     if (!info) continue;
     if (info.ty.t === "mat") {
       for (const d of [info.ty.r, info.ty.c]) {
-        if (typeof d !== "number" && ctx.pinned[ctx.dims.find(d.v)] === void 0) {
+        if (typeof d !== "number" && ctx.pinned[ctx.dims.find(d.v)] === void 0 && fixedSize(ctx, ctx.dims.find(d.v)) === void 0) {
           roots.add(ctx.dims.find(d.v));
         }
       }
@@ -8049,12 +8123,13 @@ function analyzeSource(src, opts) {
   const defs = /* @__PURE__ */ new Map();
   const definedNames = /* @__PURE__ */ new Set();
   const knownFns = new Set(decls.filter((d) => d.kind === "function").map((d) => d.name));
+  const knownValues = new Set(decls.filter((d) => d.kind !== "function").map((d) => d.name));
   const macros = harvestMacros(src);
   const steps = [];
   let previousRhs;
   let rowIndex = 0;
   for (const row of rows) {
-    const parsed = parseRow(src, row.text, row.from, rowIndex, knownFns, macros);
+    const parsed = parseRow(src, row.text, row.from, rowIndex, knownFns, macros, knownValues);
     rowIndex++;
     if (parsed.error) {
       steps.push({
@@ -8118,7 +8193,10 @@ function analyzeSource(src, opts) {
         symbols
       });
       previousRhs = rhs;
-      if (bareLhs && isDefinition) definedNames.add(bareLhs);
+      if (bareLhs && isDefinition) {
+        definedNames.add(bareLhs);
+        knownValues.add(bareLhs);
+      }
       if (isDefinition && bareLhs && rhs) {
         defs.set(bareLhs, rhs);
         ctx.defs.set(bareLhs, rhs);
@@ -8142,6 +8220,10 @@ function check(src, opts = {}) {
     for (const name of step.symbols) used.add(name);
     if (step.lhs?.k === "sym") used.add(step.lhs.name);
     if (step.rhs?.k === "sym") used.add(step.rhs.name);
+  }
+  for (const decl of decls) {
+    if (!decl.dist || !used.has(decl.name)) continue;
+    for (const param of Object.values(decl.dist)) if (param !== decl.dist.kind) used.add(param);
   }
   for (const decl of decls) {
     if (used.has(decl.name)) continue;
@@ -8403,6 +8485,7 @@ function isRational(node, ctx, defs, seen) {
     }
     case "op": {
       if (node.op === "abs" || node.op === "sqrtm") return false;
+      if (node.op === "pow" && node.args[1]?.k === "num" && node.args[1].value.d !== 1) return false;
       return node.args.every((a) => isRational(a, ctx, defs, seen));
     }
     case "call":
@@ -8439,7 +8522,7 @@ function checkExact(step, ctx, defs, opts, card) {
       annotation: step.annotation
     };
   }
-  const trialsNeeded = Math.max(opts.trials, 2 ** corners);
+  const trialsNeeded = Math.max(2 ** corners, Math.min(opts.trials * 2 ** corners, 64));
   const mask = corners > 0 ? (1 << corners) - 1 : 0;
   let worstBound = 0;
   let worstDegree = 0;
@@ -8447,15 +8530,16 @@ function checkExact(step, ctx, defs, opts, card) {
   const sizes = [];
   const assumptions = collectAssumptions(ctx, step);
   for (const setting of settings) {
-    const ran = /* @__PURE__ */ new Map([[P1, 0], [P2, 0]]);
-    const seen = /* @__PURE__ */ new Map([[P1, /* @__PURE__ */ new Set()], [P2, /* @__PURE__ */ new Set()]]);
+    const perCorner = /* @__PURE__ */ new Map([
+      [P1, new Array(1 << corners).fill(0)],
+      [P2, new Array(1 << corners).fill(0)]
+    ]);
     for (let trial = 0; trial < trialsNeeded; trial++) {
       for (const p of primes) {
         const rng = rngFor(opts.seed, step.id, settingKey(setting), trial, p);
         const outcome = runExactTrial(step, ctx, defs, setting, p, rng, trial);
         if (outcome.kind === "ok") {
-          ran.set(p, (ran.get(p) ?? 0) + 1);
-          seen.get(p).add(trial & mask);
+          perCorner.get(p)[trial & mask]++;
           continue;
         }
         if (outcome.kind === "unknown") {
@@ -8496,11 +8580,10 @@ function checkExact(step, ctx, defs, opts, card) {
         };
       }
     }
-    const covered = primes.every(
-      (p) => (ran.get(p) ?? 0) > 0 && seen.get(p).size === 1 << corners
-    );
-    if (covered) {
-      working.push({ setting, ranP1: ran.get(P1), ranP2: ran.get(P2) });
+    const ranP1 = Math.min(...perCorner.get(P1));
+    const ranP2 = Math.min(...perCorner.get(P2));
+    if (ranP1 > 0 && ranP2 > 0) {
+      working.push({ setting, ranP1, ranP2 });
     }
   }
   if (!working.length) {
@@ -8877,6 +8960,9 @@ function sampleFor(ctx, step, defs, setting, sampler, free = /* @__PURE__ */ new
           mean = { k: "m", m: sampler.sampleGeneral(size, 1) };
           values.set(dist.mu, mean);
         }
+      } else if (dist.kind === "normal") {
+        const f0 = sampler.field;
+        mean = { k: "m", m: { r: size, c: 1, d: new Array(size).fill(f0.zero) } };
       } else {
         mean = { k: "m", m: sampler.sampleGeneral(size, 1) };
       }
@@ -9165,6 +9251,7 @@ function checkNumeric(step, ctx, defs, opts, card) {
       if (run === "domain") {
         return domainResult("a sampled instance was outside the domain");
       }
+      if (run.unreadable) return unevaluable(run.unreadable);
       if (run.shapeMessage) {
         return shapeResult(run.shapeMessage);
       }
@@ -9209,6 +9296,7 @@ function checkNumeric(step, ctx, defs, opts, card) {
       if (run === "domain") {
         return domainResult("a 50 digit instance was outside the domain");
       }
+      if (run.unreadable) return unevaluable(run.unreadable);
       if (run.shapeMessage) {
         return shapeResult(run.shapeMessage);
       }
@@ -9266,6 +9354,7 @@ function numericDelta(ctx, defs, step, setting, rng, trial, field) {
   const sides = evaluateSides(field, step.lhs, step.rhs, env, sampler);
   if (sides.kind === "unknown") {
     if (sides.shape) return { delta: Number.NaN, shapeMessage: sides.message };
+    if (!sides.domain && /not read/.test(sides.message)) return { delta: Number.NaN, unreadable: sides.message };
     return "domain";
   }
   if (sides.kind === "equal") return { delta: 0 };
@@ -9709,6 +9798,8 @@ function renderOp(node) {
       return `\\operatorname{adj}\\left(${a[0]}\\right)`;
     case "kron":
       return `${a[0]} \\otimes ${a[1]}`;
+    case "cross":
+      return `${operand(node.args[0])} \\times ${operand(node.args[1])}`;
     case "had":
       return `${a[0]} \\odot ${a[1]}`;
     case "inner":
@@ -9739,7 +9830,7 @@ function operand(node) {
 function base(node) {
   if (!node) return "";
   const text = renderNode(node);
-  if (node.k === "op" && ["add", "sub", "neg", "mul", "kron", "had"].includes(node.op)) {
+  if (node.k === "op" && ["add", "sub", "neg", "mul", "cross", "kron", "had"].includes(node.op)) {
     return `\\left(${text}\\right)`;
   }
   return `{${text}}`;
@@ -9803,6 +9894,7 @@ function isMatrixType(ctx, node) {
       case "add":
       case "sub":
       case "mul":
+      case "cross":
       case "T":
       case "inv":
       case "invT":
@@ -9842,6 +9934,8 @@ function numpyExpression(node, ctx, names) {
           const bothMatrices = node.args.every((a) => isMatrixType(ctx, a));
           return bothMatrices ? `(${args[0]} @ ${args[1]})` : `(${args[0]} * ${args[1]})`;
         }
+        case "cross":
+          return `np.cross((${args[0]}).reshape(3), (${args[1]}).reshape(3)).reshape(3, 1)`;
         case "div":
           return `(${args[0]} / ${args[1]})`;
         case "inv":
@@ -10552,7 +10646,10 @@ function mutationRepairs(sh) {
           kind: "mutation",
           // the fix says which side it changes, the derivation comes before
           // the claim in the reading order of a person (review 3.1, item 2.4)
-          title: side === "rhs" ? `change the right side to ${mutation.title}` : `change the left side to ${mutation.title}`,
+          // the mistake first, then the edit; the new side follows as the
+          // detail, so "two factors are swapped, so change the right side
+          // to" reads on, into the expression
+          title: `${mutation.title}, so change the ${side === "rhs" ? "right" : "left"} side to`,
           edit: { span: original.span, insert: renderNode(candidate) },
           verified: true,
           detail: renderNode(candidate),
@@ -11023,7 +11120,8 @@ function formatPretty(report, options) {
       `${options.file}:${line}:${column}  ${ICONS[step.verdict]} ${pad(step.verdict)}  ${step.message}  samosa/${ruleId(step)}`
     );
     for (const fix of (step.fixes ?? []).slice(0, 3)) {
-      out.push(`    fix${fix.verified ? "" : " (unverified)"}: ${fix.title}`);
+      const then = fix.kind === "mutation" && fix.detail ? ` ${fix.detail}` : "";
+      out.push(`    fix${fix.verified ? "" : " (unverified)"}: ${fix.title}${then}`);
     }
   }
   out.push(summaryLine(report));
@@ -11055,6 +11153,7 @@ function summaryLine(report) {
   if (counts.ok) parts.push(`${counts.ok} ok`);
   if (counts.defined) parts.push(`${counts.defined} defined`);
   const worst = counts.wrong ? "wrong" : counts.shape ? "shape" : counts.inconclusive ? "inconclusive" : counts.unchecked || report.steps.length === 0 ? "unchecked" : counts.ok ? "ok" : "defined";
+  if (!parts.length) parts.push("nothing to check");
   return `${ICONS[worst]} ${parts.join(" \xB7 ")} \xB7 ${report.ms} ms`;
 }
 function formatSarif(reports) {

@@ -60,6 +60,9 @@ const MATRIX_ENVS = new Set([
   'cases',
 ]);
 
+/** The environments whose text is never mathematics. */
+const VERBATIM_ENVS = new Set(['verbatim', 'verbatim*', 'lstlisting', 'minted', 'comment', 'filecontents']);
+
 export function splitRows(src: string): SourceRow[] {
   const rows: SourceRow[] = [];
   const prose: string[] = [];
@@ -115,9 +118,18 @@ export function splitRows(src: string): SourceRow[] {
         i = endIdx >= 0 ? endIdx + envName.length + 6 : len;
         continue;
       }
-      // a non math environment (a table, a figure): its content is prose
-      flushProse(src.slice(contentStart, contentEnd));
-      i = endIdx >= 0 ? endIdx + 1 : len;
+      if (VERBATIM_ENVS.has(envName)) {
+        // code and comments are never mathematics, even when they hold a $$
+        flushProse(src.slice(contentStart, contentEnd));
+        i = endIdx >= 0 ? endIdx + 1 : len;
+        continue;
+      }
+      // a non math environment (the document, a proof, a figure) is read
+      // inside: the mathematics of a paper lives in them. Stepping over the
+      // whole body sent every paper to the line by line fallback, which cut
+      // an align row that spans two lines in half
+      flushProse(src.slice(next, contentStart));
+      i = contentStart;
       continue;
     }
 

@@ -144,3 +144,30 @@ describe('a declaration the parser does not read (review 5.5)', () => {
     expect(pinned.steps[0].verdict).toBe('ok');
   });
 });
+
+describe('a declared value before a parenthesis', () => {
+  // A (B + C) used to be read as a call to an unknown function A, so plain
+  // distributivity came back as a question, and before that as a false shape
+  // error. A name the user declared as a value is a factor, never a function.
+  const verdict = (row: string, decls: string) => check(`\\begin{align*} ${row} \\end{align*}`, { decls }).steps.at(-1)?.verdict;
+
+  it('is a product, so distributivity holds', () => {
+    expect(verdict('A (B + C) &= A B + A C', 'A, B, C: n×n')).toBe('ok');
+    expect(verdict('c (a + b) &= c a + c b', 'a, b, c: scalar')).toBe('ok');
+    expect(verdict('y \\left(A + B\\right) &= y A + y B', 'y: 1×n; A, B: n×n')).toBe('ok');
+  });
+
+  it('is still a product when the factors do not fit', () => {
+    expect(verdict('x (A + B) &= x A', 'x: n; A, B: n×n')).toBe('shape');
+  });
+
+  it('is a product when the name was defined earlier in the derivation', () => {
+    const source = '\\begin{align*} K &:= A B \\\\ K (C + D) &= K C + K D \\end{align*}';
+    expect(check(source, { decls: 'A, B, C, D: n×n' }).steps.at(-1)?.verdict).toBe('ok');
+  });
+
+  it('leaves a function the user declared as a call', () => {
+    const report = check('\\begin{align*} f &:= x^\\top x \\\\ \\frac{\\partial f}{\\partial x} &= 2 x \\end{align*}', { decls: 'x: n' });
+    expect(report.steps.at(-1)?.verdict).toBe('ok');
+  });
+});

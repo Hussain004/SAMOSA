@@ -21,10 +21,11 @@ import {
   vec,
   zeros,
   matSqrtm,
+  DomainError,
   type Mat,
 } from './linalg.ts';
 import type { Node } from './ir.ts';
-import { degreeInVar, evaluateExpectation, type QuadVar } from './quadrature.ts';
+import { degreeInVar, evaluateExpectation, ruleFor, type QuadVar } from './quadrature.ts';
 import { isMatrixVal, isScalarVal, scalar, type Val } from './value.ts';
 import type { Rng } from './prng.ts';
 
@@ -98,6 +99,9 @@ export function evalNode<T>(f: Field<T>, node: Node, env: EvalEnv<T>): Val<T> {
       throw new EvalError(`no value for ${node.name}`);
     }
     case 'op':
+      if (node.op === 'pow' && node.args[1]?.k === 'num' && node.args[1].value.d !== 1) {
+        return rationalPower(f, evalNode(f, node.args[0], env), node.args[1].value);
+      }
       return evalOp(f, node.op, node.args.map((a) => evalNode(f, a, env)), env);
     case 'call': {
       if (node.fn === 'var' || node.fn === 'cov') {
@@ -138,6 +142,25 @@ export function evalNode<T>(f: Field<T>, node: Node, env: EvalEnv<T>): Val<T> {
   }
 }
 
+/**
+ * x^{p/q} over the reals: |x|^{p/q}, with the sign of x kept when q is odd,
+ * so the cube root of -8 is -2. An even root of a negative number is not
+ * defined, and that is a domain error, not a number.
+ */
+function rationalPower<T>(f: Field<T>, base: Val<T>, r: { n: number; d: number }): Val<T> {
+  const x = scalarOf(base);
+  if (x === null) throw new EvalError(`the matrix power ${r.n}/${r.d} is not read; only the square root is`);
+  const sign = f.cmp(x, f.zero);
+  if (sign === 0) {
+    if (r.n > 0) return scalar(f.zero);
+    throw new DomainError('a negative power of zero');
+  }
+  const magnitude = f.exp(f.mul(f.fromRational(r.n, r.d), f.log(f.abs(x))));
+  if (sign > 0) return scalar(magnitude);
+  if (r.d % 2 === 0) throw new DomainError('an even root of a negative number');
+  return scalar(Math.abs(r.n) % 2 === 0 ? magnitude : f.neg(magnitude));
+}
+
 /** A 1 by 1 matrix behaves like a scalar in the arithmetic operations. */
 function scalarOf<T>(val: Val<T>): T | null {
   if (isScalarVal(val)) return val.v;
@@ -162,64 +185,40 @@ function evalExpect<T>(f: Field<T>, node: Extract<Node, { k: 'expect' }>, env: E
   }
   if (!vars.length) throw new EvalError('an expectation needs a random variable');
 
-  const body = expectationBody(node, env);
-  for (const v of vars) {
-    const degree = degreeInVar(body, v.name);
-    if (!Number.isFinite(degree) || degree > v.rule.degree) {
-      throw new EvalError(
-        `the expectation of ${v.name} is not a polynomial of degree at most ${v.rule.degree}`,
-      );
-    }
-  }
+  /** E[body], with the cheapest rule that is exact for each variable */
+  const integrate = (body: Node): Val<T> => {
+    const sized = vars.map((v) => {
+      const degree = degreeInVar(body, v.name);
+      const rule = Number.isFinite(degree) ? ruleFor(v.rule, degree) : v.rule;
+      if (!Number.isFinite(degree) || degree > rule.degree) {
+        throw new EvalError(`the expectation of ${v.name} is not a polynomial of degree at most ${rule.degree}`);
+      }
+      return { ...v, rule };
+    });
+    return evaluateExpectation(f, body, sized, (n, values) => {
+      const merged = new Map(env.values);
+      for (const [name, value] of values) merged.set(name, value);
+      return evalNode(f, n, { ...env, values: merged, memo: new Map() });
+    });
+  };
 
-  return evaluateExpectation(f, body, vars, (n, values) => {
-    const merged = new Map(env.values);
-    for (const [name, value] of values) merged.set(name, value);
-    return evalNode(f, n, { ...env, values: merged, memo: new Map() });
-  });
-}
+  const first = node.args[0];
+  if (!first) throw new EvalError('an expectation needs something to average');
+  if (node.op === 'E') return integrate(first);
 
-/** The expression an expectation really averages over. */
-function expectationBody(node: Extract<Node, { k: 'expect' }>, env: EvalEnv<any>): Node {
-  const arg = node.args[0];
-  if (!arg) throw new EvalError('an expectation needs something to average');
-  if (node.op === 'E') return arg;
-  if (node.op === 'Var') {
-    // Var[x] = E[(x - E x)^T (x - E x)] for a scalar
-    // and E[(x - E x)(x - E x)^T] for a vector
-    const value = arg.k === 'sym' ? env.values.get(arg.name) : undefined;
-    const vector = value?.k === 'm';
-    const centred = centredCopy(arg);
-    if (!vector) {
-      return { k: 'op', op: 'inner', args: [centred, centredCopy(arg)], span: arg.span };
-    }
-    return {
-      k: 'op',
-      op: 'mul',
-      args: [centred, { k: 'op', op: 'T', args: [centredCopy(arg)], span: arg.span }],
-      span: arg.span,
-    };
-  }
-  // Cov[x, y] = E[(x - E x)(y - E y)^T]
-  const second = node.args[1];
+  // Var[g] = E[g g^T] - E[g] E[g]^T and Cov[g, h] = E[g h^T] - E[g] E[h]^T.
+  // Both are exact for any polynomial g and h, where centring a copy of the
+  // argument only worked for a bare symbol: Var(A x) and Var(x + y) were
+  // averaged without their mean.
+  const second = node.op === 'Cov' ? node.args[1] : first;
   if (!second) throw new EvalError('a covariance needs two variables');
-  return {
-    k: 'op',
-    op: 'mul',
-    args: [centredCopy(arg), { k: 'op', op: 'T', args: [centredCopy(second)], span: second.span }],
-    span: arg.span,
-  };
-}
-
-/** A copy of a symbol, centred on its mean. */
-function centredCopy(node: Node): Node {
-  if (node.k !== 'sym') return node;
-  return {
-    k: 'op',
-    op: 'sub',
-    args: [node, { k: 'sym', name: `__mean_${node.name}`, display: node.display, span: node.span }],
-    span: node.span,
-  };
+  const transposed: Node = { k: 'op', op: 'T', args: [second], span: second.span };
+  const outer: Node = { k: 'op', op: 'mul', args: [first, transposed], span: node.span };
+  const both = integrate(outer);
+  const meanFirst = integrate(first);
+  const meanSecond = first === second ? meanFirst : integrate(second);
+  const product = evalOp(f, 'mul', [meanFirst, evalOp(f, 'T', [meanSecond], env)], env);
+  return evalOp(f, 'sub', [both, product], env);
 }
 
 function evalOp<T>(f: Field<T>, op: string, args: Val<T>[], _env: EvalEnv<T>): Val<T> {
@@ -336,6 +335,21 @@ function evalOp<T>(f: Field<T>, op: string, args: Val<T>[], _env: EvalEnv<T>): V
         }
       }
       return { k: 'm', m: cofactors };
+    }
+    case 'cross': {
+      const a = args[0];
+      const b = args[1];
+      if (isMatrixVal(a) && isMatrixVal(b) && a.m.r === 3 && a.m.c === 1 && b.m.r === 3 && b.m.c === 1) {
+        const [a1, a2, a3] = a.m.d;
+        const [b1, b2, b3] = b.m.d;
+        const d = [
+          f.sub(f.mul(a2, b3), f.mul(a3, b2)),
+          f.sub(f.mul(a3, b1), f.mul(a1, b3)),
+          f.sub(f.mul(a1, b2), f.mul(a2, b1)),
+        ];
+        return { k: 'm', m: { r: 3, c: 1, d } };
+      }
+      return evalOp(f, 'mul', args, _env);
     }
     case 'kron':
       return { k: 'm', m: kron(f, requireMatrix(args[0], 'a Kronecker product'), requireMatrix(args[1], 'a Kronecker product')) };

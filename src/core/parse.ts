@@ -1,6 +1,6 @@
 import { renderTokens, tokenize, type Token } from './lex.ts';
 import { ACCENTS, GREEK, GLYPH_ACCENTS, toDisplay } from './notation.ts';
-import { ratFromDecimal } from './rational.ts';
+import { rat, ratFromDecimal } from './rational.ts';
 import { ParseFailure, type Assertion, type Node, type Op, type ParsedRow, type Relation, type RowPart, type Span } from './ir.ts';
 
 /**
@@ -19,6 +19,12 @@ import { ParseFailure, type Assertion, type Node, type Op, type ParsedRow, type 
 export interface ParseOptions {
   /** names that are functions, so that f(x) is an application and not a product */
   knownFns?: Set<string>;
+  /**
+   * names that are values: declared as a scalar, a vector or a matrix, or
+   * defined earlier in the derivation. `A (B + C)` and `x (y + z)` are then
+   * products, never a call to an unknown function A or x.
+   */
+  knownValues?: Set<string>;
   /** the macros a source defines, by name without the backslash (review 5.6) */
   macros?: Map<string, Macro>;
 }
@@ -579,8 +585,7 @@ export class Parser {
       } else if (script.kind === 'invSqrtm') {
         node = { k: 'op', op: 'inv', args: [{ k: 'op', op: 'sqrtm', args: [node], span }], span };
       } else {
-        const exp = { k: 'num' as const, value: ratFromDecimal(script.text ?? '2'), span: { from: node.span.from, to: script.to } };
-        node = { k: 'op', op: 'pow', args: [node, exp], span };
+        node = makePower(node, powerValue(script.text ?? '2'), { from: node.span.from, to: script.to }, span);
       }
     }
     return node;
@@ -642,7 +647,10 @@ export class Parser {
       const t = this.cur;
       let op: Op | null = null;
       if (t.type === 'op' && t.value === '*') op = 'mul';
-      else if (t.type === 'cmd' && (t.value === 'cdot' || t.value === 'times' || t.value === 'ast' || t.value === 'circ')) op = 'mul';
+      else if (t.type === 'cmd' && (t.value === 'cdot' || t.value === 'ast' || t.value === 'circ')) op = 'mul';
+      // a times between two vectors is the cross product, and a product
+      // anywhere else; the types decide which
+      else if (t.type === 'cmd' && t.value === 'times') op = 'cross';
       else if (t.type === 'cmd' && t.value === 'otimes') op = 'kron';
       else if (t.type === 'cmd' && t.value === 'odot') op = 'had';
       else if (t.type === 'cmd' && t.value === 'oslash') op = 'had';
@@ -754,8 +762,7 @@ export class Parser {
           const root: Node = { k: 'op', op: 'sqrtm', args: [node], span: sup.span };
           node = { k: 'op', op: 'inv', args: [root], span: { from: node.span.from, to: sup.span.to } };
         } else if (classified.kind === 'power') {
-          const exp = { k: 'num' as const, value: ratFromDecimal(classified.powerText), span: sup.span };
-          node = { k: 'op', op: 'pow', args: [node, exp], span: { from: node.span.from, to: sup.span.to } };
+          node = makePower(node, powerValue(classified.powerText), sup.span, { from: node.span.from, to: sup.span.to });
         } else {
           node = {
             k: 'raw',
@@ -835,7 +842,13 @@ export class Parser {
         // of d squared and a group. The same shape reads H^2(...)
         const power =
           scripted.k === 'op' && scripted.op === 'pow' && scripted.args[0]?.k === 'sym' ? scripted : null;
-        if (this.kind() === 'lparen' && (scripted.k === 'sym' || power) && this.looksLikeCall(t.value)) {
+        const scriptedName = scripted.k === 'sym' ? scripted.name : power?.args[0]?.k === 'sym' ? power.args[0].name : '';
+        if (
+          this.kind() === 'lparen' &&
+          (scripted.k === 'sym' || power) &&
+          !this.opts.knownValues?.has(scriptedName) &&
+          this.looksLikeCall(t.value)
+        ) {
           // A lowercase name with parentheses is a function call, even when
           // SAMOSA does not know the function. A capital name is a matrix, so
           // A(B) is a product, the way the notation reads.
@@ -1175,11 +1188,14 @@ export class Parser {
         // any other index is named, never silently read as a square root
         if (index) {
           const two = index.k === 'num' && index.value.n === 2 && index.value.d === 1;
+          // a whole index k is the power 1/k: \sqrt[3]{8} is 8^{1/3}
+          if (!two && index.k === 'num' && index.value.d === 1 && index.value.n > 0) {
+            const span = { from: t.from, to: this.closingParen(t.to, [arg]) };
+            const exponent: Node = { k: 'num', value: rat(1, index.value.n), span: index.span };
+            return { k: 'op', op: 'pow', args: [arg, exponent], span };
+          }
           if (!two) {
-            const reason =
-              index.k === 'num'
-                ? `the root of index ${index.value.n} is not read; only the square root is`
-                : 'the root with a symbolic index is not read; only the square root is';
+            const reason = 'the root with a symbolic index is not read; only a whole number index is';
             return {
               k: 'raw',
               text: reason,
@@ -1394,7 +1410,7 @@ export class Parser {
         // \hat{l}(f, y) is a loss, not a product of a hat and a group.
         // A capital name stays a matrix product.
         const plain = base.name.startsWith(`\\${name}`) ? base.name.slice(name.length + 1) : plainName(base.name);
-        if (this.looksLikeCall(plain)) {
+        if (!this.opts.knownValues?.has(base.name) && this.looksLikeCall(plain)) {
           const { args, unknown } = this.parseArgs();
           return this.makeCall(base.name, base.span.from, args, unknown);
         }
@@ -1922,6 +1938,28 @@ type SupKind =
   | { kind: 'power'; powerText: string }
   | { kind: 'label' };
 
+/**
+ * A power node. A negative whole power is the inverse of the positive one,
+ * so x^{-2} stays exact; a fractional power stays a power with a rational
+ * exponent, which the planner sends to numeric mode.
+ */
+function makePower(base: Node, value: { n: number; d: number }, expSpan: Span, span: Span): Node {
+  if (value.d === 1 && value.n < 0) {
+    const positive: Node =
+      value.n === -1 ? base : { k: 'op', op: 'pow', args: [base, { k: 'num', value: rat(-value.n), span: expSpan }], span };
+    return { k: 'op', op: 'inv', args: [positive], span };
+  }
+  return { k: 'op', op: 'pow', args: [base, { k: 'num', value: rat(value.n, value.d), span: expSpan }], span };
+}
+
+/** The value of an exponent: a whole number, or a fraction p/q with a sign. */
+function powerValue(text: string): { n: number; d: number } {
+  const m = /^(-?)(\d+)\/(\d+)$/.exec(text);
+  if (!m) return ratFromDecimal(text);
+  const sign = m[1] ? -1 : 1;
+  return rat(sign * Number(m[2]), Number(m[3]));
+}
+
 export function classifySuperscript(text: string): SupKind {
   const s = text.replace(/\s+/g, '');
   if (s === '\\top' || s === 'T' || s === '\\mathsf{T}' || s === '\\intercal' || s === '^\\top') {
@@ -1934,6 +1972,17 @@ export function classifySuperscript(text: string): SupKind {
   if (s === '1/2' || s === '\\frac{1}{2}' || s === '\\frac12') return { kind: 'sqrtm' };
   if (s === '-1/2' || s === '-\\frac{1}{2}' || s === '-\\frac12') return { kind: 'invSqrtm' };
   if (/^\d+$/.test(s)) return { kind: 'power', powerText: s };
+  // a negative whole power is the inverse of the power: x^{-2}
+  if (/^-\d+$/.test(s)) return { kind: 'power', powerText: `${s}/1` };
+  // any other rational exponent, 1/3 or -2/3 or \frac{3}{2}, is a power too.
+  // It used to fall through to a label, so x^{1/3} became a new symbol with
+  // that name and x^{1/3} x^{2/3} = x came back wrong
+  const frac = /^(-?)(?:(\d+)\/(\d+)|\\[dt]?frac\{(\d+)\}\{(\d+)\}|\\[dt]?frac(\d)(\d))$/.exec(s);
+  if (frac) {
+    const n = frac[2] ?? frac[4] ?? frac[6];
+    const d = frac[3] ?? frac[5] ?? frac[7];
+    if (Number(d) !== 0) return { kind: 'power', powerText: `${frac[1]}${n}/${d}` };
+  }
   return { kind: 'label' };
 }
 
@@ -2105,8 +2154,9 @@ export function parseRow(
   index: number,
   knownFns?: Set<string>,
   macros?: Map<string, Macro>,
+  knownValues?: Set<string>,
 ): ParsedRow {
-  const opts: ParseOptions = { knownFns, macros };
+  const opts: ParseOptions = { knownFns, macros, knownValues };
   // a macro definition that sits in the middle of the mathematics is not
   // mathematics; it is blanked, and the offsets stay where they were
   let tokens = tokenize(blankMacroDefinitions(rowText));
@@ -2163,7 +2213,7 @@ export function parseRow(
       const first = tokens[clause.start];
       const last = tokens[clause.end - 1];
       if (!first || !last) continue;
-      const parsed = parseRow(_src, rowText.slice(first.from, last.to), offset + first.from, index, knownFns, macros);
+      const parsed = parseRow(_src, rowText.slice(first.from, last.to), offset + first.from, index, knownFns, macros, knownValues);
       if (parsed.prose) continue;
       if (parsed.error) {
         return {

@@ -70,7 +70,7 @@
     "wrongRows": 1,
     "total": 8,
     "wrongRow": 7,
-    "fixTitle": "change the right side to an inverse where there should be none, or the other way round",
+    "fixTitle": "an inverse where there should be none, or the other way round",
     "shareUrl": ""
   },
   "joseph": {
@@ -138,7 +138,7 @@
   "shape": {
     "row": 3,
     "message": "in a product: the sizes n and m do not match",
-    "fixTitle": "change the right side to a transpose is missing"
+    "fixTitle": "a transpose is missing"
   },
   "layout": {
     "row": 2,

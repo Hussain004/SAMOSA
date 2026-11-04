@@ -55,6 +55,14 @@ describe('the files the Action runs on', () => {
     expect(report.steps[0].verdict).toBe('ok');
   });
 
+  it('a row that spans two lines inside the document is one step', () => {
+    // the body of the document used to be skipped, so the rows came from a
+    // line by line fallback that cut this row in two and read the prose
+    const report = check(fixture('multiline'));
+    expect(report.steps.map((s) => s.verdict)).toEqual(['ok', 'ok']);
+    expect(report.steps[1].text).toContain('A^\\top');
+  });
+
   it('a small paper checks step by step', () => {
     const report = check(fixture('paper'));
     expect(report.steps.map((s) => s.verdict)).toEqual(['ok', 'ok', 'ok']);

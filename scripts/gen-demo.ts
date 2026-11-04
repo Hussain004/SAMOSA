@@ -18,6 +18,15 @@ import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { check, explain } from '../src/core/index.ts';
 import { MENU } from '../corpus/menu.ts';
+
+/**
+ * The name of the mistake a fix repairs. A mutation's title ends on the edit,
+ * ", so change the right side to", which the app follows with the new side;
+ * a one line demo shows only the mistake.
+ */
+function mistake(title: string | undefined): string {
+  return (title ?? '').replace(/, so change the (right|left) side to$/, '');
+}
 import type { Report } from '../src/core/index.ts';
 
 const root = resolve(import.meta.dirname, '..');
@@ -151,7 +160,7 @@ function generateDemo(): Generated {
       wrongRows: kalmanWrong.length,
       total: kalmanBug.steps.length,
       wrongRow: kalmanWrongStep?.row ?? 0,
-      fixTitle: kalmanExplanation?.fixes[0]?.title ?? '',
+      fixTitle: mistake(kalmanExplanation?.fixes[0]?.title),
       shareUrl: '',
     },
     joseph: {
@@ -172,7 +181,7 @@ function generateDemo(): Generated {
     shape: {
       row: shapeRow,
       message: shapeMessage,
-      fixTitle: shapeExplanation?.fixes[0]?.title ?? null,
+      fixTitle: shapeExplanation?.fixes[0] ? mistake(shapeExplanation.fixes[0].title) : null,
     },
     layout: {
       row: layoutRow,

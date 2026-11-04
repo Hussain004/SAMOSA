@@ -26,6 +26,19 @@ export interface Rule {
   degree: number;
 }
 
+/**
+ * The two point rule for the standard normal: exact up to degree three.
+ *
+ * It matches E z = 0 and E z^2 = 1, which is all a variance or a second
+ * moment needs, and two nodes a component instead of seven is what lets two
+ * vectors of size four share one expectation: 2^8 nodes, not 7^8.
+ */
+export const GAUSS2: Rule = {
+  atoms: [rat(1), rat(-1)],
+  weights: [rat(1, 2), rat(1, 2)],
+  degree: 3,
+};
+
 /** The five point rule for the standard normal: exact up to degree five. */
 export const GAUSS5: Rule = {
   atoms: [rat(0), rat(1), rat(-1), rat(2), rat(-2)],
@@ -61,6 +74,19 @@ export const BERNOULLI: Rule = {
   degree: 0,
 };
 
+/**
+ * The cheapest rule of the same family that is still exact at this degree.
+ *
+ * Every rule of the normal family integrates the same moments up to its own
+ * degree, so the smallest one that reaches the degree of the integrand gives
+ * the same exact answer with fewer nodes.
+ */
+export function ruleFor(rule: Rule, degree: number): Rule {
+  const family = [GAUSS2, GAUSS5, GAUSS7];
+  if (!family.includes(rule)) return rule;
+  return family.find((r) => r.degree >= degree) ?? rule;
+}
+
 /** The budget of quadrature nodes. Past this the answer is a question mark. */
 export const NODE_BUDGET = 100_000;
 
@@ -89,6 +115,7 @@ export function degreeInVar(node: Node, name: string): number {
         case 'neg':
           return degreeInVar(node.args[0], name);
         case 'mul':
+        case 'cross':
         case 'kron':
         case 'had':
           return degreeInVar(node.args[0], name) + degreeInVar(node.args[1], name);

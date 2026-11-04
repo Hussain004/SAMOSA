@@ -300,7 +300,9 @@ J &:= \frac{1}{2} x^\top A x \\
   {
     id: 'variance-of-sum',
     name: 'the variance of a sum',
-    decls: 'x: n; y: n',
+    // two Gaussians declared apart are independent, which is what the
+    // identity needs
+    decls: 'x ~ N(\\mu, \\Sigma); y ~ N(\\nu, \\Lambda); \\mu, \\nu: n; \\Sigma, \\Lambda: spd n',
     source: String.raw`\begin{align*}
 \operatorname{Var}(x + y) &= \operatorname{Var}(x) + \operatorname{Var}(y)
 \end{align*}`,
@@ -308,15 +310,15 @@ J &:= \frac{1}{2} x^\top A x \\
   {
     id: 'covariance-of-scaled',
     name: 'the covariance of a scaled variable',
-    decls: 'x: n; a: n',
+    decls: 'x ~ N(\\mu, \\Sigma); \\mu: n; \\Sigma: spd n; A: m×n',
     source: String.raw`\begin{align*}
-\operatorname{Var}(a x) &= a \operatorname{Var}(x) a^\top
+\operatorname{Var}(A x) &= A \operatorname{Var}(x) A^\top
 \end{align*}`,
   },
   {
     id: 'gaussian-moment',
     name: 'the second moment of a Gaussian',
-    decls: 'x: n; \\Sigma: spd n',
+    decls: 'x ~ N(0, \\Sigma); \\Sigma: spd n',
     source: String.raw`\begin{align*}
 \mathbb{E}[x x^\top] &= \Sigma
 \end{align*}`,
@@ -324,7 +326,7 @@ J &:= \frac{1}{2} x^\top A x \\
   {
     id: 'gaussian-mean',
     name: 'the mean of a Gaussian',
-    decls: 'x: n; \\mu: n',
+    decls: 'x ~ N(\\mu, \\Sigma); \\mu: n; \\Sigma: spd n',
     source: String.raw`\begin{align*}
 \mathbb{E}[x] &= \mu
 \end{align*}`,
@@ -332,7 +334,7 @@ J &:= \frac{1}{2} x^\top A x \\
   {
     id: 'gaussian-trace',
     name: 'the trace of a Gaussian covariance',
-    decls: 'x: n; \\Sigma: spd n',
+    decls: 'x ~ N(0, \\Sigma); \\Sigma: spd n',
     source: String.raw`\begin{align*}
 \mathbb{E}[x^\top x] &= \operatorname{tr}(\Sigma)
 \end{align*}`,

@@ -82,6 +82,7 @@ function isMatrixType(ctx: TypeContext, node: Node): boolean {
       case 'add':
       case 'sub':
       case 'mul':
+      case 'cross':
       case 'T':
       case 'inv':
       case 'invT':
@@ -132,6 +133,9 @@ export function numpyExpression(node: Node, ctx: TypeContext, names: NumpyNames)
           const bothMatrices = node.args.every((a) => isMatrixType(ctx, a));
           return bothMatrices ? `(${args[0]} @ ${args[1]})` : `(${args[0]} * ${args[1]})`;
         }
+        case 'cross':
+          // the types left a cross only between two vectors of size 3
+          return `np.cross((${args[0]}).reshape(3), (${args[1]}).reshape(3)).reshape(3, 1)`;
         case 'div':
           return `(${args[0]} / ${args[1]})`;
         case 'inv':

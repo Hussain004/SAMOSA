@@ -17,6 +17,8 @@ export type Op =
   | 'det'
   | 'adj'
   | 'kron'
+  /** \\times: the cross product of two vectors of size 3, a product otherwise */
+  | 'cross'
   | 'had'
   | 'inner'
   | 'norm2'

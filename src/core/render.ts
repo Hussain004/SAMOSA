@@ -101,6 +101,8 @@ function renderOp(node: Extract<Node, { k: 'op' }>): string {
       return `\\operatorname{adj}\\left(${a[0]}\\right)`;
     case 'kron':
       return `${a[0]} \\otimes ${a[1]}`;
+    case 'cross':
+      return `${operand(node.args[0])} \\times ${operand(node.args[1])}`;
     case 'had':
       return `${a[0]} \\odot ${a[1]}`;
     case 'inner':
@@ -149,7 +151,7 @@ function operand(node: Node | undefined): string {
 function base(node: Node | undefined): string {
   if (!node) return '';
   const text = renderNode(node);
-  if (node.k === 'op' && ['add', 'sub', 'neg', 'mul', 'kron', 'had'].includes(node.op)) {
+  if (node.k === 'op' && ['add', 'sub', 'neg', 'mul', 'cross', 'kron', 'had'].includes(node.op)) {
     return `\\left(${text}\\right)`;
   }
   return `{${text}}`;

@@ -36,7 +36,10 @@ export function formatPretty(report: Report, options: PrettyOptions): string {
     // The explanation is already computed by the CLI. A fix that has not
     // been checked is labeled, so a suggestion is never read as a guarantee.
     for (const fix of (step.fixes ?? []).slice(0, 3)) {
-      out.push(`    fix${fix.verified ? '' : ' (unverified)'}: ${fix.title}`);
+      // a mutation names the mistake and ends on "change the right side to",
+      // so the new side is printed after it, the way the app shows it
+      const then = fix.kind === 'mutation' && fix.detail ? ` ${fix.detail}` : '';
+      out.push(`    fix${fix.verified ? '' : ' (unverified)'}: ${fix.title}${then}`);
     }
   }
   out.push(summaryLine(report));
@@ -85,6 +88,7 @@ export function summaryLine(report: Report): string {
           : counts.ok
             ? 'ok'
             : 'defined';
+  if (!parts.length) parts.push('nothing to check');
   return `${ICONS[worst]} ${parts.join(' · ')} · ${report.ms} ms`;
 }
 

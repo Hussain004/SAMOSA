@@ -369,8 +369,10 @@ function mutationRepairs(sh: RepairCtx): Fix[] {
           kind: 'mutation',
           // the fix says which side it changes, the derivation comes before
           // the claim in the reading order of a person (review 3.1, item 2.4)
-          title:
-            side === 'rhs' ? `change the right side to ${mutation.title}` : `change the left side to ${mutation.title}`,
+          // the mistake first, then the edit; the new side follows as the
+          // detail, so "two factors are swapped, so change the right side
+          // to" reads on, into the expression
+          title: `${mutation.title}, so change the ${side === 'rhs' ? 'right' : 'left'} side to`,
           edit: { span: original.span, insert: renderNode(candidate) },
           verified: true,
           detail: renderNode(candidate),

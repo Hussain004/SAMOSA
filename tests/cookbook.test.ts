@@ -21,11 +21,6 @@ const CATCHES = ['wrong', 'shape'];
 const CANNOT_CHECK = new Set([
   'spectral-norm-of-transpose',
   'stationary-point',
-  'variance-of-sum',
-  'covariance-of-scaled',
-  'gaussian-moment',
-  'gaussian-mean',
-  'gaussian-trace',
   'kalman-covariance',
   'kalman-gain',
   'riccati',
@@ -63,12 +58,17 @@ describe('the cookbook', () => {
     // cannot be checked yet are named, so a new silent identity fails here.
     const known = CANNOT_CHECK;
     const silent: string[] = [];
+    const closed: string[] = [];
     for (const identity of IDENTITIES) {
       const report = check(identity.source, { decls: identity.decls });
       const holds = report.steps.filter((s) => s.relation !== 'defined' && s.verdict === 'ok');
       if (!holds.length && !known.has(identity.id)) silent.push(identity.id);
+      // and a named gap that is closed comes off the list, so the list
+      // says what is true today and not what was true once
+      if (holds.length && known.has(identity.id)) closed.push(identity.id);
     }
     expect(silent).toEqual([]);
+    expect(closed).toEqual([]);
   });
 
   it('does not declare a symbol the derivation does not use', () => {

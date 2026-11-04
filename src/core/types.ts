@@ -128,6 +128,8 @@ export interface TypeContext {
   layout: 'denominator' | 'numerator';
   /** dimension variables a declaration pins to one value, such as `n = 3` */
   pinned: Record<string, number>;
+  /** the sizes the cross product fixed its vectors to, read by the sweep */
+  fixed: Set<number>;
 }
 
 export function createContext(
@@ -170,7 +172,18 @@ export function createContext(
     bound: new Set(),
     layout,
     pinned,
+    fixed: new Set(),
   };
+}
+
+/**
+ * The size a type rule fixed a dimension to, if any. A cross product makes
+ * its vectors size 3, and a sweep that still tried n = 2 would make a true
+ * row a shape error.
+ */
+export function fixedSize(ctx: TypeContext, root: string): number | undefined {
+  for (const k of ctx.fixed) if (ctx.dims.find(`#fixed${k}`) === root) return k;
+  return undefined;
 }
 
 function freshDim(ctx: TypeContext): Dim {
@@ -521,20 +534,26 @@ function opType(ctx: TypeContext, node: Extract<Node, { k: 'op' }>): Ty {
       const a = args[0];
       return a;
     }
-    case 'mul': {
+    case 'cross': {
+      // two column vectors: the cross product, which only exists in three
+      // dimensions, so both sizes are 3. Anything else is a plain product.
       const a = args[0];
       const b = args[1];
-      if (a.t === 'poly' || b.t === 'poly') return { t: 'poly' };
-      if (isScalar(a) && isScalar(b)) return { t: 'scalar' };
-      if (isScalar(a) && isMatrix(b)) return b;
-      if (isMatrix(a) && isScalar(b)) return a;
-      if (isMatrix(a) && isMatrix(b)) {
-        unifyDim(ctx, a.c, b.r, 'in a product', node.span);
-        return { t: 'mat', r: a.r, c: b.c };
+      if (isMatrix(a) && isMatrix(b) && a.c === 1 && b.c === 1) {
+        unifyDim(ctx, a.r, 3, 'in a cross product', node.span);
+        unifyDim(ctx, b.r, 3, 'in a cross product', node.span);
+        // only this rule fixes a size for the sweep: other unions with a
+        // constant (a density, a column of ones) were never read as sizes
+        ctx.fixed.add(3);
+        return { t: 'mat', r: 3, c: 1 };
       }
-      ctx.errors.push({ message: 'these two factors do not have compatible shapes', span: node.span });
-      return { t: 'poly' };
+      // anything else is the product the times stood for, and the node says
+      // so, so the repairs, the shrinker and the NumPy printer see a product
+      (node as { op: string }).op = 'mul';
+      return productType(ctx, a, b, node.span);
     }
+    case 'mul':
+      return productType(ctx, args[0], args[1], node.span);
     case 'div': {
       const a = args[0];
       const b = args[1];
@@ -639,6 +658,20 @@ function addDim(a: Dim, b: Dim): Dim {
   return { v: `${dimName(a)}+${dimName(b)}` };
 }
 
+/** The type of a product of two factors. */
+function productType(ctx: TypeContext, a: Ty, b: Ty, span: Span): Ty {
+  if (a.t === 'poly' || b.t === 'poly') return { t: 'poly' };
+  if (isScalar(a) && isScalar(b)) return { t: 'scalar' };
+  if (isScalar(a) && isMatrix(b)) return b;
+  if (isMatrix(a) && isScalar(b)) return a;
+  if (isMatrix(a) && isMatrix(b)) {
+    unifyDim(ctx, a.c, b.r, 'in a product', span);
+    return { t: 'mat', r: a.r, c: b.c };
+  }
+  ctx.errors.push({ message: 'these two factors do not have compatible shapes', span });
+  return { t: 'poly' };
+}
+
 function callType(ctx: TypeContext, fn: string, args: Node[], span: Span): Ty {
   const types = args.map((a) => inferType(ctx, a));
   switch (fn) {
@@ -647,8 +680,13 @@ function callType(ctx: TypeContext, fn: string, args: Node[], span: Span): Ty {
     case 'trace':
     case 'norm':
     case 'logdet':
-    case 'var':
       return { t: 'scalar' };
+    case 'var': {
+      // the variance of a vector is its covariance matrix
+      const a = types[0];
+      if (a && isMatrix(a) && !(a.c === 1 && a.r === 1)) return { t: 'mat', r: a.r, c: a.r };
+      return { t: 'scalar' };
+    }
     case 'cov': {
       const a = types[0];
       const b = types[1];
@@ -775,6 +813,7 @@ export function degreeOf(
         case 'neg':
           return args[0];
         case 'mul':
+        case 'cross':
         case 'kron':
         case 'had':
           return { n: args[0].n + args[1].n, d: args[0].d + args[1].d };
@@ -888,6 +927,8 @@ function dimSize(ctx: TypeContext, d: Dim, sizes: Map<string, number>): number {
   // which is what the word was for (review 5.5)
   const pinned = ctx.pinned[root];
   if (pinned !== undefined) return pinned;
+  const fixed = fixedSize(ctx, root);
+  if (fixed !== undefined) return fixed;
   return sizes.get(root) ?? 3;
 }
 

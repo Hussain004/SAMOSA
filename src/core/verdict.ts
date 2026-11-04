@@ -271,6 +271,9 @@ export function analyzeSource(src: string, opts: CheckOptions): Source {
   const definedNames = new Set<string>();
 
   const knownFns = new Set<string>(decls.filter((d) => d.kind === 'function').map((d) => d.name));
+  // a declared value followed by a parenthesis is a product, and so is a
+  // name the derivation defined; the set grows as the definitions come
+  const knownValues = new Set<string>(decls.filter((d) => d.kind !== 'function').map((d) => d.name));
   // the macros the paper defines, so `\newcommand` and
   // `\DeclareMathOperator` mean what the author wrote (review 5.6)
   const macros = harvestMacros(src);
@@ -279,7 +282,7 @@ export function analyzeSource(src: string, opts: CheckOptions): Source {
   let rowIndex = 0;
 
   for (const row of rows) {
-    const parsed = parseRow(src, row.text, row.from, rowIndex, knownFns, macros);
+    const parsed = parseRow(src, row.text, row.from, rowIndex, knownFns, macros, knownValues);
     rowIndex++;
     if (parsed.error) {
       // a row SAMOSA did not read is a row it did not check, and it says so
@@ -359,7 +362,10 @@ export function analyzeSource(src: string, opts: CheckOptions): Source {
         symbols,
       });
       previousRhs = rhs;
-      if (bareLhs && isDefinition) definedNames.add(bareLhs);
+      if (bareLhs && isDefinition) {
+        definedNames.add(bareLhs);
+        knownValues.add(bareLhs);
+      }
       if (isDefinition && bareLhs && rhs) {
         defs.set(bareLhs, rhs);
         ctx.defs.set(bareLhs, rhs);
@@ -391,6 +397,12 @@ export function check(src: string, opts: CheckOptions = {}): Report {
     for (const name of step.symbols) used.add(name);
     if (step.lhs?.k === 'sym') used.add(step.lhs.name);
     if (step.rhs?.k === 'sym') used.add(step.rhs.name);
+  }
+  // the parameters of a random variable that is used are used too: in
+  // `x ~ N(\mu, \Sigma)` the mean and the covariance are what x is made of
+  for (const decl of decls) {
+    if (!decl.dist || !used.has(decl.name)) continue;
+    for (const param of Object.values(decl.dist)) if (param !== decl.dist.kind) used.add(param);
   }
   for (const decl of decls) {
     if (used.has(decl.name)) continue;
@@ -715,6 +727,8 @@ function isRational(node: Node, ctx: TypeContext, defs: Map<string, Node>, seen:
       // |x| and the matrix root need an order or positivity, which GF(p) has
       // not, so they force numeric mode (review 3.2)
       if (node.op === 'abs' || node.op === 'sqrtm') return false;
+      // a fractional power is a root, which GF(p) has not either
+      if (node.op === 'pow' && node.args[1]?.k === 'num' && node.args[1].value.d !== 1) return false;
       return node.args.every((a) => isRational(a, ctx, defs, seen));
     }
     case 'call':
@@ -771,7 +785,9 @@ function checkExact(
       annotation: step.annotation,
     };
   }
-  const trialsNeeded = Math.max(opts.trials, 2 ** corners);
+  // every corner is drawn the full trial count, up to a cap of 64 trials;
+  // past the cap each corner still gets one, and the bound says so
+  const trialsNeeded = Math.max(2 ** corners, Math.min(opts.trials * 2 ** corners, 64));
   const mask = corners > 0 ? (1 << corners) - 1 : 0;
 
   let worstBound = 0;
@@ -781,15 +797,17 @@ function checkExact(
   const assumptions = collectAssumptions(ctx, step);
 
   for (const setting of settings) {
-    const ran = new Map<number, number>([[P1, 0], [P2, 0]]);
-    const seen = new Map<number, Set<number>>([[P1, new Set()], [P2, new Set()]]);
+    // the trials that ran, per prime and per corner
+    const perCorner = new Map<number, number[]>([
+      [P1, new Array<number>(1 << corners).fill(0)],
+      [P2, new Array<number>(1 << corners).fill(0)],
+    ]);
     for (let trial = 0; trial < trialsNeeded; trial++) {
       for (const p of primes) {
         const rng = rngFor(opts.seed, step.id, settingKey(setting), trial, p);
         const outcome = runExactTrial(step, ctx, defs, setting, p, rng, trial);
         if (outcome.kind === 'ok') {
-          ran.set(p, (ran.get(p) ?? 0) + 1);
-          seen.get(p)!.add(trial & mask);
+          perCorner.get(p)![trial & mask]++;
           continue;
         }
         if (outcome.kind === 'unknown') {
@@ -834,11 +852,13 @@ function checkExact(
     // A size carries evidence only when every corner was drawn at both
     // primes: a corner no trial evaluated is a place a wrong step can hide
     // (review 3.1), and trials that failed on a domain error earn nothing.
-    const covered = primes.every(
-      (p) => (ran.get(p) ?? 0) > 0 && seen.get(p)!.size === 1 << corners,
-    );
-    if (covered) {
-      working.push({ setting, ranP1: ran.get(P1)!, ranP2: ran.get(P2)! });
+    // A wrong step may vanish on every corner but one, and a trial in
+    // another corner cannot see it, so the evidence of a size is the trials
+    // of its least drawn corner, not the sum (review 3.1, round 2).
+    const ranP1 = Math.min(...perCorner.get(P1)!);
+    const ranP2 = Math.min(...perCorner.get(P2)!);
+    if (ranP1 > 0 && ranP2 > 0) {
+      working.push({ setting, ranP1, ranP2 });
     }
   }
 
@@ -868,8 +888,8 @@ function checkExact(
     ctx.errors.length = errorsAt;
     const d = Math.max(dl.n + dr.d, dr.n + dl.d);
     worstDegree = Math.max(worstDegree, d);
-    // The bound counts only the trials that ran, at this size (review 3.3):
-    // a skipped trial catches nothing, and a miss factors over the corners.
+    // The bound counts only the trials that ran, at this size (review 3.3),
+    // in the least drawn corner: a skipped trial catches nothing.
     const bound = Math.pow(d / P1, ranP1) * Math.pow(d / P2, ranP2);
     worstBound = Math.max(worstBound, bound);
   }
@@ -1365,6 +1385,11 @@ function sampleFor<T>(
           mean = { k: 'm', m: sampler.sampleGeneral(size, 1) };
           values.set(dist.mu, mean);
         }
+      } else if (dist.kind === 'normal') {
+        // N(0, Sigma) has the mean it says: zero. A random mean here gave
+        // E[x x^T] = Sigma a false cross
+        const f0 = sampler.field;
+        mean = { k: 'm', m: { r: size, c: 1, d: new Array(size).fill(f0.zero) } };
       } else {
         mean = { k: 'm', m: sampler.sampleGeneral(size, 1) };
       }
@@ -1713,6 +1738,7 @@ function checkNumeric(
       if (run === 'domain') {
         return domainResult('a sampled instance was outside the domain');
       }
+      if (run.unreadable) return unevaluable(run.unreadable);
       if (run.shapeMessage) {
         return shapeResult(run.shapeMessage);
       }
@@ -1763,6 +1789,7 @@ function checkNumeric(
       if (run === 'domain') {
         return domainResult('a 50 digit instance was outside the domain');
       }
+      if (run.unreadable) return unevaluable(run.unreadable);
       if (run.shapeMessage) {
         return shapeResult(run.shapeMessage);
       }
@@ -1810,7 +1837,7 @@ function checkNumeric(
   };
 }
 
-type NumericRun = { delta: number; shapeMessage?: string } | 'domain' | null;
+type NumericRun = { delta: number; shapeMessage?: string; unreadable?: string } | 'domain' | null;
 
 export function numericDelta<T>(
   ctx: TypeContext,
@@ -1835,6 +1862,9 @@ export function numericDelta<T>(
     // a shape mismatch is not a domain miss: it is a claim about two sides
     // that cannot be compared at all (review 4.4)
     if (sides.shape) return { delta: Number.NaN, shapeMessage: sides.message };
+    // a construct the evaluator does not read is a question, never a domain
+    // miss: no positivity would make \Sigma^{1/3} readable
+    if (!sides.domain && /not read/.test(sides.message)) return { delta: Number.NaN, unreadable: sides.message };
     return 'domain';
   }
   if (sides.kind === 'equal') return { delta: 0 };

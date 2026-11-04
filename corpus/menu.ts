@@ -261,17 +261,19 @@ K &:= (R + B^\top P B)^{-1}B^\top P A \\
   {
     id: 'rotation',
     title: 'Rotations and the cross product',
-    blurb: 'R^T R = I, and the skew symmetric form of the cross product.',
-    decls: 'R: rot n',
+    blurb: 'A rotation is orthogonal with determinant one, and it carries a cross product along. A reflection would flip its sign.',
+    decls: 'R: rot 3; a, b: 3',
     source: String.raw`\begin{align*}
 R^\top R &= I \\
-R^{-1} &= R^\top \\
-\det(R) &= 1
+\det(R) &= 1 \\
+a \times b &= -(b \times a) \\
+R (a \times b) &= (R a) \times (R b)
 \end{align*}`,
     bugSource: String.raw`\begin{align*}
 R^\top R &= I \\
-R^{-1} &= R^\top \\
-\det(R) &= -1
+\det(R) &= 1 \\
+a \times b &= -(b \times a) \\
+R (a \times b) &= (R a) \times b
 \end{align*}`,
   },
 ];

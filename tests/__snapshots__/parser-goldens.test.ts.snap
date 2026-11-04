@@ -61,7 +61,7 @@ exports[`the parser, on every row of the Menu and the Cookbook > cookbook/covari
           {
             "args": [
               {
-                "sym": "a",
+                "sym": "A",
               },
               {
                 "sym": "x",
@@ -80,7 +80,7 @@ exports[`the parser, on every row of the Menu and the Cookbook > cookbook/covari
           {
             "args": [
               {
-                "sym": "a",
+                "sym": "A",
               },
               {
                 "args": [
@@ -96,7 +96,7 @@ exports[`the parser, on every row of the Menu and the Cookbook > cookbook/covari
           {
             "args": [
               {
-                "sym": "a",
+                "sym": "A",
               },
             ],
             "op": "T",
@@ -5966,18 +5966,13 @@ exports[`the parser, on every row of the Menu and the Cookbook > menu/rotation r
             "sym": "R",
           },
         ],
-        "op": "inv",
+        "call": "det",
       },
       "premise": null,
       "proportionalTo": null,
       "relation": "=",
       "rhs": {
-        "args": [
-          {
-            "sym": "R",
-          },
-        ],
-        "op": "T",
+        "num": "1/1",
       },
     },
   ],
@@ -5992,16 +5987,88 @@ exports[`the parser, on every row of the Menu and the Cookbook > menu/rotation r
       "lhs": {
         "args": [
           {
-            "sym": "R",
+            "sym": "a",
+          },
+          {
+            "sym": "b",
           },
         ],
-        "call": "det",
+        "op": "cross",
       },
       "premise": null,
       "proportionalTo": null,
       "relation": "=",
       "rhs": {
-        "num": "1/1",
+        "args": [
+          {
+            "args": [
+              {
+                "sym": "b",
+              },
+              {
+                "sym": "a",
+              },
+            ],
+            "op": "cross",
+          },
+        ],
+        "op": "neg",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > menu/rotation row 4 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "sym": "a",
+              },
+              {
+                "sym": "b",
+              },
+            ],
+            "op": "cross",
+          },
+        ],
+        "call": "R",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "sym": "R",
+              },
+              {
+                "sym": "a",
+              },
+            ],
+            "op": "mul",
+          },
+          {
+            "args": [
+              {
+                "sym": "R",
+              },
+              {
+                "sym": "b",
+              },
+            ],
+            "op": "mul",
+          },
+        ],
+        "op": "cross",
       },
     },
   ],

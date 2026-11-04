@@ -1,5 +1,5 @@
 import type { Node } from './ir.ts';
-import type { TypeContext } from './types.ts';
+import { fixedSize, type TypeContext } from './types.ts';
 
 /**
  * The dimension variables a step uses.
@@ -58,7 +58,11 @@ export function collectDimVarsFor(
     if (!info) continue;
     if (info.ty.t === 'mat') {
       for (const d of [info.ty.r, info.ty.c]) {
-        if (typeof d !== 'number' && ctx.pinned[ctx.dims.find(d.v)] === undefined) {
+        if (
+          typeof d !== 'number' &&
+          ctx.pinned[ctx.dims.find(d.v)] === undefined &&
+          fixedSize(ctx, ctx.dims.find(d.v)) === undefined
+        ) {
           roots.add(ctx.dims.find(d.v));
         }
       }
