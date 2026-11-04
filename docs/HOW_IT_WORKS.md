@@ -94,6 +94,18 @@ each size gets three trials in each of the two primes.
 The card names the sizes that were tested, because a check at one size is
 not a check at another.
 
+### Structures in two pieces
+
+An orthogonal matrix is a rotation or a reflection, and no polynomial
+sampling of one reaches the other. So each orthogonal symbol is drawn in
+both corners, and with k of them all 2^k combinations are drawn, each one the
+full trial count, up to a cap of 64 trials. A step can be wrong on the
+reflections and right on the rotations, `\det(Q) = 1` is exactly that, and a
+trial among the rotations cannot see it. So the bound is priced on the trials
+of the least drawn corner, never on the sum of them.
+
+A rotation, declared `rot n`, is one piece, and `\det(R) = 1` holds for it.
+
 ## Gradients: dual numbers
 
 A dual number is a pair (value, tangent). The rules of forward mode
@@ -127,6 +139,8 @@ for the mixed second derivative.
 A distribution on rational atoms that matches the moments of the normal
 distribution integrates polynomials *exactly*.
 
+* The two point rule has atoms ±1 with weights 1/2. It matches E z^2 = 1,
+  so it is exact up to degree three: every mean, variance and second moment.
 * The five point rule has atoms 0, ±1, ±2 with weights 1/2, 1/6, 1/12. It
   matches E z^2 = 1 and E z^4 = 3, so it is exact up to degree five.
 * The seven point rule adds ±3 and matches E z^6 = 15 as well, so it is
@@ -134,8 +148,11 @@ distribution integrates polynomials *exactly*.
 
 For a normal variable with mean μ and covariance Σ = LL^T, the variable is
 written x = μ + Lz, and the expectation becomes a weighted sum over the
-tensor product of the atoms. The weights and the atoms are rational, so the
-whole sum runs over the finite field, and the answer is exact.
+tensor product of the atoms. Each variable gets the smallest rule that is
+exact at the degree the integrand has in it, which is what keeps two vectors
+of size four affordable: a variance needs 2^8 nodes there, not 7^8. The
+weights and the atoms are rational, so the whole sum runs over the finite
+field, and the answer is exact.
 
 The spike `spikes/quadrature_check.py` verifies the rules against exact
 fractions, and checks that each rule fails at the next degree.

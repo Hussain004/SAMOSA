@@ -12,12 +12,11 @@ const CSP =
 
 /** The local preview serves the policy the host serves, so the browser tests
  * run against the real thing. */
-const servePolicy: Connect.NextHandleFunction = (req, res, next) => {
-  const path = req.url?.split('?')[0] ?? '';
-  if (path === '/' || path === '/app' || path.startsWith('/app/')) {
-    res.setHeader('Content-Security-Policy', CSP);
-    res.setHeader('Referrer-Policy', 'no-referrer');
-  }
+const servePolicy: Connect.NextHandleFunction = (_req, res, next) => {
+  // every path, as on the host: the policy used to cover / and /app/ only,
+  // and /app without its slash, the link everyone shares, had none
+  res.setHeader('Content-Security-Policy', CSP);
+  res.setHeader('Referrer-Policy', 'no-referrer');
   next();
 };
 
@@ -26,7 +25,10 @@ const cleanUrls: Plugin = {
   name: 'clean-urls-preview',
   configurePreviewServer(server) {
     const redirectApp: Connect.NextHandleFunction = (req, _res, next) => {
-      if (req.url?.split('?')[0] === '/app') req.url = '/app/';
+      const path = req.url?.split('?')[0] ?? '';
+      if (path === '/app') req.url = '/app/';
+      // a rendered doc is served without its extension, as the host does
+      else if (/^\/docs\/[A-Z_]+$/.test(path)) req.url = `${path}.html`;
       next();
     };
     server.middlewares.use(redirectApp);

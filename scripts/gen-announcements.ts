@@ -34,10 +34,14 @@ export function announcementsOf(changelog: string): Announcement[] {
     const start = releases[i].index ?? 0;
     const end = i + 1 < releases.length ? (releases[i + 1].index ?? changelog.length) : changelog.length;
     const after = changelog.slice(start, end).split('\n').slice(1).join('\n');
-    const summary = after
-      .split('\n')
-      .find((line) => line.trim().length > 0 && !line.startsWith('#'))
-      ?.trim()
+    // the whole first paragraph: a changelog wraps its lines, and the first
+    // line alone stopped the 1.1.0 summary mid sentence
+    const paragraph = after
+      .split(/\n\s*\n/)
+      .map((block) => block.trim())
+      .find((block) => block.length > 0 && !block.startsWith('#'));
+    const summary = paragraph
+      ?.replace(/\s*\n\s*/g, ' ')
       .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
       .replace(/\*([^*]*)\*/g, '$1')
       .trim();

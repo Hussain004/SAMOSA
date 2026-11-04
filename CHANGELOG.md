@@ -4,6 +4,40 @@ All notable changes to SAMOSA. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 follows [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+The stochastic identities are checked, papers are read inside their
+document body, and the docs are pages of the site.
+
+### Fixed
+
+- A symbol declared as a value is a factor before a parenthesis, so
+  `A (B + C) = AB + AC` holds instead of reading `A` as an unknown function.
+- The body of `\begin{document}` and of any other prose environment is read
+  for its mathematics. It used to be skipped, so every paper went through a
+  line by line fallback that cut a row spanning two lines in half and gave a
+  false cross on a correct paper.
+- `x \sim \mathcal{N}(0, \Sigma)` has mean zero, so `E[x x^\top] = \Sigma` holds.
+- `\operatorname{Var}(g)` is `E[g g^\top] - E[g] E[g]^\top` for any polynomial
+  `g`: the variance of a vector is a matrix, and `Var(A x)` and `Var(x + y)`
+  are checked. The five stochastic Cookbook identities are checked now.
+- A rational exponent is a power, not part of a new name: `x^{1/3} x^{2/3} = x`
+  holds, `\sqrt[k]{x}` is `x^{1/k}`, and `x^{-2}` is the inverse of the square.
+- The bound of a step with orthogonal matrices is priced on the trials of the
+  least drawn corner, and every corner gets the full trial count.
+- `/app` carries the content security policy too, not only `/app/`.
+- The nav's changelog link resolves, and the docs are rendered pages.
+- The poster of the tour is a frame of it, not a black one.
+- A fix names the mistake first: "two factors are swapped, so change the right
+  side to", followed by the new side, in the app and in the CLI.
+
+### Added
+
+- `a \times b` between two vectors is the cross product, and the rotations
+  Menu item checks that a rotation carries it along.
+- The two point rule for Gaussian expectations, exact to degree three, chosen
+  whenever it is enough.
+
 ## [1.1.0] - 2026-11-03
 
 The checker is stricter about what it will call right, the browser enforces

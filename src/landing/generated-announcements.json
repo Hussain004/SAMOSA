@@ -2,7 +2,7 @@
   {
     "date": "2026-11-03",
     "version": "1.1.0",
-    "body": "The checker is stricter about what it will call right, the browser enforces"
+    "body": "The checker is stricter about what it will call right, the browser enforces nothing leaving the page, and the release is built from the manifest."
   },
   {
     "date": "2026-10-23",

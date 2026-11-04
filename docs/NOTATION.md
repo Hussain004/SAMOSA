@@ -30,6 +30,13 @@ A run of letters is a product of single letter symbols: `cuv^\top` is c
 times u times v transpose. The only exceptions are the known functions and
 the functions you declared.
 
+A symbol you declared as a value is a factor, never a function, so
+`A (B + C)` and `x (y + z)` are products. An undeclared lowercase name before
+a parenthesis, `f(x)`, is a call.
+
+`a \times b` between two column vectors is the cross product, which makes
+both of them size 3. Anywhere else `\times` is the ordinary product.
+
 ## Scripts
 
 | Written | Read as |
@@ -38,11 +45,14 @@ the functions you declared.
 | `A^{-1}` | the inverse |
 | `A^{-\top}`, `A^{-T}` | the inverse transpose |
 | `A^{2}` | the square, or the power, depending on the shape |
-| `A^{1/2}` | the principal square root, numeric mode only |
+| `A^{1/2}`, `A^{-1/2}` | the principal square root and its inverse, numeric mode only |
+| `x^{1/3}`, `x^{-2/3}`, `x^{\frac{3}{2}}` | a rational power of a scalar, numeric mode only; an odd root keeps the sign of a negative number, an even root of one is outside the domain |
+| `A^{-2}` | the inverse of the square, and exact |
+| `A^{1/3}` | not read for a matrix: a question, with the reason |
 | `A^\dagger` | the pseudo inverse, numeric mode only |
 | `P^+`, `x^*` | a label, folded into the name |
 | `x_{k\|k-1}` | part of the name |
-| `\sqrt[k]{x}` | the k-th root, the index of the square root is the root |
+| `\sqrt[k]{x}` | the k-th root, `x^{1/k}`, for a whole number k |
 | `\begin{bmatrix} … \end{bmatrix}` | a block matrix, the blocks are its rows |
 | `\|A\|_F` | the Frobenius norm |
 | `\|A\|` | the spectral norm, with a chip |
@@ -52,6 +62,13 @@ the functions you declared.
 `\exp`, `\log`, `\ln`, `\sin`, `\cos`, `\tan`, `\tanh`, `\sqrt`, `\det`,
 `\operatorname{tr}`, `\sigma` (the sigmoid), `\operatorname{Var}`,
 `\operatorname{Cov}`, and the densities `\mathcal{N}` and `\mathcal{U}`.
+
+`\operatorname{Var}(g)` is `E[g g^\top] - E[g] E[g]^\top`, so the variance of a
+vector is its covariance matrix, and `g` can be any polynomial of the random
+variables: `\operatorname{Var}(A x)` and `\operatorname{Var}(x + y)` are read
+as written. `\operatorname{Cov}(g, h)` is `E[g h^\top] - E[g] E[h]^\top`. Two
+random variables declared apart are independent, and `x \sim
+\mathcal{N}(0, \Sigma)` has mean zero.
 
 Everything else is a symbol, unless you declared it as a function with
 `f: fn n→1`.
