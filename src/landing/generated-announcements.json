@@ -1,5 +1,10 @@
 [
   {
+    "date": "2026-11-04",
+    "version": "1.2.0",
+    "body": "The stochastic identities are checked, papers are read inside their document body, and the docs are pages of the site."
+  },
+  {
     "date": "2026-11-03",
     "version": "1.1.0",
     "body": "The checker is stricter about what it will call right, the browser enforces nothing leaving the page, and the release is built from the manifest."

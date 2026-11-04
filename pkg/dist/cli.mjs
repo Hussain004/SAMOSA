@@ -8047,7 +8047,7 @@ function collectDimVarsFor(ctx, lhs, rhs, defs) {
 }
 
 // src/core/verdict.ts
-var ENGINE_VERSION = true ? "1.1.0" : "1.1.0";
+var ENGINE_VERSION = true ? "1.2.0" : "1.1.0";
 var DEFAULT_SEED = 5910618;
 function collectSymbols(node, into) {
   if (!node) return;
@@ -11242,7 +11242,7 @@ function formatGithub(reports) {
 }
 
 // cli/bin.ts
-var VERSION = true ? "1.1.0" : "1.1.0";
+var VERSION = true ? "1.2.0" : "1.1.0";
 function topLevel(argv) {
   switch (argv[0]) {
     case "--version":
