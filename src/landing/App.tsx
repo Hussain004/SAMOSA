@@ -122,8 +122,8 @@ function ThemeToggle() {
 
 const PHRASES = [
   'A verdict on every row of an align block',
-  'Each wrong row is reported with a counterexample and a suggested fix',
-  'Each checkmark states its guarantee: sizes, trials and error bound',
+  'Wrong rows come with a counterexample and a fix',
+  'Each checkmark states its error bound',
   'No language model in the verdict path',
   'Runs in the browser. Nothing is uploaded.',
 ];
@@ -174,8 +174,8 @@ function PhraseList() {
   return (
     <ul className="mt-8 space-y-1 text-[0.9375rem] text-[var(--color-muted)]" aria-label="What SAMOSA does">
       {PHRASES.slice(0, count).map((phrase) => (
-        <li key={phrase} className="reveal in">
-          <span className="mr-1 text-[var(--color-chutney)]">›</span>
+        <li key={phrase} className="reveal in flex gap-1">
+          <span className="shrink-0 text-[var(--color-chutney)]">›</span>
           {phrase}
         </li>
       ))}
