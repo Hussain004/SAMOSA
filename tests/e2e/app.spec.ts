@@ -313,7 +313,7 @@ test('the light theme is remembered', async ({ page }) => {
 
 test('the typed demo can be paused, skipped and replayed', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByText('SAMOSA-SERVATIONS')).toBeVisible();
+  await expect(page.getByText('TYPICAL SLIPS')).toBeVisible();
 
   // the transcript for a screen reader is in the DOM
   await expect(page.locator('.sr-only').getByText('Transcript of the Claude Code demo')).toBeAttached();

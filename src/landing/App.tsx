@@ -121,11 +121,11 @@ function ThemeToggle() {
 }
 
 const PHRASES = [
-  'a verdict on every row of your align block',
-  'a wrong row comes with a counterexample and a fix',
-  'every checkmark says how sure it is',
-  'no language model decides anything',
-  'it runs in this tab, and nothing is uploaded',
+  'A verdict on every row of an align block',
+  'Each wrong row is reported with a counterexample and a suggested fix',
+  'Each checkmark states its guarantee: sizes, trials and error bound',
+  'No language model in the verdict path',
+  'Runs in the browser. Nothing is uploaded.',
 ];
 
 function Hero() {
@@ -204,7 +204,7 @@ function Intro() {
     <section className="border-y border-[var(--color-line)] bg-[var(--color-panel)]">
       <div className="mx-auto max-w-[1560px] px-6 lg:px-10 py-10">
         <p className="max-w-[900px] text-[1.0625rem] leading-relaxed tracking-wide text-[var(--color-text)]">
-          I built SAMOSA for one line in my Mobile Robotics notes: <em>after some algebraic manipulation, we may obtain ...</em> It checks that line on sampled matrices, exactly, and shows you the row that breaks.
+          SAMOSA targets the step that lecture notes and papers leave to the reader: <em>after some algebraic manipulation, we may obtain ...</em> It evaluates that step on sampled matrices, exactly, and reports the row that breaks.
         </p>
       </div>
     </section>
@@ -216,8 +216,8 @@ function AgentDemo() {
     <section className="dotted">
       <div className="mx-auto max-w-[1560px] px-6 lg:px-10 py-20">
         <SectionHead
-          eyebrow="your agent, checked"
-          body="Agents write algebra fluently, and are sometimes wrong in the row that matters. SAMOSA lets them check it first."
+          eyebrow="agent integration"
+          body="Language models write algebra fluently and still err in the row that matters. SAMOSA lets an agent verify each step before it answers."
         />
         <div className="mt-10 grid gap-8 lg:grid-cols-[1.5fr_1fr]">
           <TypedDemo />
@@ -232,14 +232,15 @@ function AgentDemo() {
             <li className="flex gap-3">
               <span className="text-[var(--color-chutney)]">›</span>
               <span>
-                <b className="text-[var(--color-text)]">Evidence, not opinion.</b> Every checkmark says
-                how it was tested.
+                <b className="text-[var(--color-text)]">Evidence, not opinion.</b> Every checkmark
+                states how it was tested.
               </span>
             </li>
             <li className="flex gap-3">
               <span className="text-[var(--color-chutney)]">›</span>
               <span>
-                <b className="text-[var(--color-text)]">Nothing is uploaded.</b> No network calls, ever.
+                <b className="text-[var(--color-text)]">Nothing is uploaded.</b> The engine makes no
+                network calls.
               </span>
             </li>
           </ul>
@@ -254,8 +255,8 @@ function Tour() {
     <section className="border-y border-[var(--color-line)] bg-[var(--color-panel)]">
       <div className="mx-auto max-w-[1560px] px-6 lg:px-10 py-16">
         <SectionHead
-          eyebrow="nineteen seconds"
-          body="The Kalman gain, one dropped noise term, caught."
+          eyebrow="walkthrough"
+          body="A Kalman gain derivation with one dropped noise term, flagged at the failing row. 19 seconds."
         />
         <TourVideo />
       </div>
@@ -306,12 +307,12 @@ const FEATURES = [
   },
   {
     title: 'Fixes',
-    body: 'The usual slips are tried for you, and a fix is offered only if it holds.',
+    body: 'Common slips are tried automatically, and a fix is offered only if the corrected row holds.',
     mock: <FixMock />,
   },
   {
     title: 'Shape errors',
-    body: 'Which sizes do not fit, and the transpose that would fix them.',
+    body: 'The sizes that do not conform, and the transpose that would fix them.',
     mock: <ShapeMock />,
   },
   {
@@ -321,7 +322,7 @@ const FEATURES = [
   },
   {
     title: 'Guarantees',
-    body: 'Every checkmark says how it was tested. An exact one carries a bound, usually below 10⁻⁴⁶.',
+    body: 'Every checkmark states how it was tested. An exact one carries a bound, usually below 10⁻⁴⁶.',
     mock: <GuaranteeMock />,
   },
   {
@@ -337,7 +338,7 @@ function Features() {
       <div className="mx-auto max-w-[1560px] px-6 lg:px-10 py-20">
         <SectionHead
           eyebrow="what you get back"
-          body="A verdict and a reason for every row. It never guesses a checkmark."
+          body="A verdict and a reason for every row. A checkmark is issued only after evaluation."
         />
         <div className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map((feature) => (
@@ -482,9 +483,9 @@ function MockLine({ children, tone }: { children: React.ReactNode; tone: 'ok' | 
 
 function Divider() {
   const bubbles = [
-    '(AB)ᵀ ≠ AᵀBᵀ, bestie',
-    'you dropped + KQKᵀ',
-    "that's numerator layout 👀",
+    '(AB)ᵀ ≠ AᵀBᵀ',
+    'dropped term: + KQKᵀ',
+    'numerator vs denominator layout',
     '≈ is not =',
   ];
   const states = ['crispy', 'soggy', 'burnt', 'raw'] as const;
@@ -499,7 +500,7 @@ function Divider() {
   return (
     <section className="border-y border-[var(--color-line)] bg-[var(--color-panel)]">
       <div className="mx-auto flex max-w-[1560px] flex-wrap items-center justify-center gap-6 px-6 lg:px-10 py-12">
-        <span className="text-[0.8125rem] tracking-[0.3em] text-[var(--color-faint)]">SAMOSA-SERVATIONS</span>
+        <span className="text-[0.8125rem] tracking-[0.3em] text-[var(--color-faint)]">TYPICAL SLIPS</span>
         {bubbles.map((bubble, i) => (
           <div
             key={bubble}
@@ -590,8 +591,8 @@ function HallOfBugs() {
     <section className="overflow-hidden border-b border-[var(--color-line)] py-16">
       <div className="mx-auto max-w-[1560px] px-6 lg:px-10">
         <SectionHead
-          eyebrow="the hall of bugs"
-          body="Each looks right on a careful read. Each is wrong."
+          eyebrow="plausible but wrong"
+          body="Each passes a careful read. Each is wrong."
         />
       </div>
       <div className="mt-10 flex overflow-hidden">
@@ -655,7 +656,7 @@ const DEEP_DIVES = [
   },
   {
     n: '06',
-    title: 'It reads real papers',
+    title: 'Measured on real papers',
     body: 'On 36 recent papers, 56.3% of claim rows parse end to end, and 24.9% read with nothing unknown.',
     link: '/docs/COVERAGE',
   },
@@ -739,7 +740,7 @@ function DiveVisual({ index }: { index: number }) {
           <div className="mt-4 text-[var(--color-text)]">(x, 1) ⊗ (x, 1)</div>
           <div className="text-[var(--color-chutney)]">= (x², 2x)</div>
           <p className="mt-3 text-[var(--color-faint)]">
-            the tangent rides along, exactly, over the same field
+            the tangent is carried exactly, over the same field
           </p>
         </div>
       );
@@ -752,7 +753,7 @@ function DiveVisual({ index }: { index: number }) {
       ];
       return (
         <div className={box}>
-          <div className="text-[var(--color-gold)]">shrink until a person can read it</div>
+          <div className="text-[var(--color-gold)]">shrunk to a readable case</div>
           <div className="mt-4 flex items-center justify-center gap-6">
             <div>
               <div className="grid grid-cols-4 gap-1">
@@ -775,14 +776,14 @@ function DiveVisual({ index }: { index: number }) {
               <div className="mt-2 text-center text-[0.625rem] text-[var(--color-faint)]">1 by 1</div>
             </div>
           </div>
-          <p className="mt-4 text-[var(--color-faint)]">still wrong, and now readable</p>
+          <p className="mt-4 text-[var(--color-faint)]">still a counterexample, and now readable</p>
         </div>
       );
     }
     case 3:
       return (
         <div className={box}>
-          <div className="text-[var(--color-gold)]">an agent, checking its own work</div>
+          <div className="text-[var(--color-gold)]">an agent verifying its own derivation</div>
           <div className="mt-3">
             <span className="text-[var(--color-slate)]">tool</span> samosa.check_derivation
           </div>
@@ -849,7 +850,7 @@ function MenuSection() {
       <div className="mx-auto max-w-[1560px] px-6 lg:px-10 py-20">
         <SectionHead
           eyebrow="the menu"
-          body={`${MENU.length} real derivations, each with a planted bug. Find it before SAMOSA does.`}
+          body={`${MENU.length} real derivations, each with one planted error. Try to find it before running the check.`}
         />
         <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {MENU.map((item) => (
@@ -924,7 +925,7 @@ function Install() {
       <div className="mx-auto max-w-[1560px] px-6 lg:px-10 py-20">
         <SectionHead
           eyebrow="install"
-          body="The web app needs nothing. The CLI and the MCP server are one npm package."
+          body="The web app requires no installation. The CLI and the MCP server ship as one npm package."
         />
         <div className="mt-10 flex flex-wrap gap-1.5">
           {TABS.map((t, i) => (
@@ -1017,7 +1018,7 @@ function Footer() {
         />
       </div>
       <div className="border-t border-[var(--color-line)] px-6 lg:px-10 py-6 text-center text-[0.6875rem] text-[var(--color-faint)]">
-        ∇ SAMOSA · a ∇ is just a samosa with filling
+        ∇ SAMOSA · open source, MIT licensed
       </div>
     </footer>
   );
