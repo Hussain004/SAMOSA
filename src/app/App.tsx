@@ -64,7 +64,6 @@ export function App() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [copied, setCopied] = useState('');
   const [showSettings, setShowSettings] = useState(false);
-  const [headerMenu, setHeaderMenu] = useState(false);
   const [mobilePane, setMobilePane] = useState<'rendered' | 'source'>('rendered');
   const [hoverStep, setHoverStep] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -170,23 +169,36 @@ export function App() {
 
   // The header actions are the same on a wide screen and in the panel that
   // the phone opens, so they are written once.
-  const headerActions = useMemo(
+  // primary: two things only. Everything else lives in the overflow menu.
+  const primaryActions = useMemo(
     () => [
       { id: 'menu', label: 'Menu', run: () => setMenuOpen((v) => !v) },
+      { id: 'share', label: 'Share', run: share },
+    ],
+    [share],
+  );
+  const overflowActions = useMemo(
+    () => [
       {
         id: 'spot',
         label: spotTheBug ? 'Stop the game' : 'Spot the bug',
         run: () => (spotTheBug ? stopSpotTheBug() : nextBug()),
       },
       { id: 'presets', label: 'Presets', run: () => setShowSettings((v) => !v) },
-      { id: 'share', label: 'Share', run: share },
       {
         id: 'theme',
         label: theme === 'dark' ? 'Light' : 'Dark',
         run: () => setTheme((value) => (value === 'dark' ? 'light' : 'dark')),
       },
+      {
+        id: 'json',
+        label: 'Export as JSON',
+        run: () => report && download('samosa.json', exportJson(report, source, settings), 'application/json'),
+      },
+      { id: 'md', label: 'Export as Markdown', run: () => report && download('samosa.md', exportMarkdown(report, source)) },
+      { id: 'tex', label: 'Export as LaTeX', run: () => report && download('samosa.tex', exportLatex(report, source)) },
     ],
-    [nextBug, share, spotTheBug, stopSpotTheBug, theme],
+    [nextBug, spotTheBug, stopSpotTheBug, report, source, settings, theme],
   );
 
   const commands = useMemo<Command[]>(
@@ -265,29 +277,22 @@ export function App() {
           <span className="text-lg leading-none">∇</span>
           <span className="tracking-[0.18em]">SAMOSA</span>
         </a>
-        <div className="hidden items-center gap-3 md:flex">
-          {headerActions.map((action) => (
-            <button key={action.id} onClick={action.run} className={HEADER_BUTTON}>
+        <div className="flex items-center gap-3">
+          {primaryActions.map((action) => (
+            <button
+              key={action.id}
+              onClick={action.run}
+              className={
+                action.id === 'share'
+                  ? 'rounded border border-[var(--color-gold)] bg-[var(--color-gold)] px-3 py-1 text-[0.6875rem] font-semibold text-[var(--color-ink)] hover:brightness-110'
+                  : HEADER_BUTTON
+              }
+            >
               {action.label}
             </button>
           ))}
-          <a
-            href="https://github.com/Hussain004/SAMOSA"
-            target="_blank"
-            rel="noreferrer"
-            className={HEADER_BUTTON}
-          >
-            ★ GitHub
-          </a>
+          <OverflowMenu actions={overflowActions} github />
         </div>
-        <button
-          onClick={() => setHeaderMenu((v) => !v)}
-          className={`${HEADER_BUTTON} md:hidden`}
-          aria-label="more actions"
-          aria-expanded={headerMenu}
-        >
-          ⋯
-        </button>
         {spotTheBug && (
           <span className="rounded border border-[var(--color-saffron)]/60 px-2 py-1 text-[0.6875rem] text-[var(--color-saffron)]">
             spot the bug
@@ -301,24 +306,7 @@ export function App() {
         </div>
       </header>
 
-      {headerMenu && (
-        <div className="flex flex-wrap gap-2 border-b border-[var(--color-line)] bg-[var(--color-panel)] px-4 py-2 md:hidden">
-          {headerActions.map((action) => (
-            <button key={action.id} onClick={action.run} className={HEADER_BUTTON}>
-              {action.label}
-            </button>
-          ))}
-          <a
-            href="https://github.com/Hussain004/SAMOSA"
-            target="_blank"
-            rel="noreferrer"
-            className={HEADER_BUTTON}
-          >
-            ★ GitHub
-          </a>
-          <FontSizeControl className="text-[0.6875rem]" />
-        </div>
-      )}
+
 
       {spotTheBug && (
         <div className="flex flex-wrap items-center gap-3 border-b border-[var(--color-line)] bg-[var(--color-panel)] px-4 py-2 text-[0.6875rem]">
@@ -646,6 +634,50 @@ function MenuDialog({
         onClose={onClose}
       />
     </dialog>
+  );
+}
+
+/**
+ * The overflow menu: everything that is not Menu or Share, in one place,
+ * behind a quiet ⋯. Native <details>, so it opens and closes without JS.
+ */
+function OverflowMenu({
+  actions,
+  github,
+}: {
+  actions: Array<{ id: string; label: string; run: () => void }>;
+  github?: boolean;
+}) {
+  return (
+    <details className="relative">
+      <summary
+        aria-label="more actions"
+        className="list-none cursor-pointer rounded border border-[var(--color-line)] px-2 py-1 text-[0.8125rem] leading-none text-[var(--color-muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-text)] marker:hidden"
+      >
+        ⋯
+      </summary>
+      <div className="absolute right-0 z-30 mt-2 w-56 overflow-hidden rounded border border-[var(--color-line)] bg-[var(--color-panel)] shadow-xl">
+        {actions.map((action) => (
+          <button
+            key={action.id}
+            onClick={action.run}
+            className="block w-full px-3 py-2 text-left text-[0.6875rem] text-[var(--color-muted)] hover:bg-[var(--color-panel-2)] hover:text-[var(--color-text)]"
+          >
+            {action.label}
+          </button>
+        ))}
+        {github && (
+          <a
+            href="https://github.com/Hussain004/SAMOSA"
+            target="_blank"
+            rel="noreferrer"
+            className="block border-t border-[var(--color-line)] px-3 py-2 text-[0.6875rem] text-[var(--color-muted)] hover:bg-[var(--color-panel-2)] hover:text-[var(--color-text)]"
+          >
+            ★ GitHub
+          </a>
+        )}
+      </div>
+    </details>
   );
 }
 
