@@ -284,7 +284,7 @@ export function sampleFor<T>(
   sampler: Sampler<T>,
   free: Set<string> = new Set(),
   variety = 0,
-): { values: Map<string, Val<T>>; quad: Map<string, QuadVar> } | 'unknown' {
+): { values: Map<string, Val<T>>; quad: Map<string, QuadVar<any>> } | 'unknown' {
   const values = new Map<string, Val<T>>();
   const quad = new Map<string, QuadVar<any>>();
   const names = sampledNames(step, defs, free);

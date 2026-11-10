@@ -37,6 +37,7 @@ import { checkNumeric } from './numeric.ts';
 import { checkImplication } from './implication.ts';
 import { checkInequality } from './inequality.ts';
 import { checkDistributionClaim } from './distribution.ts';
+import { checkMonteCarlo, hasNonPolynomialExpectation } from './montecarlo.ts';
 import { checkProportionality } from './proportionality.ts';
 import {
   ENGINE_VERSION,
@@ -357,6 +358,11 @@ function checkStep(
 
   if (step.relation === 'sim') {
     return checkDistributionClaim(step, ctx, defs, opts, base);
+  }
+
+  if (step.relation === '=' && hasNonPolynomialExpectation(step, ctx, defs)) {
+    // the quadrature integrates polynomials; anything else is sampled
+    return checkMonteCarlo(step, ctx, defs, opts, base);
   }
 
   if (step.relation === '=>' || step.relation === '<=>') {

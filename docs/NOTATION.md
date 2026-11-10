@@ -70,6 +70,13 @@ as written. `\operatorname{Cov}(g, h)` is `E[g h^\top] - E[g] E[h]^\top`. Two
 random variables declared apart are independent, and `x \sim
 \mathcal{N}(0, \Sigma)` has mean zero.
 
+A row whose expectation is not a polynomial (say `\mathbb{E}[\sin x] = 0`)
+cannot be read by the quadrature. It goes through a seeded Monte Carlo
+estimate instead: the verdict is wrong when the estimate is more than six
+standard errors from the claim, inconclusive otherwise, and never a
+checkmark. The estimate can refute and it can fail to refute; it cannot
+certify.
+
 A row `f ~ \mathcal{N}(m, S)` with a Gaussian on the right is checked by its
 two moments, exactly: `E[f] = m` and `Var(f) = S` are evaluated by the
 rational quadrature, in the primes. The first two moments determine the law
