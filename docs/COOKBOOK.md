@@ -100,11 +100,11 @@ The corpus is not only a measurement. It found real bugs, and they are fixed:
 | --- | --- | --- |
 | G1: no false checkmark | the golden suite and the Cookbook | 0 false checkmarks in 94 identities, and 0 in the 16 Menu derivations |
 | G2: the bugs caught | 95%, with the repair in the top three | the mutation score is 100.0% (343 of 343, the 107 harmless mutants excluded and confirmed by the float64 oracle); the raw rate is 76.2% (343 of 450); the four planted bugs of the golden suite all get their expected repair in the top three |
-| G3: the parse coverage | 70% | 56.3%, measured in [COVERAGE.md](COVERAGE.md); the gate is not met |
+| G3: the parse coverage | 70% | 78.9% of the claim rows of the sample parse end to end, measured in [COVERAGE.md](COVERAGE.md); the gate is met |
 <!-- /gen:cookbook-gates -->
 
-The number that does not meet the gate is published rather than hidden. The
-misses are the steps the engine cannot decide, and each one says so.
+All three gates are met, and the misses are the steps the engine cannot
+decide; each one says so, and the gaps are named.
 
 ## Running it
 

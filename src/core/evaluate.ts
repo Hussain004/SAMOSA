@@ -1,4 +1,5 @@
 import type { Field } from './fields/types.ts';
+import { GFpField } from './fields/gfp.ts';
 import { DualField, type DualValue } from './fields/dual.ts';
 import { HyperDualField, type HyperDualValue } from './fields/hyperdual.ts';
 import {
@@ -75,6 +76,35 @@ export function makeEnv<T>(field: Field<T>, random: Rng): EvalEnv<T> {
  * Components are deliberately not memoized, because they depend on the
  * bound values.
  */
+/** The truth of a case condition, for the reals. */
+function evalCondition<T>(f: Field<T>, node: Node, env: EvalEnv<T>): boolean {
+  if (node.k !== 'cond') {
+    throw new EvalError('a case condition is a relation');
+  }
+  const l = evalNode(f, node.lhs, env);
+  const r = evalNode(f, node.rhs, env);
+  const left = isScalarVal(l) ? l.v : isMatrixVal(l) && l.m.r === 1 && l.m.c === 1 ? l.m.d[0] : null;
+  const right = isScalarVal(r) ? r.v : isMatrixVal(r) && r.m.r === 1 && r.m.c === 1 ? r.m.d[0] : null;
+  if (left === null || right === null) {
+    throw new EvalError('a case condition has to compare scalars');
+  }
+  const cmp = f.cmp(left, right);
+  switch (node.relation) {
+    case '=':
+      return cmp === 0;
+    case 'lt':
+      return cmp < 0;
+    case 'gt':
+      return cmp > 0;
+    case 'le':
+      return cmp <= 0;
+    case 'ge':
+      return cmp >= 0;
+    default:
+      throw new EvalError('a case condition is = \\le \\ge < or >');
+  }
+}
+
 function componentValue<T>(f: Field<T>, node: Node, env: EvalEnv<T>): Val<T> | null {
   if (node.k !== 'sym') return null;
   const m = /^([A-Za-z]+)_([A-Za-z0-9]+)$/.exec(node.name);
@@ -203,6 +233,25 @@ export function evalNode<T>(f: Field<T>, node: Node, env: EvalEnv<T>): Val<T> {
       if (!acc) return scalar(f.zero);
       return acc;
     }
+    case 'piecewise': {
+      // a piecewise expression needs an order on the conditions, which a
+      // finite field has not: it is checked over the reals only
+      if (f instanceof GFpField) {
+        throw new EvalError('a piecewise expression is checked over the reals only');
+      }
+      for (const branch of node.cases) {
+        if (branch.condition === null) {
+          return evalNode(f, branch.value, env);
+        }
+        if (evalCondition(f, branch.condition, env)) {
+          return evalNode(f, branch.value, env);
+        }
+      }
+      throw new EvalError('no case of the piecewise applies');
+    }
+    case 'cond':
+      // a condition is read by the case that owns it, not evaluated as a value
+      throw new EvalError('a case condition is not a value');
     case 'block': {
       const rows = node.rows.map((row) => row.map((cell) => evalNode(f, cell, env)));
       const mats = rows.map((row) => row.map((cell) => cellMatrix(cell)));
@@ -471,7 +520,7 @@ function nodeExponent<T>(field: Field<T>, val: Val<T>): number {
   return 2;
 }
 
-function evalCall<T>(f: Field<T>, fn: string, args: Val<T>[], _env: EvalEnv<T>): Val<T> {
+function evalCall<T>(f: Field<T>, fn: string, args: Val<T>[], env: EvalEnv<T>): Val<T> {
   const a0 = args[0];
   switch (fn) {
     case 'sqrt': {
@@ -537,8 +586,34 @@ function evalCall<T>(f: Field<T>, fn: string, args: Val<T>[], _env: EvalEnv<T>):
     }
     case 'uniformDensity':
       return scalar(f.one);
-    default:
+    default: {
+      // a function the derivation defined itself: apply it, binding its
+      // parameters to the arguments
+      const body = env.defs.get(fn);
+      if (body) {
+        const params = (env.defs as import('./ir.ts').Defs).params?.get(fn) ?? [];
+        if (params.length !== args.length) {
+          throw new EvalError(`${fn} takes ${params.length} arguments, got ${args.length}`);
+        }
+        const saved = new Map<string, Val<T> | undefined>();
+        params.forEach((param, i) => {
+          saved.set(param, env.values.get(param));
+          env.memo.delete(param);
+          env.values.set(param, args[i]);
+        });
+        try {
+          return evalNode(f, body, env);
+        } finally {
+          params.forEach((param) => {
+            const before = saved.get(param);
+            if (before === undefined) env.values.delete(param);
+            else env.values.set(param, before);
+            env.memo.delete(param);
+          });
+        }
+      }
       throw new EvalError(`unknown function ${fn}`);
+    }
   }
 }
 

@@ -43,8 +43,11 @@ export function isRational(node: Node, ctx: TypeContext, defs: Map<string, Node>
       if (node.op === 'pow' && node.args[1]?.k === 'num' && node.args[1].value.d !== 1) return false;
       return node.args.every((a) => isRational(a, ctx, defs, seen));
     }
-    case 'call':
+    case 'call': {
+      const def = defs.get(node.fn);
+      if (def) return isRational(def, ctx, defs, seen);
       return node.fn === 'det' || node.fn === 'tr' || node.fn === 'trace' || node.fn === 'var' || node.fn === 'cov';
+    }
     case 'deriv':
       return isRational(node.f, ctx, defs, seen);
     case 'expect':
@@ -58,6 +61,12 @@ export function isRational(node: Node, ctx: TypeContext, defs: Map<string, Node>
       );
     case 'block':
       return node.rows.every((row) => row.every((cell) => isRational(cell, ctx, defs, seen)));
+    case 'piecewise':
+      // an order is needed on the conditions, so a piecewise row is
+      // checked over the reals only
+      return false;
+    case 'cond':
+      return isRational(node.lhs, ctx, defs, seen) && isRational(node.rhs, ctx, defs, seen);
     case 'raw':
       return false;
   }

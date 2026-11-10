@@ -149,6 +149,10 @@ export function degreeInVar(node: Node, name: string): number {
       return degreeInVar(node.body, name);
     case 'block':
       return Infinity;
+    case 'piecewise':
+      return Infinity;
+    case 'cond':
+      return Infinity;
     case 'raw':
       return Infinity;
   }

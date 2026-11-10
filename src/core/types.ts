@@ -358,6 +358,24 @@ export function inferType(ctx: TypeContext, node: Node): Ty {
       for (const w of widths) c = c === null ? w : addDim(c, w);
       return { t: 'mat', r: r ?? 0, c: c ?? 0 };
     }
+    case 'piecewise': {
+      // the shape is the unification of the value branches
+      let ty: Ty = { t: 'poly' };
+      for (const { value } of node.cases) {
+        const t = inferType(ctx, value);
+        if (t.t === 'mat' && ty.t === 'poly') ty = t;
+        else if (t.t === 'mat' && ty.t === 'mat') {
+          unifyDim(ctx, ty.r, t.r, 'the branches of a piecewise', node.span);
+          unifyDim(ctx, ty.c, t.c, 'the branches of a piecewise', node.span);
+        } else if (t.t === 'scalar' && ty.t === 'poly') ty = t;
+      }
+      return ty;
+    }
+    case 'cond': {
+      inferType(ctx, node.lhs);
+      inferType(ctx, node.rhs);
+      return { t: 'scalar' };
+    }
     case 'raw':
       return { t: 'poly' };
   }
@@ -850,6 +868,15 @@ function callType(ctx: TypeContext, fn: string, args: Node[], span: Span): Ty {
           cod: { t: 'scalar' },
         };
       }
+      // a function the derivation defined itself: its type is its body's
+      const def = ctx.defs.get(fn);
+      if (def) {
+        if (ctx.inferring.has(fn)) return { t: 'poly' };
+        ctx.inferring.add(fn);
+        const ty = inferType(ctx, def);
+        ctx.inferring.delete(fn);
+        return ty;
+      }
       ctx.errors.push({ message: `unknown function ${fn}`, span, kind: 'unknown-function' });
       return { t: 'poly' };
     }
@@ -1031,6 +1058,17 @@ export function degreeOf(
       }
       return best;
     }
+    case 'piecewise': {
+      // the degree of a piecewise is the largest degree of its branches
+      let best = ZERO_DEG;
+      for (const { value } of node.cases) {
+        const deg = degreeOf(ctx, value, sizes, defs);
+        if (deg.n + deg.d > best.n + best.d) best = deg;
+      }
+      return best;
+    }
+    case 'cond':
+      return ZERO_DEG;
     case 'raw':
       return ZERO_DEG;
   }

@@ -15,6 +15,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseRow as engineParseRow } from '../src/core/parse.ts';
+import { splitRows as engineSplitRows } from '../src/core/steps.ts';
 import type { Node } from '../src/core/ir.ts';
 
 const root = resolve(import.meta.dirname, '..');
@@ -267,8 +268,8 @@ export function extractRows(text: string): string[] {
     const end = text.indexOf(`\\end{${name}}`, match.index);
     if (end < 0) continue;
     const content = text.slice(match.index + match[0].length, end);
-    for (const row of splitRows(content)) {
-      const cleaned = row
+    for (const row of engineSplitRows(content)) {
+      const cleaned = row.text
         .replace(/&/g, ' ')
         .replace(/\\label\{[^}]*\}/g, '')
         .replace(/\\nonumber|\\notag/g, '')
@@ -278,37 +279,6 @@ export function extractRows(text: string): string[] {
     }
   }
   return rows;
-}
-
-function splitRows(text: string): string[] {
-  const out: string[] = [];
-  let current = '';
-  let depth = 0;
-  let i = 0;
-  while (i < text.length) {
-    if (text.startsWith('\\begin{', i)) {
-      depth++;
-      current += text.slice(i, i + 7);
-      i += 7;
-      continue;
-    }
-    if (text.startsWith('\\end{', i)) {
-      depth--;
-      current += text.slice(i, i + 5);
-      i += 5;
-      continue;
-    }
-    if (text.startsWith('\\\\', i) && depth === 0) {
-      out.push(current);
-      current = '';
-      i += 2;
-      continue;
-    }
-    current += text[i];
-    i++;
-  }
-  if (current.trim()) out.push(current);
-  return out;
 }
 
 function findTexFiles(dir: string): string[] {

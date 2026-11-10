@@ -1300,7 +1300,8 @@ var Parser = class _Parser {
         const scripted = this.applyScripts(sym, [], t.value);
         const power = scripted.k === "op" && scripted.op === "pow" && scripted.args[0]?.k === "sym" ? scripted : null;
         const scriptedName = scripted.k === "sym" ? scripted.name : power?.args[0]?.k === "sym" ? power.args[0].name : "";
-        if (this.kind() === "lparen" && (scripted.k === "sym" || power) && !this.opts.knownValues?.has(scriptedName) && this.looksLikeCall(t.value)) {
+        const fIsFn = this.opts.knownFns?.has(scriptedName);
+        if (this.kind() === "lparen" && (scripted.k === "sym" || power) && (!this.opts.knownValues?.has(scriptedName) || fIsFn) && this.looksLikeCall(t.value)) {
           const wasDivergence = this.inDivergence;
           this.inDivergence = DIVERGENCES.has(plainName(t.value));
           const { args, unknown } = this.parseArgs();
@@ -1786,7 +1787,7 @@ var Parser = class _Parser {
           );
         }
         const plain = base2.name.startsWith(`\\${name}`) ? base2.name.slice(name.length + 1) : plainName(base2.name);
-        if (!this.opts.knownValues?.has(base2.name) && this.looksLikeCall(plain)) {
+        if ((!this.opts.knownValues?.has(base2.name) || this.opts.knownFns?.has(base2.name)) && this.looksLikeCall(plain)) {
           const { args, unknown } = this.parseArgs();
           return this.makeCall(base2.name, base2.span.from, args, unknown);
         }
@@ -2130,10 +2131,83 @@ var Parser = class _Parser {
       span: { from: t.from, to: body.span.to }
     };
   }
+  /**
+   * \begin{cases} value & condition \ ... \end{cases}, a piecewise function.
+   *
+   * Conditions have to be relations over scalars or an otherwise branch:
+   * anything else is named and the row is left unchecked, which is honest.
+   */
+  parseCases(t) {
+    const cases = [];
+    let value = null;
+    let condition = null;
+    for (; ; ) {
+      if (this.kind() === "end" || this.kind() === "eof") break;
+      if (this.kind() === "nl") {
+        this.pos++;
+        if (value !== null) cases.push({ condition, value });
+        value = null;
+        condition = null;
+        continue;
+      }
+      if (this.kind() === "amp") {
+        this.pos++;
+        condition = this.parseCaseCondition();
+        continue;
+      }
+      const cell = this.parseExpression();
+      if (value === null) value = cell;
+      else value = cell;
+    }
+    if (value !== null) cases.push({ condition, value });
+    const endTok = this.kind() === "end" ? this.cur : null;
+    if (endTok) this.pos++;
+    return { k: "piecewise", cases, span: { from: t.from, to: endTok ? endTok.to : t.to } };
+  }
+  /** The condition of a case: a relation, or the otherwise branch. */
+  parseCaseCondition() {
+    const t = this.cur;
+    if (t.type === "cmd" && (t.value === "text" || t.value === "mathrm" || t.value === "mbox")) {
+      this.pos++;
+      const g = this.rawGroupText();
+      if (/otherwise|else|default/i.test(g.text)) return null;
+      throw new ParseFailure("a case condition SAMOSA does not read", { from: g.span.from, to: g.span.to });
+    }
+    const lhs = this.parseExpression();
+    const rel = this.readRelationToken();
+    const rhs = this.parseExpression();
+    return { k: "cond", lhs, relation: rel, rhs, span: { from: lhs.span.from, to: rhs.span.to } };
+  }
+  /** The relation token of a case condition. */
+  readRelationToken() {
+    const t = this.cur;
+    const advance = () => {
+      this.pos++;
+    };
+    if (t.type === "op") {
+      if (t.value === "=") return this.take(advance, "=");
+      if (t.value === "<") return this.take(advance, "lt");
+      if (t.value === ">") return this.take(advance, "gt");
+    }
+    if (t.type === "cmd") {
+      if (t.value === "le" || t.value === "leq" || t.value === "leqq") return this.take(advance, "le");
+      if (t.value === "ge" || t.value === "geq" || t.value === "geqq") return this.take(advance, "ge");
+      if (t.value === "lt") return this.take(advance, "lt");
+      if (t.value === "gt") return this.take(advance, "gt");
+    }
+    throw new ParseFailure("a case condition is a relation", { from: t.from, to: t.to });
+  }
+  take(advance, value) {
+    advance();
+    return value;
+  }
   parseMatrixEnv() {
     const t = this.cur;
     this.pos++;
     const env = t.value;
+    if (env === "cases") {
+      return this.parseCases(t);
+    }
     if ((env === "array" || env === "alignedat") && this.kind() === "lbrace") {
       this.rawGroupText();
     }
@@ -2733,7 +2807,7 @@ function splitRows(src) {
       const endIdx = findEnvEnd(src, beginIdx, envName);
       const contentStart2 = env.next;
       const contentEnd2 = endIdx >= 0 ? endIdx : len;
-      if (MATH_ENVS.has(envName)) {
+      if (MATH_ENVS.has(envName) || ROW_GROUP_ENVS.has(envName)) {
         rows.push(...splitMathContent(src, contentStart2, contentEnd2, `${envName}@${beginIdx}`));
         i = endIdx >= 0 ? endIdx + 1 : len;
         continue;
@@ -3713,6 +3787,23 @@ function inferType(ctx, node) {
       for (const w of widths) c = c === null ? w : addDim(c, w);
       return { t: "mat", r: r ?? 0, c: c ?? 0 };
     }
+    case "piecewise": {
+      let ty = { t: "poly" };
+      for (const { value } of node.cases) {
+        const t = inferType(ctx, value);
+        if (t.t === "mat" && ty.t === "poly") ty = t;
+        else if (t.t === "mat" && ty.t === "mat") {
+          unifyDim(ctx, ty.r, t.r, "the branches of a piecewise", node.span);
+          unifyDim(ctx, ty.c, t.c, "the branches of a piecewise", node.span);
+        } else if (t.t === "scalar" && ty.t === "poly") ty = t;
+      }
+      return ty;
+    }
+    case "cond": {
+      inferType(ctx, node.lhs);
+      inferType(ctx, node.rhs);
+      return { t: "scalar" };
+    }
     case "raw":
       return { t: "poly" };
   }
@@ -4132,6 +4223,14 @@ function callType(ctx, fn, args, span) {
           cod: { t: "scalar" }
         };
       }
+      const def = ctx.defs.get(fn);
+      if (def) {
+        if (ctx.inferring.has(fn)) return { t: "poly" };
+        ctx.inferring.add(fn);
+        const ty = inferType(ctx, def);
+        ctx.inferring.delete(fn);
+        return ty;
+      }
       ctx.errors.push({ message: `unknown function ${fn}`, span, kind: "unknown-function" });
       return { t: "poly" };
     }
@@ -4284,6 +4383,16 @@ function degreeOf(ctx, node, sizes, defs) {
       }
       return best;
     }
+    case "piecewise": {
+      let best = ZERO_DEG;
+      for (const { value } of node.cases) {
+        const deg = degreeOf(ctx, value, sizes, defs);
+        if (deg.n + deg.d > best.n + best.d) best = deg;
+      }
+      return best;
+    }
+    case "cond":
+      return ZERO_DEG;
     case "raw":
       return ZERO_DEG;
   }
@@ -4759,6 +4868,10 @@ function degreeInVar(node, name) {
     case "bigop":
       return degreeInVar(node.body, name);
     case "block":
+      return Infinity;
+    case "piecewise":
+      return Infinity;
+    case "cond":
       return Infinity;
     case "raw":
       return Infinity;
@@ -5272,8 +5385,11 @@ function isRational(node, ctx, defs, seen) {
       if (node.op === "pow" && node.args[1]?.k === "num" && node.args[1].value.d !== 1) return false;
       return node.args.every((a) => isRational(a, ctx, defs, seen));
     }
-    case "call":
+    case "call": {
+      const def = defs.get(node.fn);
+      if (def) return isRational(def, ctx, defs, seen);
       return node.fn === "det" || node.fn === "tr" || node.fn === "trace" || node.fn === "var" || node.fn === "cov";
+    }
     case "deriv":
       return isRational(node.f, ctx, defs, seen);
     case "expect":
@@ -5282,6 +5398,10 @@ function isRational(node, ctx, defs, seen) {
       return (!node.lo || isRational(node.lo, ctx, defs, seen)) && (!node.hi || isRational(node.hi, ctx, defs, seen)) && isRational(node.body, ctx, defs, seen);
     case "block":
       return node.rows.every((row) => row.every((cell) => isRational(cell, ctx, defs, seen)));
+    case "piecewise":
+      return false;
+    case "cond":
+      return isRational(node.lhs, ctx, defs, seen) && isRational(node.rhs, ctx, defs, seen);
     case "raw":
       return false;
   }
@@ -5846,6 +5966,33 @@ var EvalError = class extends Error {
 function makeEnv(field, random2) {
   return { field, values: /* @__PURE__ */ new Map(), defs: /* @__PURE__ */ new Map(), memo: /* @__PURE__ */ new Map(), quad: /* @__PURE__ */ new Map(), sizes: /* @__PURE__ */ new Map(), random: random2 };
 }
+function evalCondition(f, node, env) {
+  if (node.k !== "cond") {
+    throw new EvalError("a case condition is a relation");
+  }
+  const l = evalNode(f, node.lhs, env);
+  const r = evalNode(f, node.rhs, env);
+  const left = isScalarVal(l) ? l.v : isMatrixVal(l) && l.m.r === 1 && l.m.c === 1 ? l.m.d[0] : null;
+  const right = isScalarVal(r) ? r.v : isMatrixVal(r) && r.m.r === 1 && r.m.c === 1 ? r.m.d[0] : null;
+  if (left === null || right === null) {
+    throw new EvalError("a case condition has to compare scalars");
+  }
+  const cmp = f.cmp(left, right);
+  switch (node.relation) {
+    case "=":
+      return cmp === 0;
+    case "lt":
+      return cmp < 0;
+    case "gt":
+      return cmp > 0;
+    case "le":
+      return cmp <= 0;
+    case "ge":
+      return cmp >= 0;
+    default:
+      throw new EvalError("a case condition is = \\le \\ge < or >");
+  }
+}
 function componentValue(f, node, env) {
   if (node.k !== "sym") return null;
   const m = /^([A-Za-z]+)_([A-Za-z0-9]+)$/.exec(node.name);
@@ -5961,6 +6108,22 @@ function evalNode(f, node, env) {
       if (!acc) return scalar(f.zero);
       return acc;
     }
+    case "piecewise": {
+      if (f instanceof GFpField) {
+        throw new EvalError("a piecewise expression is checked over the reals only");
+      }
+      for (const branch of node.cases) {
+        if (branch.condition === null) {
+          return evalNode(f, branch.value, env);
+        }
+        if (evalCondition(f, branch.condition, env)) {
+          return evalNode(f, branch.value, env);
+        }
+      }
+      throw new EvalError("no case of the piecewise applies");
+    }
+    case "cond":
+      throw new EvalError("a case condition is not a value");
     case "block": {
       const rows = node.rows.map((row) => row.map((cell) => evalNode(f, cell, env)));
       const mats = rows.map((row) => row.map((cell) => cellMatrix(cell)));
@@ -6193,7 +6356,7 @@ function nodeExponent(field, val) {
   }
   return 2;
 }
-function evalCall(f, fn, args, _env) {
+function evalCall(f, fn, args, env) {
   const a0 = args[0];
   switch (fn) {
     case "sqrt": {
@@ -6254,8 +6417,32 @@ function evalCall(f, fn, args, _env) {
     }
     case "uniformDensity":
       return scalar(f.one);
-    default:
+    default: {
+      const body = env.defs.get(fn);
+      if (body) {
+        const params = env.defs.params?.get(fn) ?? [];
+        if (params.length !== args.length) {
+          throw new EvalError(`${fn} takes ${params.length} arguments, got ${args.length}`);
+        }
+        const saved = /* @__PURE__ */ new Map();
+        params.forEach((param, i) => {
+          saved.set(param, env.values.get(param));
+          env.memo.delete(param);
+          env.values.set(param, args[i]);
+        });
+        try {
+          return evalNode(f, body, env);
+        } finally {
+          params.forEach((param) => {
+            const before = saved.get(param);
+            if (before === void 0) env.values.delete(param);
+            else env.values.set(param, before);
+            env.memo.delete(param);
+          });
+        }
+      }
       throw new EvalError(`unknown function ${fn}`);
+    }
   }
 }
 function toDual(f, m) {
@@ -9690,10 +9877,16 @@ function analyzeSource(src, opts) {
       if (bareLhs && isDefinition) {
         definedNames.add(bareLhs);
         knownValues.add(bareLhs);
+        if (lhs?.k === "call") knownFns.add(bareLhs);
       }
       if (isDefinition && bareLhs && rhs) {
         defs.set(bareLhs, rhs);
         ctx.defs.set(bareLhs, rhs);
+        if (lhs?.k === "call") {
+          const params = lhs.args.filter((a) => a.k === "sym").map((a) => a.name);
+          defs.params ??= /* @__PURE__ */ new Map();
+          defs.params.set(bareLhs, params);
+        }
       }
     }
   }
@@ -9989,9 +10182,30 @@ function renderNode(node) {
       const rows = node.rows.map((row) => row.map(renderNode).join(" & ")).join(" \\\\ ");
       return `\\begin{bmatrix} ${rows} \\end{bmatrix}`;
     }
+    case "piecewise": {
+      const rows = node.cases.map(
+        ({ condition, value }) => condition ? `${renderNode(value)} & ${renderNodeCond(condition)}` : `${renderNode(value)} & otherwise`
+      ).join(" \\\\ ");
+      return `\\begin{cases} ${rows} \\end{cases}`;
+    }
     case "raw":
       return node.text;
+    default:
+      return "";
   }
+}
+function renderNodeCond(node) {
+  if (node.k !== "cond") return renderNode(node);
+  const cond = node;
+  const REL = {
+    le: "\\le",
+    ge: "\\ge",
+    lt: "<",
+    gt: ">",
+    "=": "=",
+    approx: "\\approx"
+  };
+  return `${renderNode(cond.lhs)} ${REL[cond.relation] ?? cond.relation} ${renderNode(cond.rhs)}`;
 }
 function renderSymbol(name) {
   const supIndex = name.indexOf("^");

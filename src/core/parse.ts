@@ -843,10 +843,13 @@ export class Parser {
         const power =
           scripted.k === 'op' && scripted.op === 'pow' && scripted.args[0]?.k === 'sym' ? scripted : null;
         const scriptedName = scripted.k === 'sym' ? scripted.name : power?.args[0]?.k === 'sym' ? power.args[0].name : '';
+        // a name the derivation defined as a function is a call, not a
+        // product, even though it is also a value
+        const fIsFn = this.opts.knownFns?.has(scriptedName);
         if (
           this.kind() === 'lparen' &&
           (scripted.k === 'sym' || power) &&
-          !this.opts.knownValues?.has(scriptedName) &&
+          (!this.opts.knownValues?.has(scriptedName) || fIsFn) &&
           this.looksLikeCall(t.value)
         ) {
           // A lowercase name with parentheses is a function call, even when
@@ -1421,7 +1424,7 @@ export class Parser {
         // \hat{l}(f, y) is a loss, not a product of a hat and a group.
         // A capital name stays a matrix product.
         const plain = base.name.startsWith(`\\${name}`) ? base.name.slice(name.length + 1) : plainName(base.name);
-        if (!this.opts.knownValues?.has(base.name) && this.looksLikeCall(plain)) {
+        if ((!this.opts.knownValues?.has(base.name) || this.opts.knownFns?.has(base.name)) && this.looksLikeCall(plain)) {
           const { args, unknown } = this.parseArgs();
           return this.makeCall(base.name, base.span.from, args, unknown);
         }
@@ -1821,10 +1824,89 @@ export class Parser {
     };
   }
 
+  /**
+   * \begin{cases} value & condition \ ... \end{cases}, a piecewise function.
+   *
+   * Conditions have to be relations over scalars or an otherwise branch:
+   * anything else is named and the row is left unchecked, which is honest.
+   */
+  private parseCases(t: Token): Node {
+    const cases: Array<{ condition: Node | null; value: Node }> = [];
+    let value: Node | null = null;
+    let condition: Node | null = null;
+    for (;;) {
+      if (this.kind() === 'end' || this.kind() === 'eof') break;
+      if (this.kind() === 'nl') {
+        this.pos++;
+        if (value !== null) cases.push({ condition, value });
+        value = null;
+        condition = null;
+        continue;
+      }
+      if (this.kind() === 'amp') {
+        this.pos++;
+        condition = this.parseCaseCondition();
+        continue;
+      }
+      const cell = this.parseExpression();
+      if (value === null) value = cell;
+      else value = cell;
+    }
+    if (value !== null) cases.push({ condition, value });
+    const endTok = this.kind() === 'end' ? this.cur : null;
+    if (endTok) this.pos++;
+    return { k: 'piecewise', cases, span: { from: t.from, to: endTok ? endTok.to : t.to } };
+  }
+
+  /** The condition of a case: a relation, or the otherwise branch. */
+  private parseCaseCondition(): Node | null {
+    const t = this.cur;
+    // \text{otherwise}, \mathrm{else} and friends: the case that catches
+    // what nothing else did
+    if (t.type === 'cmd' && (t.value === 'text' || t.value === 'mathrm' || t.value === 'mbox')) {
+      this.pos++; // past the \text command itself
+      const g = this.rawGroupText();
+      if (/otherwise|else|default/i.test(g.text)) return null;
+      throw new ParseFailure('a case condition SAMOSA does not read', { from: g.span.from, to: g.span.to });
+    }
+    const lhs = this.parseExpression();
+    const rel = this.readRelationToken();
+    const rhs = this.parseExpression();
+    return { k: 'cond', lhs, relation: rel, rhs, span: { from: lhs.span.from, to: rhs.span.to } };
+  }
+
+  /** The relation token of a case condition. */
+  private readRelationToken(): '=' | 'le' | 'ge' | 'lt' | 'gt' {
+    const t = this.cur;
+    const advance = (): void => {
+      this.pos++;
+    };
+    if (t.type === 'op') {
+      if (t.value === '=') return this.take(advance, '=');
+      if (t.value === '<') return this.take(advance, 'lt');
+      if (t.value === '>') return this.take(advance, 'gt');
+    }
+    if (t.type === 'cmd') {
+      if (t.value === 'le' || t.value === 'leq' || t.value === 'leqq') return this.take(advance, 'le');
+      if (t.value === 'ge' || t.value === 'geq' || t.value === 'geqq') return this.take(advance, 'ge');
+      if (t.value === 'lt') return this.take(advance, 'lt');
+      if (t.value === 'gt') return this.take(advance, 'gt');
+    }
+    throw new ParseFailure('a case condition is a relation', { from: t.from, to: t.to });
+  }
+
+  private take<T>(advance: () => void, value: T): T {
+    advance();
+    return value;
+  }
+
   private parseMatrixEnv(): Node {
     const t = this.cur;
     this.pos++;
     const env = t.value;
+    if (env === 'cases') {
+      return this.parseCases(t);
+    }
     // array and alignedat take a column specification before their rows.
     if ((env === 'array' || env === 'alignedat') && this.kind() === 'lbrace') {
       this.rawGroupText();

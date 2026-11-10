@@ -107,7 +107,11 @@ export function splitRows(src: string): SourceRow[] {
       const endIdx = findEnvEnd(src, beginIdx, envName);
       const contentStart = env.next;
       const contentEnd = endIdx >= 0 ? endIdx : len;
-      if (MATH_ENVS.has(envName)) {
+      if (MATH_ENVS.has(envName) || ROW_GROUP_ENVS.has(envName)) {
+        // a math environment, or a row group outside any math region:
+        // a standalone `gathered` is math, wherever it sits, and its lines
+        // are claims of their own. Nested inside another region it never
+        // reaches here, and the other region's rows stay untouched.
         rows.push(...splitMathContent(src, contentStart, contentEnd, `${envName}@${beginIdx}`));
         i = endIdx >= 0 ? endIdx + 1 : len;
         continue;

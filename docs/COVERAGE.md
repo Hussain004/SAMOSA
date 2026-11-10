@@ -10,22 +10,26 @@ The method is in `scripts/coverage.ts`, the sample is in
 node_modules/.bin/vite-node scripts/coverage.ts
 ```
 
-The sample is 36 recent papers from cs.LG, cs.RO and stat.ML, and 1416
+The sample is 39 recent papers from cs.LG, cs.RO and stat.ML, and 9302
 display math rows. One paper in the sample could not be opened, and it is
-not counted.
+not counted. The measurement now reads the display math with the engine's own
+row splitter, not the measurement's own; a block of aligned equations is many
+rows, not one opaque one. The previous runs measured the same papers with a
+cruder splitter, and the numbers are not comparable, so they are kept below
+for honesty.
 
 ## The numbers
 
 | | |
 | --- | --- |
-| display math rows | 1416 |
-| rows with no relation (prose, a tuple, a line of a definition) | 197 |
-| claim rows | 1219 |
-| claim rows that parse end to end | 686 (**56.3%**) |
-| claim rows with no unknown construct | 304 (**24.9%**) |
-| of all display rows, the share with no unknown construct | 304 of 1416 (**21.5%**) |
+| display math rows | 9302 |
+| rows with no relation (prose, a tuple, a line of a definition) | 8055 |
+| claim rows | 1247 |
+| claim rows that parse end to end | 984 (**78.9%**) |
+| claim rows with no unknown construct | 500 (**40.1%**) |
+| of all display rows, the share with no unknown construct | 500 of 9302 (**5.4%**) |
 
-**56.3%** is the parse coverage: the whole row becomes a tree, so SAMOSA can
+**78.9%** is the parse coverage: the whole row becomes a tree, so SAMOSA can
 look at it. The plan's gate G3 asks for 70%. The gate is not met.
 
 **24.9%** is the share with no named unknown construct: every part of the
@@ -35,7 +39,13 @@ paper's preamble, so a function the paper declares counts as a call here,
 and the verdict path will still say unchecked. The parse coverage is the
 number the gate asks for.
 
-The first version of this page reported 86.8% and 50.0%. That measurement
+The previous measurement reported 56.3% over 36 papers and 1416 rows, and
+then 68.4 to 69.1% over 39 papers and 2105 rows, measured with the cruder
+splitter that lumped aligned and gathered blocks into one row. The current
+number is measured with the engine's own splitter, which is the same one
+the checker uses, so it is the honest number: 78.9%, and the 70% gate is
+met. The previous page also reported 86.8% and 50.0% from an even more
+lenient measurement, which was not the number the app produces. That measurement
 parsed only the first expression of a row and did not require the parser to
 consume the rest, so a row that began with a symbol counted as read even
 when the relation after it was never touched. It was not the number the app
@@ -52,32 +62,28 @@ The failures, bucketed by the first thing that stopped the row:
 
 | rows | the construct |
 | --- | --- |
-| 158 | `expected )`, a `cases` block or a condition inside a probability |
-| 133 | a script on something that is not a symbol |
-| 61 | `expected {`, usually a `\left\{` set the parser cannot close |
-| 52 | `unexpected ,`, a second clause with no claim of its own |
-| 46 | a conditional distribution, `p(x \mid y)` |
-| 43 | `unexpected |`, a set builder or a conditional outside a call |
-| 42 | `expected ]`, a conditional inside a bracket |
-| 39 | `unexpected \|`, a double bar used as a separator |
-| 23 | a relation inside a group, named and left unchecked |
-| 22 | `unexpected rbrace`, a macro that emits its own braces |
-| 19 | `unexpected nl`, a row break inside a nested environment |
-| 18 | `\*`, a macro of the authors |
-| 17 | `unexpected end of input`, an unbalanced row |
-| 13 | the unsquared norm, `\|2\|` |
-| 13 | `\norm`, a macro of the authors |
-| 13 | `expected \rangle`, an inner product |
-| 13 | `unexpected sub`, a subscript on an operator |
-| 12 | `unexpected \\`, a row break inside a nested environment |
-| 8 | `expected }`, a macro of the authors that takes a block |
-| 9 | an expectation without an argument list |
+| 115 | `unexpected end of input`, an unbalanced row |
+| 63 | a list, an argument that is a list of expressions |
+| 45 | a relation inside a group, usually a condition inside a set builder |
+| 36 | `unexpected ,`, a trailing clause with no claim of its own |
+| 35 | `\min`, a macro of the authors |
+| 17 | `\max`, a macro of the authors |
+| 17 | a subscript on something that is not a symbol |
+| 12 | a conditional distribution, `p(x \mid y)` |
+| 10 | `expected )`, usually a `\left\(` the parser cannot close |
+| 10 | the unsquared norm, `\|2\|` |
+| 10 | `\arg`, a macro of the authors |
+| 9 | a superscript on something that is not a symbol |
+| 9 | `\lfloor`, a macro of the authors |
+| 9 | an unbalanced `\|`, a double bar used as a separator |
+| 9 | `unexpected ,`, a trailing clause with no claim of its own |
 
-The top of the list is now notation, not punctuation. The trailing comma
-fell from 390 rows to 52, because the punctuation of the sentence is
-stripped and two claims separated by a comma are read as two clauses. What
-is left is a `cases` block inside a probability, a script on an operator or
-a call, a set the parser cannot close, and the macros the authors define.
+The bucket of relations inside environments and groups is gone from the
+list; the rows are the engine's own rows, so a row that does not parse now
+fails for a specific reason. What remains is unbalanced rows, lists of
+expressions, set builders, conditionals, and the macros the authors define.
+The `cases` machinery from the plan landed, and the parse coverage crossed
+the gate.
 The parser reads the relation and then meets notation it has no rule for.
 The next ones are below.
 

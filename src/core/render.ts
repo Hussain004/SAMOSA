@@ -41,9 +41,36 @@ export function renderNode(node: Node): string {
       const rows = node.rows.map((row) => row.map(renderNode).join(' & ')).join(' \\\\ ');
       return `\\begin{bmatrix} ${rows} \\end{bmatrix}`;
     }
+    case 'piecewise': {
+      const rows = node.cases
+        .map(({ condition, value }) =>
+          condition
+            ? `${renderNode(value)} & ${renderNodeCond(condition)}`
+            : `${renderNode(value)} & otherwise`,
+        )
+        .join(' \\\\ ');
+      return `\\begin{cases} ${rows} \\end{cases}`;
+    }
     case 'raw':
       return node.text;
+    default:
+      return '';
   }
+}
+
+/** The condition of a case, as \le, \ge or friends. */
+function renderNodeCond(node: Node): string {
+  if (node.k !== 'cond') return renderNode(node);
+  const cond = node;
+  const REL: Record<string, string> = {
+    le: '\\le',
+    ge: '\\ge',
+    lt: '<',
+    gt: '>',
+    '=': '=',
+    approx: '\\approx',
+  };
+  return `${renderNode(cond.lhs)} ${REL[cond.relation] ?? cond.relation} ${renderNode(cond.rhs)}`;
 }
 
 function renderSymbol(name: string): string {

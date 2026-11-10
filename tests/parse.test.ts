@@ -205,7 +205,7 @@ describe('the constructs of a real paper', () => {
       0,
     );
     expect(parsed.error).toBeUndefined();
-    expect(parsed.parts[0].rhs).toMatchObject({ k: 'block' });
+    expect(parsed.parts[0].rhs).toMatchObject({ k: 'piecewise' });
   });
 
   it('reads a visible left brace closed by an invisible right delimiter', () => {

@@ -21,7 +21,7 @@ import {
   type Chip,
   type TypeContext,
 } from '../types.ts';
-import type { Node, Relation, Span } from '../ir.ts';
+import type { Defs, Node, Relation, Span } from '../ir.ts';
 import type { Dim } from '../decl.ts';
 import {
   collectDimVars,
@@ -81,7 +81,7 @@ export function analyzeSource(src: string, opts: CheckOptions): Source {
   const decls = mergeDecls(preset, declared.decls);
 
   const ctx = createContext(decls, opts.layout ?? 'denominator', declared.pinned);
-  const defs = new Map<string, Node>();
+  const defs: Defs = new Map<string, Node>();
   const definedNames = new Set<string>();
 
   const knownFns = new Set<string>(decls.filter((d) => d.kind === 'function').map((d) => d.name));
@@ -179,10 +179,18 @@ export function analyzeSource(src: string, opts: CheckOptions): Source {
       if (bareLhs && isDefinition) {
         definedNames.add(bareLhs);
         knownValues.add(bareLhs);
+        // a definition whose left side is a call is a function, and f(3)
+        // is a call afterwards, not the product f · 3
+        if (lhs?.k === 'call') knownFns.add(bareLhs);
       }
       if (isDefinition && bareLhs && rhs) {
         defs.set(bareLhs, rhs);
         ctx.defs.set(bareLhs, rhs);
+        if (lhs?.k === 'call') {
+          const params = lhs.args.filter((a) => a.k === 'sym').map((a) => (a as { name: string }).name);
+          (defs as Defs).params ??= new Map();
+          (defs as Defs).params!.set(bareLhs, params);
+        }
       }
     }
   }

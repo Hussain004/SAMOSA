@@ -52,7 +52,12 @@ export type Node =
       span: Span;
     }
   | { k: 'block'; rows: Node[][]; span: Span }
+  | { k: 'piecewise'; cases: Array<{ condition: Node | null; value: Node }>; span: Span }
+  | { k: 'cond'; lhs: Node; relation: Relation; rhs: Node; span: Span }
   | { k: 'raw'; text: string; span: Span };
+
+/** A definition, with the parameter names for calls. */
+export type Defs = Map<string, Node> & { params?: Map<string, string[]> };
 
 export type Relation =
   | '='
