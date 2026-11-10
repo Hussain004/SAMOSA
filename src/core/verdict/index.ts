@@ -11,7 +11,7 @@
  * check each step, and report.
  */
 import { harvestMacros, parseRow } from '../parse.ts';
-import { splitRows, harvestDecls } from '../steps.ts';
+import { splitRows, harvestDeclsDetailed } from '../steps.ts';
 import { parseDeclarations, type SymbolDecl } from '../decl.ts';
 import { presetDecls } from '../presets.ts';
 import {
@@ -73,10 +73,19 @@ export {
 export function analyzeSource(src: string, opts: CheckOptions): Source {
   const rows = splitRows(src);
   // the declarations around the mathematics count too: the `% samosa:`
-  // comments and the where lines (review 4.7), so the CLI, the MCP server
-  // and the app all read the same source the same way
-  const harvested = harvestDecls(src);
-  const declared = parseDeclarations([opts.decls ?? '', ...harvested].filter(Boolean).join('; '));
+  // comments and the prose lines that carry them (review 4.7), so the
+  // CLI, the MCP server and the app all read the same source the same
+  // way. Every declaration read from prose says where it came from.
+  const harvested = harvestDeclsDetailed(src);
+  const proseChips: Chip[] = harvested.fromProse.map((h) => ({
+    id: 'harvested',
+    symbol: h.name,
+    span: { from: 0, to: 0 },
+    message: `${h.decl}, read from line ${h.line}`,
+  }));
+  // a harvested declaration that is a typo is caught later by the unused
+  // declaration visitor; a harvested declaration that is read is not
+  const declared = parseDeclarations([opts.decls ?? '', ...harvested.decls].filter(Boolean).join('; '));
   const preset = presetDecls(opts.preset);
   const decls = mergeDecls(preset, declared.decls);
 
@@ -195,7 +204,7 @@ export function analyzeSource(src: string, opts: CheckOptions): Source {
     }
   }
 
-  return { ctx, defs, steps, declErrors: declared.errors };
+  return { ctx, defs, steps, declErrors: declared.errors, harvested: proseChips };
 }
 
 /** Checks a derivation. This is the entry point of the whole product. */
@@ -255,6 +264,7 @@ export function check(src: string, opts: CheckOptions = {}): Report {
   }
 
   chips.push(...ctx.chips);
+  chips.push(...source.harvested);
 
   return {
     version: ENGINE_VERSION,

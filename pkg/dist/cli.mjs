@@ -3049,36 +3049,110 @@ function pushRow(rows, segment, offset, where) {
 function cleanRow(text) {
   return text.replace(/\\nonumber\b/g, "").replace(/\\notag\b/g, "").replace(/\\\\\s*$/, "").trim();
 }
-function harvestProseDecls(prose) {
+var SYM_SRC = String.raw`(?:\\[A-Za-z][A-Za-z0-9]*(?:\{[A-Za-z0-9_]+\}|_[A-Za-z0-9]+)?|[A-Za-z][A-Za-z0-9_]*)`;
+var ADJECTIVES = [
+  [/symmetric positive definite/i, "spd"],
+  [/symmetric positive semidefinite/i, "psd"],
+  [/symmetric/i, "sym"],
+  [/positive semidefinite/i, "psd"],
+  [/positive definite/i, "spd"],
+  [/orthogonal/i, "orth"],
+  [/diagonal/i, "diag"],
+  [/skew[- ]symmetric/i, "skew"],
+  [/idempotent/i, "idem"],
+  [/projection/i, "proj"],
+  [/stochastic/i, "stoch"]
+];
+function sizeOf(dim) {
+  const t = dim.replace(/\s/g, "").replace(/\\times/g, "x");
+  const m = t.match(/^([0-9a-zA-Z]+)x([0-9a-zA-Z]+)$/);
+  if (m) {
+    if (/^[0-9a-zA-Z]+$/.test(m[1]) && /^[0-9a-zA-Z]+$/.test(m[2])) return `${m[1]}\xD7${m[2]}`;
+    return null;
+  }
+  if (/^[0-9a-zA-Z]+$/.test(t)) return t;
+  return null;
+}
+function harvestProseDeclsDetailed(proseLines) {
   const found = [];
-  for (const line of prose) {
-    const m = line.match(/\bwhere\b\s*([\s\S]+)$/i);
-    if (!m) continue;
-    const rest = m[1];
-    for (const piece of rest.split(/[,;]\s*(?=[A-Za-z\\])/)) {
-      const t = piece.trim();
-      if (!t) continue;
-      if (/\\in\s*\\mathbb|\\succ|\\succeq|\\sim|\\top\s*\w*\s*=|:/.test(t)) {
-        found.push(t);
+  const push = (decl, name, line, sentence) => {
+    if (found.some((f) => f.name === name)) return;
+    found.push({ decl, name, line, sentence });
+  };
+  for (const { line, text } of proseLines) {
+    const trigger = text.match(/\b(where|let|given|for|with|suppose|assume|denote|consider)\b([\s\S]*)$/i);
+    if (!trigger) continue;
+    const rest = trigger[2] ?? "";
+    const sentence = text.trim();
+    const maths = [];
+    for (const pattern of [/\$([^$]+)\$/g, /\\\(([^)]+)\\\)/g]) {
+      for (const m of rest.matchAll(pattern)) {
+        maths.push({ text: m[1].trim(), from: m.index ?? 0 });
+      }
+    }
+    for (const math of maths) {
+      const assignMatch = math.text.match(new RegExp(`^(${SYM_SRC})\\s*=[\\s\\S]*?\\\\in\\s*\\\\mathbb\\{R\\}\\^\\s*\\{?\\s*([0-9a-zA-Z]+(?:\\s*\\\\times\\s*[0-9a-zA-Z]+)?)\\s*\\}?`));
+      const inMatch = assignMatch ?? math.text.match(new RegExp(`(${SYM_SRC})\\s*\\\\in\\s*\\\\mathbb\\{R\\}\\^\\s*\\{?\\s*([0-9a-zA-Z]+(?:\\s*\\\\times\\s*[0-9a-zA-Z]+)?)\\s*\\}?`));
+      if (inMatch) {
+        const size = sizeOf(inMatch[2]);
+        if (size) {
+          push(`${inMatch[1]}: ${size}`, inMatch[1], line, sentence);
+          continue;
+        }
+      }
+      const simMatch = math.text.match(new RegExp(`(${SYM_SRC})\\s*\\\\sim\\s*\\\\mathcal\\{N\\}\\(([^)]*)\\)`));
+      if (simMatch) {
+        push(`${simMatch[1]} ~ N(${simMatch[2]})`, simMatch[1], line, sentence);
+        continue;
+      }
+      const succMatch = math.text.match(new RegExp(`(${SYM_SRC})\\s*\\\\succ(?:eq)?\\s*0`));
+      if (succMatch) {
+        push(`${succMatch[1]}: spd n`, succMatch[1], line, sentence);
+        continue;
+      }
+    }
+    const adjMatches = [...rest.matchAll(new RegExp(`([A-Za-z][A-Za-z ]+?)\\s*\\$(${SYM_SRC})\\$`, "g"))];
+    for (const m of adjMatches) {
+      for (const [pattern, prop] of ADJECTIVES) {
+        if (pattern.test(m[1])) {
+          push(`${m[2]}: ${prop} n`, m[2], line, sentence);
+          break;
+        }
+      }
+    }
+    if (!found.some((f) => f.line === line)) {
+      for (const [pattern, prop] of ADJECTIVES) {
+        if (!pattern.test(rest)) continue;
+        for (const math of maths) {
+          const bare = math.text.match(new RegExp(`^(${SYM_SRC})$`));
+          if (bare) {
+            push(`${bare[1]}: ${prop} n`, bare[1], line, sentence);
+            break;
+          }
+        }
       }
     }
   }
   return found;
 }
-function harvestDecls(src) {
+function harvestDeclsDetailed(src) {
   const comments = [];
-  const whereLines = [];
-  for (const line of src.split("\n")) {
-    const trimmed = line.trim();
+  const proseLines = [];
+  const lines = src.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
     const comment = trimmed.match(/%\s*samosa:\s*(.+)$/);
     if (comment) {
       comments.push(comment[1].trim());
       continue;
     }
     if (!trimmed || trimmed.startsWith("%")) continue;
-    if (/\bwhere\b/i.test(trimmed)) whereLines.push(trimmed);
+    if (/\b(where|let|given|for|with|suppose|assume|denote|consider)\b/i.test(trimmed)) {
+      proseLines.push({ line: i + 1, text: trimmed });
+    }
   }
-  return [...comments, ...harvestProseDecls(whereLines)];
+  const detailed = harvestProseDeclsDetailed(proseLines);
+  return { decls: [...comments, ...detailed.map((d) => d.decl)], fromProse: detailed };
 }
 
 // src/core/decl.ts
@@ -9857,8 +9931,14 @@ var DEFAULT_SEED = 5910618;
 // src/core/verdict/index.ts
 function analyzeSource(src, opts) {
   const rows = splitRows(src);
-  const harvested = harvestDecls(src);
-  const declared = parseDeclarations([opts.decls ?? "", ...harvested].filter(Boolean).join("; "));
+  const harvested = harvestDeclsDetailed(src);
+  const proseChips = harvested.fromProse.map((h) => ({
+    id: "harvested",
+    symbol: h.name,
+    span: { from: 0, to: 0 },
+    message: `${h.decl}, read from line ${h.line}`
+  }));
+  const declared = parseDeclarations([opts.decls ?? "", ...harvested.decls].filter(Boolean).join("; "));
   const preset = presetDecls(opts.preset);
   const decls = mergeDecls(preset, declared.decls);
   const ctx = createContext(decls, opts.layout ?? "denominator", declared.pinned);
@@ -9951,7 +10031,7 @@ function analyzeSource(src, opts) {
       }
     }
   }
-  return { ctx, defs, steps, declErrors: declared.errors };
+  return { ctx, defs, steps, declErrors: declared.errors, harvested: proseChips };
 }
 function check(src, opts = {}) {
   const started = now();
@@ -9994,6 +10074,7 @@ function check(src, opts = {}) {
     diagnostics.push({ severity: "warning", message, span: { from: 0, to: 0 } });
   }
   chips.push(...ctx.chips);
+  chips.push(...source.harvested);
   return {
     version: ENGINE_VERSION,
     seed,

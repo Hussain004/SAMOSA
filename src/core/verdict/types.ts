@@ -157,6 +157,8 @@ export interface Source {
   steps: Step[];
   /** the declarations that could not be read, one message each (review 5.5) */
   declErrors: string[];
+  /** a chip for every declaration that was read from prose, with its origin */
+  harvested: Chip[];
 }
 
 /**

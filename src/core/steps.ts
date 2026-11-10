@@ -429,22 +429,130 @@ export function extractProse(src: string): string[] {
   return out;
 }
 
-/** Harvests declarations written in prose, such as "where A ∈ R^{n×n}". */
-export function harvestProseDecls(prose: string[]): string[] {
-  const found: string[] = [];
-  for (const line of prose) {
-    const m = line.match(/\bwhere\b\s*([\s\S]+)$/i);
-    if (!m) continue;
-    const rest = m[1];
-    for (const piece of rest.split(/[,;]\s*(?=[A-Za-z\\])/)) {
-      const t = piece.trim();
-      if (!t) continue;
-      if (/\\in\s*\\mathbb|\\succ|\\succeq|\\sim|\\top\s*\w*\s*=|:/.test(t)) {
-        found.push(t);
+/** A symbol in the papers: plain, or with an accent command. */
+const SYM_SRC = String.raw`(?:\\[A-Za-z][A-Za-z0-9]*(?:\{[A-Za-z0-9_]+\}|_[A-Za-z0-9]+)?|[A-Za-z][A-Za-z0-9_]*)`;
+
+/** A declaration read from prose, with where it came from. */
+export interface HarvestedDecl {
+  /** the declaration, in the compact syntax */
+  decl: string;
+  /** the name it declares */
+  name: string;
+  /** the line the sentence came from, 1 based */
+  line: number;
+  /** the sentence, for the chip */
+  sentence: string;
+}
+
+/** The adjectives and what they declare, longest name first. */
+const ADJECTIVES: Array<[RegExp, string]> = [
+  [/symmetric positive definite/i, 'spd'],
+  [/symmetric positive semidefinite/i, 'psd'],
+  [/symmetric/i, 'sym'],
+  [/positive semidefinite/i, 'psd'],
+  [/positive definite/i, 'spd'],
+  [/orthogonal/i, 'orth'],
+  [/diagonal/i, 'diag'],
+  [/skew[- ]symmetric/i, 'skew'],
+  [/idempotent/i, 'idem'],
+  [/projection/i, 'proj'],
+  [/stochastic/i, 'stoch'],
+];
+
+/** Reads the sizes out of a \\mathbb{R} notation, in canonical order. */
+function sizeOf(dim: string): string | null {
+  const t = dim.replace(/\s/g, '').replace(/\\times/g, 'x');
+  const m = t.match(/^([0-9a-zA-Z]+)x([0-9a-zA-Z]+)$/);
+  if (m) {
+    if (/^[0-9a-zA-Z]+$/.test(m[1]) && /^[0-9a-zA-Z]+$/.test(m[2])) return `${m[1]}×${m[2]}`;
+    return null;
+  }
+  if (/^[0-9a-zA-Z]+$/.test(t)) return t;
+  return null;
+}
+
+/**
+ * Harvests declarations written in prose, such as "where A ∈ R^{n×n}".
+ *
+ * Real papers write the declaration in words, in the surrounding sentence,
+ * and not in a where clause. The trigger is any of the usual words, the
+ * inline math is lifted out before matching, and the adjectives are read
+ * the way a person reads them: "symmetric positive definite $\\Sigma$"
+ * is one declaration.
+ */
+export function harvestProseDeclsDetailed(proseLines: Array<{ line: number; text: string }>): HarvestedDecl[] {
+  const found: HarvestedDecl[] = [];
+  const push = (decl: string, name: string, line: number, sentence: string): void => {
+    if (found.some((f) => f.name === name)) return;
+    found.push({ decl, name, line, sentence });
+  };
+  for (const { line, text } of proseLines) {
+    const trigger = text.match(/\b(where|let|given|for|with|suppose|assume|denote|consider)\b([\s\S]*)$/i);
+    if (!trigger) continue;
+    const rest = trigger[2] ?? '';
+    const sentence = text.trim();
+    // the inline math the sentence carries
+    const maths: Array<{ text: string; from: number }> = [];
+    for (const pattern of [/\$([^$]+)\$/g, /\\\(([^)]+)\\\)/g]) {
+      for (const m of rest.matchAll(pattern)) {
+        maths.push({ text: m[1].trim(), from: m.index ?? 0 });
+      }
+    }
+    for (const math of maths) {
+      // $A \\in \\mathbb{R}^{n\\times n}$ or $A \\in \\mathbb{R}^M$
+      // the assignment form: $\mathbf{v} = \dots \in \mathbb{R}^M$ — the subject is the first symbol
+      const assignMatch = math.text.match(new RegExp(`^(${SYM_SRC})\\s*=[\\s\\S]*?\\\\in\\s*\\\\mathbb\\{R\\}\\^\\s*\\{?\\s*([0-9a-zA-Z]+(?:\\s*\\\\times\\s*[0-9a-zA-Z]+)?)\\s*\\}?`));
+      const inMatch = assignMatch ?? math.text.match(new RegExp(`(${SYM_SRC})\\s*\\\\in\\s*\\\\mathbb\\{R\\}\\^\\s*\\{?\\s*([0-9a-zA-Z]+(?:\\s*\\\\times\\s*[0-9a-zA-Z]+)?)\\s*\\}?`));
+      if (inMatch) {
+        const size = sizeOf(inMatch[2]);
+        if (size) {
+          push(`${inMatch[1]}: ${size}`, inMatch[1], line, sentence);
+          continue;
+        }
+      }
+      // $B \\sim \\mathcal{N}(\\mu, \\Sigma)$
+      const simMatch = math.text.match(new RegExp(`(${SYM_SRC})\\s*\\\\sim\\s*\\\\mathcal\\{N\\}\\(([^)]*)\\)`));
+      if (simMatch) {
+        push(`${simMatch[1]} ~ N(${simMatch[2]})`, simMatch[1], line, sentence);
+        continue;
+      }
+      // $\\Sigma \\succ 0$ or $\\Sigma \\succeq 0$
+      const succMatch = math.text.match(new RegExp(`(${SYM_SRC})\\s*\\\\succ(?:eq)?\\s*0`));
+      if (succMatch) {
+        push(`${succMatch[1]}: spd n`, succMatch[1], line, sentence);
+        continue;
+      }
+    }
+    // the adjectives in the prose, attached to the next symbol in math
+    const adjMatches = [...rest.matchAll(new RegExp(`([A-Za-z][A-Za-z ]+?)\\s*\\$(${SYM_SRC})\\$`, 'g'))];
+    for (const m of adjMatches) {
+      for (const [pattern, prop] of ADJECTIVES) {
+        if (pattern.test(m[1])) {
+          push(`${m[2]}: ${prop} n`, m[2], line, sentence);
+          break;
+        }
+      }
+    }
+    // a symbol all by itself in math, with an adjective anywhere in the sentence
+    if (!found.some((f) => f.line === line)) {
+      for (const [pattern, prop] of ADJECTIVES) {
+        if (!pattern.test(rest)) continue;
+        for (const math of maths) {
+          const bare = math.text.match(new RegExp(`^(${SYM_SRC})$`));
+          if (bare) {
+            push(`${bare[1]}: ${prop} n`, bare[1], line, sentence);
+            break;
+          }
+        }
       }
     }
   }
   return found;
+}
+
+/** Harvests declarations written in prose, such as "where A ∈ R^{n×n}". */
+export function harvestProseDecls(prose: string[]): string[] {
+  return harvestProseDeclsDetailed(prose.map((text) => ({ line: 0, text }))).map((h) => h.decl);
 }
 
 /**
@@ -454,21 +562,39 @@ export function harvestProseDecls(prose: string[]): string[] {
  * Every caller passes the raw source, so the checker itself reads these:
  * the CLI, the MCP server and the app all see the same declarations.
  */
-export function harvestDecls(src: string): string[] {
+/** The harvested declarations, with their origin for the chips. */
+export interface HarvestResult {
+  /** the declarations, in the compact syntax */
+  decls: string[];
+  /** the declarations that came from prose, with the line they came from */
+  fromProse: HarvestedDecl[];
+}
+
+export function harvestDeclsDetailed(src: string): HarvestResult {
   const comments: string[] = [];
-  const whereLines: string[] = [];
-  for (const line of src.split('\n')) {
-    const trimmed = line.trim();
+  const proseLines: Array<{ line: number; text: string }> = [];
+  const lines = src.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
     const comment = trimmed.match(/%\s*samosa:\s*(.+)$/);
     if (comment) {
       comments.push(comment[1].trim());
       continue;
     }
     if (!trimmed || trimmed.startsWith('%')) continue;
-    if (/\bwhere\b/i.test(trimmed)) whereLines.push(trimmed);
+    if (/\b(where|let|given|for|with|suppose|assume|denote|consider)\b/i.test(trimmed)) {
+      proseLines.push({ line: i + 1, text: trimmed });
+    }
   }
-  return [...comments, ...harvestProseDecls(whereLines)];
+  const detailed = harvestProseDeclsDetailed(proseLines);
+  return { decls: [...comments, ...detailed.map((d) => d.decl)], fromProse: detailed };
 }
+
+export function harvestDecls(src: string): string[] {
+  return harvestDeclsDetailed(src).decls;
+}
+
+/** The span of a row inside the source. */
 
 /** The span of a row inside the source. */
 export function rowSpan(row: SourceRow): Span {
