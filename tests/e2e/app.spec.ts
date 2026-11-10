@@ -367,6 +367,46 @@ test('the app is installable and works offline-ish', async ({ page }) => {
   expect(state.active).toBe('activated');
 });
 
+test('a paper with two blocks gets an outline, and the wrong row shows in it', async ({ page }) => {
+  const PAPER = readFileSync('tests/e2e/action/paper-wrong.tex', 'utf8');
+
+  // open the paper with the button under the source pane
+  await page.setInputFiles('input[aria-label="open a .tex file"]', 'tests/e2e/action/paper-wrong.tex');
+  await expect(page.locator('[data-step-id]').first()).toBeVisible({ timeout: 30_000 });
+
+  // the rail lists the two math blocks, with the rows they hold
+  const rail = page.getByRole('navigation', { name: 'the blocks of the document' });
+  await expect(rail).toBeVisible();
+  await expect(rail.getByText('align*')).toHaveCount(2);
+  await expect(rail.getByText('rows 1–1')).toBeVisible();
+  await expect(rail.getByText('rows 2–3')).toBeVisible();
+
+  // the wrong row is marked in its block
+  await expect(rail.getByText('1 ✗')).toBeVisible();
+  await expect(page.locator('[data-verdict="wrong"]')).toHaveCount(1);
+
+  // jumping to the second block selects its first row
+  await rail.getByText('rows 2–3').click();
+  await expect(page.locator('[data-step-id]').nth(1)).toHaveAttribute('data-verdict', 'ok');
+
+  // the engine read the declarations from the comment at the top of the file
+  expect(PAPER).toContain('% samosa:');
+});
+
+test('a .tex file dropped on the source pane loads into the editor', async ({ page }) => {
+  const PAPER = readFileSync('tests/e2e/action/paper-wrong.tex', 'utf8');
+  const dataTransfer = await page.evaluateHandle((text) => {
+    const transfer = new DataTransfer();
+    transfer.items.add(new File([text], 'paper.tex', { type: 'text/x-tex' }));
+    return transfer;
+  }, PAPER);
+  const pane = page.locator('section', { has: page.locator('.cm-content') }).first();
+  await pane.dispatchEvent('dragover');
+  await pane.dispatchEvent('drop', { dataTransfer });
+  await expect(page.locator('[data-step-id]').first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('[data-verdict="wrong"]')).toHaveCount(1);
+});
+
 test('the light theme is remembered', async ({ page }) => {
   await page.goto('/app/');
   await page.waitForSelector('.cm-content');

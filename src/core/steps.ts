@@ -63,6 +63,53 @@ const MATRIX_ENVS = new Set([
 /** The environments whose text is never mathematics. */
 const VERBATIM_ENVS = new Set(['verbatim', 'verbatim*', 'lstlisting', 'minted', 'comment', 'filecontents']);
 
+/** One block of mathematics: an align, an equation, a display, or a line of a paper. */
+export interface MathBlock {
+  /** the environment that holds the block, like align*, equation or $$ */
+  env: string;
+  /** the offset of the \begin{...} or of the opening \$\$ */
+  from: number;
+  /** the offset just past the last row of the block */
+  to: number;
+  /** the first row of the block, 1 based, as the engine indexes its steps */
+  rowFrom: number;
+  /** the last row of the block, 1 based */
+  rowTo: number;
+}
+
+/**
+ * The blocks of mathematics in a source.
+ *
+ * A derivation with more than one math environment has an outline, and the
+ * outline needs the blocks in order with the rows they hold, so the rail
+ * in the app can jump to one and the counts of the rows inside can be
+ * read straight off the report.
+ */
+export function mathBlocks(src: string): MathBlock[] {
+  const rows = splitRows(src);
+  const byWhere = new Map<string, Array<{ row: number; to: number }>>();
+  rows.forEach((row, index) => {
+    if (row.where === 'line') return;
+    const at = row.where.lastIndexOf('@');
+    if (at < 0) return;
+    const members = byWhere.get(row.where) ?? [];
+    members.push({ row: index + 1, to: row.to });
+    byWhere.set(row.where, members);
+  });
+  const blocks: MathBlock[] = [];
+  for (const [where, members] of byWhere) {
+    const at = where.lastIndexOf('@');
+    blocks.push({
+      env: where.slice(0, at),
+      from: Number(where.slice(at + 1)),
+      to: members[members.length - 1].to,
+      rowFrom: members[0].row,
+      rowTo: members[members.length - 1].row,
+    });
+  }
+  return blocks.sort((a, b) => a.from - b.from);
+}
+
 export function splitRows(src: string): SourceRow[] {
   const rows: SourceRow[] = [];
   const prose: string[] = [];

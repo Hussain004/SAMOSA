@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApp, shareUrl, runCheck, DEFAULT_SOURCE } from './store.ts';
 import { SourceEditor } from './SourceEditor.tsx';
 import { RenderedRows } from './RenderedRows.tsx';
+import { DocumentOutline } from './DocumentOutline.tsx';
 import { Inspector } from './Inspector.tsx';
 import { CommandPalette, Menu, PresetList, type Command } from './Menu.tsx';
 import { DeclarationsStrip } from './Declarations.tsx';
@@ -71,6 +72,10 @@ export function App() {
   const [sheetHeight, setSheetHeight] = useState<number | null>(null);
   const sheetDrag = useRef<{ startY: number; startHeight: number } | null>(null);
   const [undoToast, setUndoToast] = useState<{ row: number; previous: string } | null>(null);
+  const fileInput = useRef<HTMLInputElement | null>(null);
+  const openTexFile = useCallback((file: File) => {
+    void file.text().then((text) => setSource(text));
+  }, [setSource]);
   const undoTimer = useRef<number | undefined>(undefined);
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const [theme, setTheme] = useState<'dark' | 'light'>(() =>
@@ -515,23 +520,57 @@ export function App() {
         <section
           className={`${
             mobilePane === 'source' ? 'flex' : 'hidden'
-          } min-h-0 flex-col border-b border-[var(--color-line)] md:flex md:border-b-0 md:border-r`}
+          } min-h-0 border-b border-[var(--color-line)] md:flex md:border-b-0 md:border-r`}
+          onDragOver={(event) => {
+            // a .tex file dropped anywhere in the source pane loads into the editor
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'copy';
+          }}
+          onDrop={(event) => {
+            event.preventDefault();
+            const file = event.dataTransfer.files?.[0];
+            if (file) void openTexFile(file);
+          }}
         >
-          <div className="flex items-center justify-between px-3 py-1.5">
-            <span className="pane-title">source</span>
-            <span className="text-[0.625rem] text-[var(--color-faint)]">{source.length} characters</span>
-          </div>
-          <div className="min-h-0 flex-1">
-            <SourceEditor
-              value={source}
-              onChange={setSource}
-              report={report}
-              selectedStep={selectedStep}
-              onSelectStep={select}
-              hideDiagnostics={spotTheBug && !revealed}
-              hoverStep={hoverStep}
-              onHoverStep={setHoverStep}
-            />
+          <DocumentOutline source={source} report={report} selectedStep={selectedStep} onJump={select} />
+          <div className="flex min-h-0 flex-1 flex-col">
+            <div className="flex items-center justify-between px-3 py-1.5">
+              <span className="pane-title">source</span>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => fileInput.current?.click()}
+                  title="open a .tex, .md or .txt file (nothing leaves the browser)"
+                  className="text-[0.625rem] text-[var(--color-faint)] hover:text-[var(--color-text)]"
+                >
+                  open .tex
+                </button>
+                <input
+                  ref={fileInput}
+                  type="file"
+                  accept=".tex,.md,.txt"
+                  className="hidden"
+                  aria-label="open a .tex file"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) void openTexFile(file);
+                    event.target.value = '';
+                  }}
+                />
+                <span className="text-[0.625rem] text-[var(--color-faint)]">{source.length} characters</span>
+              </div>
+            </div>
+            <div className="min-h-0 flex-1">
+              <SourceEditor
+                value={source}
+                onChange={setSource}
+                report={report}
+                selectedStep={selectedStep}
+                onSelectStep={select}
+                hideDiagnostics={spotTheBug && !revealed}
+                hoverStep={hoverStep}
+                onHoverStep={setHoverStep}
+              />
+            </div>
           </div>
         </section>
 
