@@ -80,6 +80,14 @@ test('a quick fix applies', async ({ page }) => {
 
   // the row is right now
   await expect(page.getByText('wrong').first()).toHaveCount(0, { timeout: 15_000 });
+
+  // ctrl+z puts the row back the way it was, with the history of one edit,
+  // not one whole-document replacement
+  await page.locator('.cm-content').click();
+  await page.keyboard.press('Control+Z');
+  const restored = await page.locator('.cm-content').innerText();
+  expect(restored).not.toContain('K_t Q_t K_t^\\top');
+  await expect(page.getByText('wrong').first()).toBeVisible({ timeout: 15_000 });
 });
 
 test('the share link round trips, with the derivation in it', async ({ page }) => {

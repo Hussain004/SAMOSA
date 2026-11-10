@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { EditorState } from '@codemirror/state';
+import { EditorState, Transaction } from '@codemirror/state';
 import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
 import { lintGutter, lintKeymap, setDiagnostics, type Diagnostic as CmDiagnostic } from '@codemirror/lint';
@@ -75,14 +75,31 @@ export function SourceEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // push the external value in, when it is not the one the editor has
+  // push the external value in, when it is not the one the editor has: the
+  // smallest edit that turns one into the other, so the cursor, the
+  // selection and the undo history survive a fix (review §2.4)
   useEffect(() => {
     const v = view.current;
     if (!v) return;
     const current = v.state.doc.toString();
-    if (current !== value) {
-      v.dispatch({ changes: { from: 0, to: current.length, insert: value } });
+    if (current === value) return;
+    let prefix = 0;
+    const limit = Math.min(current.length, value.length);
+    while (prefix < limit && current.charCodeAt(prefix) === value.charCodeAt(prefix)) prefix++;
+    let suffix = 0;
+    const aTail = current.length - prefix;
+    const bTail = value.length - prefix;
+    const tail = Math.min(aTail, bTail);
+    while (suffix < tail && current.charCodeAt(current.length - 1 - suffix) === value.charCodeAt(value.length - 1 - suffix)) {
+      suffix++;
     }
+    v.dispatch({
+      changes: { from: prefix, to: current.length - suffix, insert: value.slice(prefix, value.length - suffix) },
+      // an external push is its own undo unit: it must not merge into the
+      // typing the user did a moment ago, or ctrl+z throws away the whole
+      // derivation instead of the fix (review §2.4)
+      annotations: [Transaction.userEvent.of('samosa.sync')],
+    });
   }, [value]);
 
   // the diagnostics: one squiggle per step
