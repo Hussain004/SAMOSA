@@ -14,6 +14,8 @@ export interface RenderedProps {
   onSelectStep: (id: string) => void;
   hoverStep: string | null;
   onHoverStep: (id: string | null) => void;
+  /** the order of the rows, for the keyboard */
+  stepOrder: StepResult[];
   /** the spot the bug game: the badges are hidden until the user guesses */
   spotTheBug: boolean;
   /** the row the user guessed, and the row that is really wrong */
@@ -39,6 +41,7 @@ export function RenderedRows({
   spotTheBug,
   guess,
   revealed,
+  stepOrder,
 }: RenderedProps) {
   if (!report || report.steps.length === 0) {
     // on the first paint there is nothing to say yet, so the page does not
@@ -67,7 +70,12 @@ export function RenderedRows({
   }
 
   return (
-    <div className="h-full overflow-auto px-4 py-3">
+    <div
+      className="h-full overflow-auto px-4 py-3"
+      role="listbox"
+      aria-label="the rows of the derivation"
+      aria-activedescendant={selectedStep ?? undefined}
+    >
       {report.steps.map((step) => (
         <Row
           key={step.id}
@@ -78,7 +86,8 @@ export function RenderedRows({
           spotTheBug={spotTheBug}
           guess={guess}
           revealed={revealed}
-          onSelect={() => onSelectStep(step.id)}
+          stepOrder={stepOrder}
+          onSelect={onSelectStep}
           onHover={(on) => onHoverStep(on ? step.id : null)}
         />
       ))}
@@ -94,6 +103,7 @@ function Row({
   spotTheBug,
   guess,
   revealed,
+  stepOrder,
   onSelect,
   onHover,
 }: {
@@ -104,7 +114,8 @@ function Row({
   spotTheBug: boolean;
   guess: string | null;
   revealed: string | null;
-  onSelect: () => void;
+  stepOrder: StepResult[];
+  onSelect: (id: string) => void;
   onHover: (on: boolean) => void;
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
@@ -117,15 +128,68 @@ function Row({
     if (selected) ref.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }, [selected]);
 
+  const move = (delta: number): void => {
+    const at = stepOrder.findIndex((s) => s.id === step.id);
+    const next = Math.max(0, Math.min(stepOrder.length - 1, at + delta));
+    const target = stepOrder[next];
+    if (target) {
+      onSelect(target.id);
+      // focus follows selection: the roving tabIndex moves with it
+      document.getElementById(target.id)?.focus();
+    }
+  };
+  const nextProblem = (delta: number): void => {
+    const at = stepOrder.findIndex((s) => s.id === step.id);
+    for (let i = at + delta; i >= 0 && i < stepOrder.length; i += delta) {
+      if (stepOrder[i].verdict !== 'ok') {
+        onSelect(stepOrder[i].id);
+        document.getElementById(stepOrder[i].id)?.focus();
+        return;
+      }
+    }
+  };
+
   return (
     <div
       ref={ref}
+      id={step.id}
+      role="option"
+      aria-selected={selected}
+      tabIndex={selected ? 0 : -1}
       data-step-id={step.id}
       data-verdict={step.verdict}
-      onClick={onSelect}
+      onClick={() => onSelect(step.id)}
       onMouseEnter={() => onHover(true)}
       onMouseLeave={() => onHover(false)}
-      className={`group flex cursor-pointer items-start gap-3 rounded-md border-l-2 px-2 py-2 transition-colors ${
+      onKeyDown={(e) => {
+        switch (e.key) {
+          case 'Enter':
+          case ' ':
+            e.preventDefault();
+            onSelect(step.id);
+            return;
+          case 'ArrowDown':
+          case 'j':
+            e.preventDefault();
+            move(1);
+            return;
+          case 'ArrowUp':
+          case 'k':
+            e.preventDefault();
+            move(-1);
+            return;
+          case 'n':
+            e.preventDefault();
+            nextProblem(1);
+            return;
+          case 'p':
+            e.preventDefault();
+            nextProblem(-1);
+            return;
+          default:
+        }
+      }}
+      className={`group flex cursor-pointer items-start gap-3 rounded-md border-l-2 px-2 py-2 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-gold)] ${
         selected
           ? 'border-l-[var(--color-gold)] bg-[#e8b04b12]'
           : hovered

@@ -235,6 +235,19 @@ export function App() {
     for (const s of report?.steps ?? []) out[s.verdict] += 1;
     return out;
   }, [report]);
+  // the sentence a screen reader hears, once per check, not on every keystroke
+  const summary = useMemo(() => {
+    const total = report?.steps.length ?? 0;
+    if (!total) return '';
+    const parts: string[] = [];
+    if (counts.ok) parts.push(`${counts.ok} hold`);
+    if (counts.wrong) parts.push(`${counts.wrong} wrong`);
+    if (counts.shape) parts.push(`${counts.shape} shape`);
+    if (counts.inconclusive) parts.push(`${counts.inconclusive} undecided`);
+    if (counts.unchecked) parts.push(`${counts.unchecked} not checked`);
+    if (counts.defined) parts.push(`${counts.defined} defined`);
+    return `${total} rows: ${parts.join(', ')}`;
+  }, [counts, report?.steps.length]);
 
   return (
     <main className="flex h-full flex-col overflow-y-auto bg-[var(--color-ink)] text-[var(--color-text)]">
@@ -410,27 +423,19 @@ export function App() {
         </div>
       )}
 
-      {menuOpen && (
-        <div className="absolute inset-0 z-20 overflow-auto bg-black/70 p-6" onClick={() => setMenuOpen(false)}>
-          <div
-            className="mx-auto max-h-[80vh] max-w-4xl overflow-auto rounded border border-[var(--color-line)] bg-[var(--color-panel)]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Menu
-              onPick={(src, decls) => {
-                setSource(src);
-                setSettings({ decls });
-                setMenuOpen(false);
-              }}
-              onSpotTheBug={(src, decls, id) => {
-                startSpotTheBug(src, decls, id);
-                setMenuOpen(false);
-              }}
-              onClose={() => setMenuOpen(false)}
-            />
-          </div>
-        </div>
-      )}
+      <MenuDialog
+        open={menuOpen}
+        onPick={(src, decls) => {
+          setSource(src);
+          setSettings({ decls });
+          setMenuOpen(false);
+        }}
+        onSpotTheBug={(src, decls, id) => {
+          startSpotTheBug(src, decls, id);
+          setMenuOpen(false);
+        }}
+        onClose={() => setMenuOpen(false)}
+      />
 
       <DeclarationsStrip
         decls={settings.decls}
@@ -476,6 +481,7 @@ export function App() {
               selectedStep={selectedStep}
               hoverStep={hoverStep}
               onHoverStep={setHoverStep}
+              stepOrder={report?.steps ?? []}
               onSelectStep={(id) => {
                 select(id);
                 // on a phone the card is a bottom sheet, so a tap opens it
@@ -584,8 +590,52 @@ export function App() {
         )}
       </footer>
 
+      <span className="sr-only" role="status" aria-live="polite">{summary}</span>
       <CommandPalette commands={commands} open={paletteOpen} onClose={() => setPaletteOpen(false)} />
     </main>
+  );
+}
+
+/**
+ * The Menu as a native dialog: focus is trapped, Escape closes, and the
+ * backdrop click works too. The browser gives all of it for free.
+ */
+function MenuDialog({
+  open,
+  onPick,
+  onSpotTheBug,
+  onClose,
+}: {
+  open: boolean;
+  onPick: (source: string, decls: string) => void;
+  onSpotTheBug?: (source: string, decls: string, id: string) => void;
+  onClose: () => void;
+}) {
+  const dialog = useRef<HTMLDialogElement | null>(null);
+  useEffect(() => {
+    const d = dialog.current;
+    if (!d) return;
+    if (open && !d.open) d.showModal();
+    if (!open && d.open) d.close();
+  }, [open]);
+  if (!open) return null;
+  return (
+    <dialog
+      ref={dialog}
+      aria-label="the derivation menu"
+      onCancel={onClose}
+      onClose={onClose}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="m-0 mx-auto mt-[5vh] max-h-[85vh] w-[min(920px,94vw)] overflow-auto border border-[var(--color-line)] bg-[var(--color-panel)] p-0 text-[var(--color-text)] backdrop:bg-black/60"
+    >
+      <Menu
+        onPick={onPick}
+        onSpotTheBug={onSpotTheBug}
+        onClose={onClose}
+      />
+    </dialog>
   );
 }
 

@@ -306,6 +306,14 @@ test('the whole flow works with the keyboard alone', async ({ page }) => {
   await page.keyboard.press('Control+A');
   await page.keyboard.type(DERIVATION);
   await expect(page.getByText('wrong').first()).toBeVisible({ timeout: 15_000 });
+
+  // the rows are in the tab order: focus one, Enter opens its card, arrows move the selection
+  const rows = page.getByRole('option');
+  await rows.first().focus();
+  await page.keyboard.press('Enter');
+  await expect(rows.first()).toHaveAttribute('aria-selected', 'true', { timeout: 5_000 });
+  await page.keyboard.press('ArrowDown');
+  await expect(rows.nth(1)).toHaveAttribute('aria-selected', 'true', { timeout: 5_000 });
 });
 
 test('the light theme is remembered', async ({ page }) => {
