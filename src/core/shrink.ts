@@ -11,7 +11,7 @@ import { type Val } from './value.ts';
 import type { TypeContext } from './types.ts';
 import type { Prop } from './decl.ts';
 import { dimSizeOf } from './types.ts';
-import { NUMPY_PRELUDE, numpyExpression, numpyNames, symbolsOf, type NumpyNames } from './numpy.ts';
+import { NUMPY_PRELUDE, JULIA_PRELUDE, MATLAB_PRELUDE, numpyExpression, numpyNames, symbolsOf, rationalize, type NumpyNames, type SnippetLang } from './numpy.ts';
 
 /**
  * Counterexample shrinking.
@@ -46,6 +46,10 @@ export interface ShrunkInstance {
   rhsShape: [number, number];
   diffShape: [number, number];
   numpy: string;
+  /** the same instance, in Julia */
+  julia: string;
+  /** the same instance, in MATLAB */
+  matlab: string;
 }
 
 interface ShrinkCtx {
@@ -406,18 +410,33 @@ function describe<T>(
     lhsShape: valueShape(lhs),
     rhsShape: valueShape(rhs),
     diffShape: lhs.k === 'm' && rhs.k === 'm' ? [lhs.m.r, lhs.m.c] : [1, 1],
-    numpy: toNumpy(ctx, sizes, lhsNode, rhsNode, defs, plain),
+    numpy: toSnippet('numpy', ctx, sizes, lhsNode, rhsNode, defs, plain),
+    julia: toSnippet('julia', ctx, sizes, lhsNode, rhsNode, defs, plain),
+    matlab: toSnippet('matlab', ctx, sizes, lhsNode, rhsNode, defs, plain),
   };
 }
 
+/** Backwards compatible name: the NumPy snippet. */
+export function toNumpy(
+  ctx: TypeContext,
+  sizes: Map<string, number>,
+  lhsNode: Node,
+  rhsNode: Node,
+  defs: Map<string, Node>,
+  values: Record<string, number[] | number>,
+): string {
+  return toSnippet('numpy', ctx, sizes, lhsNode, rhsNode, defs, values);
+}
+
 /**
- * A self contained NumPy snippet that reproduces the counterexample.
+ * A self contained snippet in one language that reproduces the counterexample.
  *
  * The snippet names the symbols the way a person can type them, uses the
  * declared shapes, computes the symbols the derivation defines, and prints
  * the difference of the two sides. Run it, and it shows why the step fails.
  */
-export function toNumpy(
+export function toSnippet(
+  lang: SnippetLang,
   ctx: TypeContext,
   sizes: Map<string, number>,
   lhsNode: Node,
@@ -435,7 +454,8 @@ export function toNumpy(
   }
   const names = numpyNames([...symbols]);
 
-  const lines: string[] = [NUMPY_PRELUDE, ''];
+  const PRELUDE = { numpy: NUMPY_PRELUDE, julia: JULIA_PRELUDE, matlab: MATLAB_PRELUDE }[lang];
+  const lines: string[] = [PRELUDE, ''];
   lines.push('# the values that break the step');
   for (const symbol of names.order) {
     if (defs.has(symbol)) continue;
@@ -445,12 +465,14 @@ export function toNumpy(
       const info = ctx.symbols.get(symbol);
       if (info && info.props.includes('ident')) {
         const size = info.ty.t === 'mat' ? dimSizeOf(ctx, info.ty.r, sizes) : 1;
-        lines.push(`${names.map.get(symbol)} = np.eye(${size}, dtype=object)`);
+        if (lang === 'numpy') lines.push(`${names.map.get(symbol)} = np.eye(${size}, dtype=object)`);
+        else if (lang === 'julia') lines.push(`${names.map.get(symbol)} = Matrix{Rational{BigInt}}(I, ${size}, ${size})`);
+        else lines.push(`${names.map.get(symbol)} = eye(${size}, 'sym')`);
       }
       continue;
     }
     const shape = shapeOf(ctx, symbol, sizes);
-    lines.push(`${names.map.get(symbol)} = ${literal(value, shape)}`);
+    lines.push(`${names.map.get(symbol)} = ${literal(lang, value, shape)}`);
   }
 
   const defined = [...defs.keys()].filter((name) => names.map.has(name));
@@ -460,9 +482,9 @@ export function toNumpy(
     for (const name of defined) {
       const node = defs.get(name);
       if (!node) continue;
-      const defText = numpySide(node, ctx, names);
+      const defText = expressionSide(lang, node, ctx, names);
       if (defText === null) {
-        lines.push('# a definition the printer cannot write in NumPy');
+        lines.push('# a definition the printer cannot write in this language');
       } else {
         lines.push(`${names.map.get(name)} = ${defText}`);
       }
@@ -471,16 +493,16 @@ export function toNumpy(
 
   lines.push('');
   lines.push('# the two sides of the step, with these values');
-  const lhsText = numpySide(lhsNode, ctx, names);
-  const rhsText = numpySide(rhsNode, ctx, names);
+  const lhsText = expressionSide(lang, lhsNode, ctx, names);
+  const rhsText = expressionSide(lang, rhsNode, ctx, names);
   if (lhsText === null || rhsText === null) {
     // the printer refused the expression, so the snippet says so instead of
     // printing a difference the engine never computed
-    lines.push('# the expression of this step cannot be written in NumPy');
+    lines.push(`# the expression of this step cannot be written in ${{ numpy: 'NumPy', julia: 'Julia', matlab: 'MATLAB' }[lang]}`);
   } else {
     lines.push(`lhs = ${lhsText}`);
     lines.push(`rhs = ${rhsText}`);
-    lines.push('print(lhs - rhs)');
+    lines.push(lang === 'matlab' ? 'disp(lhs - rhs)' : lang === 'julia' ? 'println(lhs - rhs)' : 'print(lhs - rhs)');
   }
   lines.push('');
   lines.push('# the values above are the ones SAMOSA found; the two sides differ with them');
@@ -488,11 +510,11 @@ export function toNumpy(
 }
 
 /**
- * The NumPy text of one expression, or null when the printer refuses it.
+ * The text of one expression, or null when the printer refuses it.
  */
-function numpySide(node: Node, ctx: TypeContext, names: NumpyNames): string | null {
+function expressionSide(lang: SnippetLang, node: Node, ctx: TypeContext, names: NumpyNames): string | null {
   try {
-    return numpyExpression(node, ctx, names);
+    return numpyExpression(node, ctx, names, lang);
   } catch {
     return null;
   }
@@ -507,16 +529,31 @@ function shapeOf(ctx: TypeContext, symbol: string, sizes: Map<string, number>): 
   return [r, c];
 }
 
-/** A value as Python, with the shape it has. */
-function literal(value: number[] | number, shape: [number, number]): string {
-  if (typeof value === 'number') return `Fraction('${value}')`;
+/** A scalar cell in the language, with small rationals where they exist. */
+function scalarCell(lang: SnippetLang, x: number): string {
+  if (lang === 'numpy') return `Fraction('${x}')`;
+  const rational = rationalize(x);
+  if (lang === 'julia') return rational ? (rational[1] === 1 ? `${rational[0]}` : `${rational[0]}//${rational[1]}`) : `${x}`;
+  return rational ? (rational[1] === 1 ? `sym(${rational[0]})` : `sym(${rational[0]})/sym(${rational[1]})`) : `sym(${x})`;
+}
+
+/** A value in the language, with the shape it has. */
+function literal(lang: SnippetLang, value: number[] | number, shape: [number, number]): string {
+  if (typeof value === 'number') return scalarCell(lang, value);
   const [rows, cols] = shape;
-  const out: string[] = [];
-  for (let i = 0; i < rows; i++) {
-    const row = value
-      .slice(i * cols, (i + 1) * cols)
-      .map((x) => `Fraction('${x}')`);
-    out.push(`[${row.join(', ')}]`);
+  const cell = (x: number) => scalarCell(lang, x);
+  const rowAt = (i: number) => value.slice(i * cols, (i + 1) * cols).map(cell);
+  if (lang === 'numpy') {
+    const out: string[] = [];
+    for (let i = 0; i < rows; i++) out.push(`[${rowAt(i).join(', ')}]`);
+    return `np.array([${out.join(', ')}], dtype=object)`;
   }
-  return `np.array([${out.join(', ')}], dtype=object)`;
+  if (lang === 'julia') {
+    const out: string[] = [];
+    for (let i = 0; i < rows; i++) out.push(rowAt(i).join(' '));
+    return `[${out.join('; ')}]`;
+  }
+  const out: string[] = [];
+  for (let i = 0; i < rows; i++) out.push(rowAt(i).join(' '));
+  return `[${out.join('; ')}]`;
 }

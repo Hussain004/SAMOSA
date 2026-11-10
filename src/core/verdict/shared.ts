@@ -429,6 +429,8 @@ export function buildCounterexample<T>(
     rhs: null,
     diff: null,
     numpy: '',
+    julia: '',
+    matlab: '',
     debug: { residues, lhs: lhsVal, rhs: rhsVal, diff },
   };
 }

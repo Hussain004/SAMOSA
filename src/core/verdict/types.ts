@@ -43,6 +43,10 @@ export interface Counterexample {
   rhs: unknown;
   diff: unknown;
   numpy: string;
+  /** the same instance, in Julia, with exact rationals */
+  julia: string;
+  /** the same instance, in MATLAB, with sym arithmetic */
+  matlab: string;
   /**
    * The raw residues of the finite field.
    *

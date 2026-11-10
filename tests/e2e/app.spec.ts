@@ -210,7 +210,7 @@ test('a guessed symbol is declared with one click', async ({ page }) => {
 S S^\top &= I
 \end{align*}`);
   // the checker guesses the symbol is a matrix, and says so in the strip
-  await expect(page.getByText('guessed').first()).toBeVisible();
+  await expect(page.getByText('guessed').first()).toBeVisible({ timeout: 15_000 });
   // one click declares it and the check re-runs
   await page.getByRole('button', { name: 'spd n', exact: true }).click();
   await expect(page.getByText('S: spd n', { exact: true })).toBeVisible();

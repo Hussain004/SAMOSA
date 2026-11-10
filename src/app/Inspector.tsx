@@ -199,8 +199,10 @@ function CounterexampleView({
   counterexample: import('../core/index.ts').ShrunkInstance;
   onCopy: (text: string) => void;
 }) {
-  const [copied, setCopied] = useState(false);
-  useEffect(() => setCopied(false), [counterexample]);
+  const [copied, setCopied] = useState<string | null>(null);
+  useEffect(() => setCopied(null), [counterexample]);
+  const [lang, setLang] = useState<'numpy' | 'julia' | 'matlab'>('numpy');
+  const snippet = counterexample[lang];
 
   // The values are drawn as the matrices they are. A symbol the derivation
   // defines is shown under its own heading, because it is computed and not
@@ -253,20 +255,40 @@ function CounterexampleView({
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
+        {(
+          [
+            { id: 'numpy', label: 'NumPy' },
+            { id: 'julia', label: 'Julia' },
+            { id: 'matlab', label: 'MATLAB' },
+          ] as const
+        ).map(({ id, label }) => (
+          <button
+            key={id}
+            onClick={() => setLang(id)}
+            aria-pressed={lang === id}
+            className={`rounded border px-2 py-1 text-[0.625rem] transition-colors ${
+              lang === id
+                ? 'border-[var(--color-gold)] text-[var(--color-gold)]'
+                : 'border-[var(--color-line)] text-[var(--color-muted)] hover:text-[var(--color-text)]'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
         <button
           onClick={() => {
-            onCopy(counterexample.numpy);
-            setCopied(true);
+            onCopy(snippet);
+            setCopied(lang);
           }}
           className="rounded border border-[var(--color-line)] px-2 py-1 text-[0.625rem] text-[var(--color-muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-text)]"
         >
-          {copied ? '✓ copied' : 'copy as NumPy'}
+          {copied === lang ? '✓ copied' : `copy as ${{ numpy: 'NumPy', julia: 'Julia', matlab: 'MATLAB' }[lang]}`}
         </button>
       </div>
       <details className="mt-2">
-        <summary className="cursor-pointer text-[0.625rem] text-[var(--color-faint)]">the NumPy snippet</summary>
+        <summary className="cursor-pointer text-[0.625rem] text-[var(--color-faint)]">the { { numpy: 'NumPy', julia: 'Julia', matlab: 'MATLAB' }[lang] } snippet</summary>
         <pre className="mt-1 max-h-56 overflow-auto rounded border border-[var(--color-line)] bg-black/30 p-2 text-[0.625rem] leading-relaxed">
-          {counterexample.numpy}
+          {snippet}
         </pre>
       </details>
     </div>

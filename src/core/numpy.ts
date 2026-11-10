@@ -2,12 +2,41 @@ import type { Node } from './ir.ts';
 import type { TypeContext } from './types.ts';
 
 /**
- * The NumPy printer.
+ * The snippets.
  *
  * The counterexample has to be reproducible by hand, so the snippet that goes
- * with it computes the two sides and prints the difference. This is the
- * printer that turns the tree into that code.
+ * with it computes the two sides and prints the difference. The same tree is
+ * printed in NumPy (Python, with exact rationals via Fraction), in Julia, and
+ * in MATLAB (sym arithmetic, so the values stay exact). Three languages, one
+ * tree.
  */
+export type SnippetLang = 'numpy' | 'julia' | 'matlab';
+export const SNIPPET_LANG_LABEL: Record<SnippetLang, string> = {
+  numpy: 'NumPy',
+  julia: 'Julia',
+  matlab: 'MATLAB',
+};
+
+/** A small rational, when the double is one; otherwise the double itself. */
+export function rationalize(x: number): [number, number] | null {
+  if (!Number.isFinite(x)) return null;
+  const sign = x < 0 ? -1 : 1;
+  const abs = Math.abs(x);
+  let h1 = 1, h2 = 0, k1 = 0, k2 = 1;
+  let b = abs;
+  const MAX = 1e9;
+  for (let i = 0; i < 40; i++) {
+    const a = Math.floor(b);
+    const h = a * h1 + h2, k = a * k1 + k2;
+    if (k > MAX) break;
+    h2 = h1; h1 = h; k2 = k1; k1 = k;
+    if (b === a) break;
+    b = 1 / (b - a);
+  }
+  if (k1 === 0 || Math.abs(h1 / k1 - abs) > 1e-12) return null;
+  return [sign * h1, k1];
+}
+
 
 /** The commands that decorate a symbol without changing what it is. */
 const ACCENTS = new Set([
@@ -99,15 +128,18 @@ function isMatrixType(ctx: TypeContext, node: Node): boolean {
 }
 
 /**
- * The NumPy code for an expression.
+ * The code for an expression.
  *
- * The matrix product is `@` and the scalar product is `*`, so the printer
- * has to know which is which. Everything else is the same in Python.
+ * The matrix product is `@` only in NumPy (in Julia and MATLAB `*` is the
+ * matrix product); in NumPy the scalar product is `*`, so the printer has to
+ * know which is which. The rest is the same tree in three languages.
  */
-export function numpyExpression(node: Node, ctx: TypeContext, names: NumpyNames): string {
+export function numpyExpression(node: Node, ctx: TypeContext, names: NumpyNames, lang: SnippetLang = 'numpy'): string {
   switch (node.k) {
     case 'num': {
       const v = node.value;
+      if (lang === 'julia') return v.d === 1 ? `${v.n}` : `${v.n}//${v.d}`;
+      if (lang === 'matlab') return v.d === 1 ? `sym(${v.n})` : `sym(${v.n})/sym(${v.d})`;
       if (v.d === 1) return `Fraction(${v.n})`;
       return `Fraction(${v.n}, ${v.d})`;
     }
@@ -119,7 +151,7 @@ export function numpyExpression(node: Node, ctx: TypeContext, names: NumpyNames)
       return name;
     }
     case 'op': {
-      const args = node.args.map((a) => numpyExpression(a, ctx, names));
+      const args = node.args.map((a) => numpyExpression(a, ctx, names, lang));
       switch (node.op) {
         case 'add':
           return `(${args[0]} + ${args[1]})`;
@@ -129,26 +161,42 @@ export function numpyExpression(node: Node, ctx: TypeContext, names: NumpyNames)
           return `(-${args[0]})`;
         case 'mul': {
           // the product of two matrices is a matrix product, and everything
-          // else is a scalar product
-          const bothMatrices = node.args.every((a) => isMatrixType(ctx, a));
-          return bothMatrices ? `(${args[0]} @ ${args[1]})` : `(${args[0]} * ${args[1]})`;
+          // else is a scalar product. Julia and MATLAB spell both with `*`.
+          if (lang === 'numpy') {
+            const bothMatrices = node.args.every((a) => isMatrixType(ctx, a));
+            return bothMatrices ? `(${args[0]} @ ${args[1]})` : `(${args[0]} * ${args[1]})`;
+          }
+          return `(${args[0]} * ${args[1]})`;
         }
         case 'cross':
           // the types left a cross only between two vectors of size 3
-          return `np.cross((${args[0]}).reshape(3), (${args[1]}).reshape(3)).reshape(3, 1)`;
+          if (lang === 'numpy') return `np.cross((${args[0]}).reshape(3), (${args[1]}).reshape(3)).reshape(3, 1)`;
+          if (lang === 'julia') return `cross(vec(${args[0]}), vec(${args[1]}))`;
+          return `cross(${args[0]}, ${args[1]})`;
         case 'div':
           return `(${args[0]} / ${args[1]})`;
         case 'inv':
+          if (lang === 'julia') return `inv(${args[0]})`;
+          if (lang === 'matlab') return `inv(${args[0]})`;
           return `_inv(${args[0]})`;
         case 'invT':
+          if (lang === 'julia') return `inv(${args[0]}).'`;
+          if (lang === 'matlab') return `inv(${args[0]}).'`;
           return `_inv(${args[0]}).T`;
         case 'T':
+          if (lang === 'julia') return `(${args[0]}).'`;
+          if (lang === 'matlab') return `(${args[0]}).'`;
           return `(${args[0]}).T`;
         case 'pow':
-          return `(${args[0]}) ** ${args[1]}`;
+          if (lang === 'numpy') return `(${args[0]}) ** ${args[1]}`;
+          return `(${args[0]}) ^ ${args[1]}`;
         case 'tr':
+          if (lang === 'julia') return `tr(${args[0]})`;
+          if (lang === 'matlab') return `trace(${args[0]})`;
           return `_tr(${args[0]})`;
         case 'det':
+          if (lang === 'julia') return `det(${args[0]})`;
+          if (lang === 'matlab') return `det(${args[0]})`;
           return `_det(${args[0]})`;
         case 'frob':
           return `_frob(${args[0]})`;
@@ -159,6 +207,8 @@ export function numpyExpression(node: Node, ctx: TypeContext, names: NumpyNames)
         case 'diag':
           return `_diag(${args[0]})`;
         case 'abs':
+          if (lang === 'julia') return `abs.(${args[0]})`;
+          if (lang === 'matlab') return `abs(${args[0]})`;
           return `_abs(${args[0]})`;
         case 'sqrtm': {
           // the matrix square root is a matrix thing, and a matrix the
@@ -166,6 +216,8 @@ export function numpyExpression(node: Node, ctx: TypeContext, names: NumpyNames)
           if (isMatrixType(ctx, node.args[0])) {
             throw new Error(`no snippet for the matrix square root of \\${node.args[0].k === 'sym' ? node.args[0].name : node.op}`);
           }
+          if (lang === 'julia') return `sqrt(${args[0]})`;
+          if (lang === 'matlab') return `sqrt(${args[0]})`;
           return `_sqrtm(${args[0]})`;
         }
         default:
@@ -173,18 +225,24 @@ export function numpyExpression(node: Node, ctx: TypeContext, names: NumpyNames)
       }
     }
     case 'call': {
-      const args = node.args.map((a) => numpyExpression(a, ctx, names));
-      if (node.fn === 'tr') return `_tr(${args[0]})`;
-      if (node.fn === 'det') return `_det(${args[0]})`;
+      const args = node.args.map((a) => numpyExpression(a, ctx, names, lang));
+      if (node.fn === 'tr') return lang === 'julia' ? `tr(${args[0]})` : lang === 'matlab' ? `trace(${args[0]})` : `_tr(${args[0]})`;
+      if (node.fn === 'det') return lang === 'julia' ? `det(${args[0]})` : lang === 'matlab' ? `det(${args[0]})` : `_det(${args[0]})`;
       if (node.fn === 'frob') return `_frob(${args[0]})`;
       if (node.fn === 'norm2') return `(${args[0]}) * (${args[0]})`;
       if (node.fn === 'sqrtm') {
         if (isMatrixType(ctx, node.args[0])) {
           throw new Error(`no snippet for the matrix square root of \\${node.args[0].k === 'sym' ? node.args[0].name : node.fn}`);
         }
+        if (lang === 'julia') return `sqrt(${args[0]})`;
+        if (lang === 'matlab') return `sqrt(${args[0]})`;
         return `_sqrtm(${args[0]})`;
       }
-      if (node.fn === 'exp') return `(_exp(${args[0]}))`;
+      if (node.fn === 'exp') {
+        if (lang === 'julia') return `exp.(${args[0]})`;
+        if (lang === 'matlab') return `exp(${args[0]})`;
+        return `(_exp(${args[0]}))`;
+      }
       throw new Error(`no snippet for \\${node.fn}`);
     }
     default:
@@ -295,4 +353,54 @@ def _sqrtm(a):
 def _exp(a):
     values = np.atleast_1d(a)
     return np.array([math.exp(float(x)) for x in values], dtype=object)
+`;
+
+/**
+ * The Julia prelude. Rational{BigInt} is honest exact arithmetic; tr and det
+ * come from LinearAlgebra, the rest is written out here.
+ */
+export const JULIA_PRELUDE = `using LinearAlgebra
+
+function _inner(a, b)
+    return sum(a .* b)
+end
+
+function _frob(a)
+    return sum(abs2, a)
+end
+
+function _diag(a)
+    n = size(a, 1)
+    m = fill(zero(a[1, 1]), n, n)
+    for i in 1:n
+        m[i, i] = a[i, i]
+    end
+    return m
+end
+
+function _abs(a)
+    return abs.(a)
+end
+`;
+
+/**
+ * The MATLAB prelude. Exact rational arithmetic needs the Symbolic Math
+ * Toolbox; the matrices are built with sym(n)/sym(d) so nothing is a float.
+ */
+export const MATLAB_PRELUDE = `% exact rational arithmetic: needs the Symbolic Math Toolbox
+function r = _inner(a, b)
+    r = sum(sum(a .* b));
+end
+
+function r = _frob(a)
+    r = sum(sum(abs(a) .^ 2));
+end
+
+function r = _diag(a)
+    n = size(a, 1);
+    r = zeros(n, n, 'sym');
+    for i = 1:n
+        r(i, i) = a(i, i);
+    end
+end
 `;

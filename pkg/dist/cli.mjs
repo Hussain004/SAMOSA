@@ -5449,6 +5449,8 @@ function buildCounterexample(_ctx, _step, setting, sampled, lhs, rhs, field) {
     rhs: null,
     diff: null,
     numpy: "",
+    julia: "",
+    matlab: "",
     debug: { residues, lhs: lhsVal, rhs: rhsVal, diff }
   };
 }
@@ -10445,6 +10447,27 @@ function base(node) {
 }
 
 // src/core/numpy.ts
+function rationalize(x) {
+  if (!Number.isFinite(x)) return null;
+  const sign2 = x < 0 ? -1 : 1;
+  const abs2 = Math.abs(x);
+  let h1 = 1, h2 = 0, k1 = 0, k2 = 1;
+  let b = abs2;
+  const MAX = 1e9;
+  for (let i = 0; i < 40; i++) {
+    const a = Math.floor(b);
+    const h = a * h1 + h2, k = a * k1 + k2;
+    if (k > MAX) break;
+    h2 = h1;
+    h1 = h;
+    k2 = k1;
+    k1 = k;
+    if (b === a) break;
+    b = 1 / (b - a);
+  }
+  if (k1 === 0 || Math.abs(h1 / k1 - abs2) > 1e-12) return null;
+  return [sign2 * h1, k1];
+}
 var ACCENTS2 = /* @__PURE__ */ new Set([
   "bar",
   "hat",
@@ -10517,10 +10540,12 @@ function isMatrixType(ctx, node) {
   }
   return false;
 }
-function numpyExpression(node, ctx, names) {
+function numpyExpression(node, ctx, names, lang = "numpy") {
   switch (node.k) {
     case "num": {
       const v = node.value;
+      if (lang === "julia") return v.d === 1 ? `${v.n}` : `${v.n}//${v.d}`;
+      if (lang === "matlab") return v.d === 1 ? `sym(${v.n})` : `sym(${v.n})/sym(${v.d})`;
       if (v.d === 1) return `Fraction(${v.n})`;
       return `Fraction(${v.n}, ${v.d})`;
     }
@@ -10530,7 +10555,7 @@ function numpyExpression(node, ctx, names) {
       return name;
     }
     case "op": {
-      const args = node.args.map((a) => numpyExpression(a, ctx, names));
+      const args = node.args.map((a) => numpyExpression(a, ctx, names, lang));
       switch (node.op) {
         case "add":
           return `(${args[0]} + ${args[1]})`;
@@ -10539,24 +10564,40 @@ function numpyExpression(node, ctx, names) {
         case "neg":
           return `(-${args[0]})`;
         case "mul": {
-          const bothMatrices = node.args.every((a) => isMatrixType(ctx, a));
-          return bothMatrices ? `(${args[0]} @ ${args[1]})` : `(${args[0]} * ${args[1]})`;
+          if (lang === "numpy") {
+            const bothMatrices = node.args.every((a) => isMatrixType(ctx, a));
+            return bothMatrices ? `(${args[0]} @ ${args[1]})` : `(${args[0]} * ${args[1]})`;
+          }
+          return `(${args[0]} * ${args[1]})`;
         }
         case "cross":
-          return `np.cross((${args[0]}).reshape(3), (${args[1]}).reshape(3)).reshape(3, 1)`;
+          if (lang === "numpy") return `np.cross((${args[0]}).reshape(3), (${args[1]}).reshape(3)).reshape(3, 1)`;
+          if (lang === "julia") return `cross(vec(${args[0]}), vec(${args[1]}))`;
+          return `cross(${args[0]}, ${args[1]})`;
         case "div":
           return `(${args[0]} / ${args[1]})`;
         case "inv":
+          if (lang === "julia") return `inv(${args[0]})`;
+          if (lang === "matlab") return `inv(${args[0]})`;
           return `_inv(${args[0]})`;
         case "invT":
+          if (lang === "julia") return `inv(${args[0]}).'`;
+          if (lang === "matlab") return `inv(${args[0]}).'`;
           return `_inv(${args[0]}).T`;
         case "T":
+          if (lang === "julia") return `(${args[0]}).'`;
+          if (lang === "matlab") return `(${args[0]}).'`;
           return `(${args[0]}).T`;
         case "pow":
-          return `(${args[0]}) ** ${args[1]}`;
+          if (lang === "numpy") return `(${args[0]}) ** ${args[1]}`;
+          return `(${args[0]}) ^ ${args[1]}`;
         case "tr":
+          if (lang === "julia") return `tr(${args[0]})`;
+          if (lang === "matlab") return `trace(${args[0]})`;
           return `_tr(${args[0]})`;
         case "det":
+          if (lang === "julia") return `det(${args[0]})`;
+          if (lang === "matlab") return `det(${args[0]})`;
           return `_det(${args[0]})`;
         case "frob":
           return `_frob(${args[0]})`;
@@ -10567,11 +10608,15 @@ function numpyExpression(node, ctx, names) {
         case "diag":
           return `_diag(${args[0]})`;
         case "abs":
+          if (lang === "julia") return `abs.(${args[0]})`;
+          if (lang === "matlab") return `abs(${args[0]})`;
           return `_abs(${args[0]})`;
         case "sqrtm": {
           if (isMatrixType(ctx, node.args[0])) {
             throw new Error(`no snippet for the matrix square root of \\${node.args[0].k === "sym" ? node.args[0].name : node.op}`);
           }
+          if (lang === "julia") return `sqrt(${args[0]})`;
+          if (lang === "matlab") return `sqrt(${args[0]})`;
           return `_sqrtm(${args[0]})`;
         }
         default:
@@ -10579,18 +10624,24 @@ function numpyExpression(node, ctx, names) {
       }
     }
     case "call": {
-      const args = node.args.map((a) => numpyExpression(a, ctx, names));
-      if (node.fn === "tr") return `_tr(${args[0]})`;
-      if (node.fn === "det") return `_det(${args[0]})`;
+      const args = node.args.map((a) => numpyExpression(a, ctx, names, lang));
+      if (node.fn === "tr") return lang === "julia" ? `tr(${args[0]})` : lang === "matlab" ? `trace(${args[0]})` : `_tr(${args[0]})`;
+      if (node.fn === "det") return lang === "julia" ? `det(${args[0]})` : lang === "matlab" ? `det(${args[0]})` : `_det(${args[0]})`;
       if (node.fn === "frob") return `_frob(${args[0]})`;
       if (node.fn === "norm2") return `(${args[0]}) * (${args[0]})`;
       if (node.fn === "sqrtm") {
         if (isMatrixType(ctx, node.args[0])) {
           throw new Error(`no snippet for the matrix square root of \\${node.args[0].k === "sym" ? node.args[0].name : node.fn}`);
         }
+        if (lang === "julia") return `sqrt(${args[0]})`;
+        if (lang === "matlab") return `sqrt(${args[0]})`;
         return `_sqrtm(${args[0]})`;
       }
-      if (node.fn === "exp") return `(_exp(${args[0]}))`;
+      if (node.fn === "exp") {
+        if (lang === "julia") return `exp.(${args[0]})`;
+        if (lang === "matlab") return `exp(${args[0]})`;
+        return `(_exp(${args[0]}))`;
+      }
       throw new Error(`no snippet for \\${node.fn}`);
     }
     default:
@@ -10690,6 +10741,46 @@ def _sqrtm(a):
 def _exp(a):
     values = np.atleast_1d(a)
     return np.array([math.exp(float(x)) for x in values], dtype=object)
+`;
+var JULIA_PRELUDE = `using LinearAlgebra
+
+function _inner(a, b)
+    return sum(a .* b)
+end
+
+function _frob(a)
+    return sum(abs2, a)
+end
+
+function _diag(a)
+    n = size(a, 1)
+    m = fill(zero(a[1, 1]), n, n)
+    for i in 1:n
+        m[i, i] = a[i, i]
+    end
+    return m
+end
+
+function _abs(a)
+    return abs.(a)
+end
+`;
+var MATLAB_PRELUDE = `% exact rational arithmetic: needs the Symbolic Math Toolbox
+function r = _inner(a, b)
+    r = sum(sum(a .* b));
+end
+
+function r = _frob(a)
+    r = sum(sum(abs(a) .^ 2));
+end
+
+function r = _diag(a)
+    n = size(a, 1);
+    r = zeros(n, n, 'sym');
+    for i = 1:n
+        r(i, i) = a(i, i);
+    end
+end
 `;
 
 // src/core/shrink.ts
@@ -10923,10 +11014,12 @@ function describe(ctx, sizes, values, derived, propOf, lhsNode, rhsNode, defs, l
     lhsShape: valueShape(lhs),
     rhsShape: valueShape(rhs),
     diffShape: lhs.k === "m" && rhs.k === "m" ? [lhs.m.r, lhs.m.c] : [1, 1],
-    numpy: toNumpy(ctx, sizes, lhsNode, rhsNode, defs, plain)
+    numpy: toSnippet("numpy", ctx, sizes, lhsNode, rhsNode, defs, plain),
+    julia: toSnippet("julia", ctx, sizes, lhsNode, rhsNode, defs, plain),
+    matlab: toSnippet("matlab", ctx, sizes, lhsNode, rhsNode, defs, plain)
   };
 }
-function toNumpy(ctx, sizes, lhsNode, rhsNode, defs, values) {
+function toSnippet(lang, ctx, sizes, lhsNode, rhsNode, defs, values) {
   const symbols = /* @__PURE__ */ new Set();
   for (const name of symbolsOf(lhsNode)) symbols.add(name);
   for (const name of symbolsOf(rhsNode)) symbols.add(name);
@@ -10935,7 +11028,8 @@ function toNumpy(ctx, sizes, lhsNode, rhsNode, defs, values) {
     for (const name of symbolsOf(node)) symbols.add(name);
   }
   const names = numpyNames([...symbols]);
-  const lines = [NUMPY_PRELUDE, ""];
+  const PRELUDE = { numpy: NUMPY_PRELUDE, julia: JULIA_PRELUDE, matlab: MATLAB_PRELUDE }[lang];
+  const lines = [PRELUDE, ""];
   lines.push("# the values that break the step");
   for (const symbol of names.order) {
     if (defs.has(symbol)) continue;
@@ -10944,12 +11038,14 @@ function toNumpy(ctx, sizes, lhsNode, rhsNode, defs, values) {
       const info = ctx.symbols.get(symbol);
       if (info && info.props.includes("ident")) {
         const size = info.ty.t === "mat" ? dimSizeOf(ctx, info.ty.r, sizes) : 1;
-        lines.push(`${names.map.get(symbol)} = np.eye(${size}, dtype=object)`);
+        if (lang === "numpy") lines.push(`${names.map.get(symbol)} = np.eye(${size}, dtype=object)`);
+        else if (lang === "julia") lines.push(`${names.map.get(symbol)} = Matrix{Rational{BigInt}}(I, ${size}, ${size})`);
+        else lines.push(`${names.map.get(symbol)} = eye(${size}, 'sym')`);
       }
       continue;
     }
     const shape = shapeOf(ctx, symbol, sizes);
-    lines.push(`${names.map.get(symbol)} = ${literal(value, shape)}`);
+    lines.push(`${names.map.get(symbol)} = ${literal(lang, value, shape)}`);
   }
   const defined = [...defs.keys()].filter((name) => names.map.has(name));
   if (defined.length) {
@@ -10958,9 +11054,9 @@ function toNumpy(ctx, sizes, lhsNode, rhsNode, defs, values) {
     for (const name of defined) {
       const node = defs.get(name);
       if (!node) continue;
-      const defText = numpySide(node, ctx, names);
+      const defText = expressionSide(lang, node, ctx, names);
       if (defText === null) {
-        lines.push("# a definition the printer cannot write in NumPy");
+        lines.push("# a definition the printer cannot write in this language");
       } else {
         lines.push(`${names.map.get(name)} = ${defText}`);
       }
@@ -10968,22 +11064,22 @@ function toNumpy(ctx, sizes, lhsNode, rhsNode, defs, values) {
   }
   lines.push("");
   lines.push("# the two sides of the step, with these values");
-  const lhsText = numpySide(lhsNode, ctx, names);
-  const rhsText = numpySide(rhsNode, ctx, names);
+  const lhsText = expressionSide(lang, lhsNode, ctx, names);
+  const rhsText = expressionSide(lang, rhsNode, ctx, names);
   if (lhsText === null || rhsText === null) {
-    lines.push("# the expression of this step cannot be written in NumPy");
+    lines.push(`# the expression of this step cannot be written in ${{ numpy: "NumPy", julia: "Julia", matlab: "MATLAB" }[lang]}`);
   } else {
     lines.push(`lhs = ${lhsText}`);
     lines.push(`rhs = ${rhsText}`);
-    lines.push("print(lhs - rhs)");
+    lines.push(lang === "matlab" ? "disp(lhs - rhs)" : lang === "julia" ? "println(lhs - rhs)" : "print(lhs - rhs)");
   }
   lines.push("");
   lines.push("# the values above are the ones SAMOSA found; the two sides differ with them");
   return lines.join("\n");
 }
-function numpySide(node, ctx, names) {
+function expressionSide(lang, node, ctx, names) {
   try {
-    return numpyExpression(node, ctx, names);
+    return numpyExpression(node, ctx, names, lang);
   } catch {
     return null;
   }
@@ -10995,15 +11091,30 @@ function shapeOf(ctx, symbol, sizes) {
   const c = dimSizeOf(ctx, info.ty.c, sizes);
   return [r, c];
 }
-function literal(value, shape) {
-  if (typeof value === "number") return `Fraction('${value}')`;
+function scalarCell(lang, x) {
+  if (lang === "numpy") return `Fraction('${x}')`;
+  const rational = rationalize(x);
+  if (lang === "julia") return rational ? rational[1] === 1 ? `${rational[0]}` : `${rational[0]}//${rational[1]}` : `${x}`;
+  return rational ? rational[1] === 1 ? `sym(${rational[0]})` : `sym(${rational[0]})/sym(${rational[1]})` : `sym(${x})`;
+}
+function literal(lang, value, shape) {
+  if (typeof value === "number") return scalarCell(lang, value);
   const [rows, cols] = shape;
-  const out = [];
-  for (let i = 0; i < rows; i++) {
-    const row = value.slice(i * cols, (i + 1) * cols).map((x) => `Fraction('${x}')`);
-    out.push(`[${row.join(", ")}]`);
+  const cell = (x) => scalarCell(lang, x);
+  const rowAt = (i) => value.slice(i * cols, (i + 1) * cols).map(cell);
+  if (lang === "numpy") {
+    const out2 = [];
+    for (let i = 0; i < rows; i++) out2.push(`[${rowAt(i).join(", ")}]`);
+    return `np.array([${out2.join(", ")}], dtype=object)`;
   }
-  return `np.array([${out.join(", ")}], dtype=object)`;
+  if (lang === "julia") {
+    const out2 = [];
+    for (let i = 0; i < rows; i++) out2.push(rowAt(i).join(" "));
+    return `[${out2.join("; ")}]`;
+  }
+  const out = [];
+  for (let i = 0; i < rows; i++) out.push(rowAt(i).join(" "));
+  return `[${out.join("; ")}]`;
 }
 
 // src/core/repair.ts
