@@ -108,8 +108,14 @@ function renderOp(node: Extract<Node, { k: 'op' }>): string {
       return `${operand(node.args[0])} - ${operand(node.args[1])}`;
     case 'neg':
       return `-${operand(node.args[0])}`;
-    case 'mul':
-      return `${operand(node.args[0])} ${operand(node.args[1])}`;
+    case 'mul': {
+      // a space between two numeric literals re-lexes as one number:
+      // `2 2` is 22, so digits need the middle dot
+      const a = operand(node.args[0]);
+      const b = operand(node.args[1]);
+      if (/[0-9]$/.test(a) && /^[0-9]/.test(b)) return `${a} \\cdot ${b}`;
+      return `${a} ${b}`;
+    }
     case 'div':
       return `\\frac{${a[0]}}{${a[1]}}`;
     case 'pow':

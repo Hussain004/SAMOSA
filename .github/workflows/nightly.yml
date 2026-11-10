@@ -1,0 +1,23 @@
+name: nightly
+
+on:
+  schedule:
+    # 03:17 UTC every day
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  seed-sweep:
+    name: the seed sweep, on one machine, thirty seeds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.14.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: pnpm install --frozen-lockfile
+      - name: The Menu, the Cookbook and the false friends at thirty seeds
+        run: SEED_COUNT=30 npx vite-node scripts/seed-sweep.ts

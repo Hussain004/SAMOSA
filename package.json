@@ -35,6 +35,7 @@
     "gen:announcements": "vite-node scripts/gen-announcements.ts --write",
     "gen:readme": "vite-node scripts/gen-readme.ts --write",
     "gen:ledger": "vite-node scripts/gen-ledger.ts",
+    "sweep": "vite-node scripts/seed-sweep.ts",
     "record:gifs": "node scripts/record-gifs.mjs",
     "publish:pkg": "npm run build:pkg && cd pkg && npm publish --access public",
     "setup": "git config core.hooksPath .githooks",

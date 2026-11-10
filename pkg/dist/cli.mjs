@@ -11271,8 +11271,12 @@ function renderOp(node) {
       return `${operand(node.args[0])} - ${operand(node.args[1])}`;
     case "neg":
       return `-${operand(node.args[0])}`;
-    case "mul":
-      return `${operand(node.args[0])} ${operand(node.args[1])}`;
+    case "mul": {
+      const a2 = operand(node.args[0]);
+      const b = operand(node.args[1]);
+      if (/[0-9]$/.test(a2) && /^[0-9]/.test(b)) return `${a2} \\cdot ${b}`;
+      return `${a2} ${b}`;
+    }
     case "div":
       return `\\frac{${a[0]}}{${a[1]}}`;
     case "pow":
