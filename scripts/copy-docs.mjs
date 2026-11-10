@@ -21,7 +21,7 @@ const to = resolve(root, 'public/docs');
 const REPO = 'https://github.com/Hussain004/SAMOSA/blob/master';
 
 /** The pages, in the order the navigation lists them. */
-const ORDER = ['HOW_IT_WORKS', 'NOTATION', 'CLI', 'MCP', 'COOKBOOK', 'COVERAGE', 'PRIVACY', 'CHANGELOG'];
+const ORDER = ['HOW_IT_WORKS', 'NOTATION', 'CLI', 'MCP', 'COOKBOOK', 'COVERAGE', 'LEDGER', 'PRIVACY', 'CHANGELOG'];
 
 const sources = new Map();
 for (const name of readdirSync(from)) {
