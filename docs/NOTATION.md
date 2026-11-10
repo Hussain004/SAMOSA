@@ -136,12 +136,17 @@ The types are:
 | `pos` | a strictly positive number, over the reals |
 | `int` | an integer |
 | `fn n→1` | a function |
-| `sym n`, `spd n`, `psd n`, `orth n`, `rot n`, `diag n`, `triu n`, `tril n`, `skew n`, `idem n`, `proj n`, `unit n`, `stoch n` | a matrix with that structure |
+| `sym n`, `spd n`, `psd n`, `orth n`, `rot n`, `diag n`, `triu n`, `tril n`, `skew n`, `idem n`, `proj n`, `unit n`, `stoch n`, `unitary n`, `complex n×n`, `hermitian n` | a matrix with that structure |
 | `rank 3 n×n` | a matrix of that rank |
 
 `orth n` is the orthogonal group O(n), the matrices whose transpose is
 their inverse; `rot n` is the spelling for the rotations, the orthogonal
 matrices with determinant one.
+
+`unitary n` is a matrix with `U^\dagger U = I` (the conjugate transpose
+is what makes it true, and SAMOSA blocks the claim `U^\top U = I`), and
+`complex` marks a matrix with no other structure, checked in the field of
+complex numbers. Both live in GF(p^2), so the complex checks are exact.
 
 `ident n`, `zero n`, `ones n`, `unit n` and `stoch n` are matrices of that
 size, so `ident n` is the n by n identity, `zero n` the zero matrix, `ones n`

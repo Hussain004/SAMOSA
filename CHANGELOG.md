@@ -98,6 +98,11 @@ speaks three languages, and the editor is an extension.
 - The landing page opens with a live mini-checker, the soundness ledger
   and the coverage curve; the landing is `sections/`, one file per
   section.
+- A row or a derivation with complex numbers is checked exactly, in
+  GF(p^2): `U^\dagger U = I` holds for a unitary U and `U^\top U = I`
+  does not, and `conj` (elementwise conjugation) and the adjoint `A^\dagger`
+  are first-class operators. The second prime changed to 2147483587,
+  prime and congruent to 3 (mod 4); the old second prime was not.
 - Nightly CI runs the Menu, the Cookbook and the false friends at thirty
   seeds; the parser is fuzzed; Lighthouse gates accessibility at 0.95 on
   `/` and `/app/`; the release refuses a changelog with no section for

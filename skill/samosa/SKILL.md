@@ -21,7 +21,7 @@ reproducible.
    ```
 
    The compact syntax is `names: type`, where the type is `n`, `n×m`, `spd n`,
-   `sym n`, `orth n`, `scalar`, `fn n→1` or a distribution such as
+   `sym n`, `orth n`, `unitary n`, `complex n×n`, `scalar`, `fn n→1` or a distribution such as
    `x ~ N(\mu, \Sigma)`.
 3. Check it, with the MCP tool `check_derivation`, or with the CLI:
 
