@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { AsciiSamosa } from './AsciiSamosa.tsx';
+import { MiniChecker } from './MiniChecker.tsx';
 import { TypedDemo } from './typed-demo.tsx';
 import { MENU } from '../../corpus/menu.ts';
 import { MOCKS } from './demo-scripts.ts';
@@ -149,6 +150,7 @@ function Hero() {
             </a>
             <CopyChip text="npx samosa-math check paper.tex" />
           </div>
+          <MiniChecker />
         </div>
         <div className="order-1 md:order-2">
           <AsciiSamosa />
