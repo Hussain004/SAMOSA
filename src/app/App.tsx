@@ -5,6 +5,7 @@ import { RenderedRows } from './RenderedRows.tsx';
 import { Inspector } from './Inspector.tsx';
 import { CommandPalette, Menu, PresetList, type Command } from './Menu.tsx';
 import { DeclarationsStrip } from './Declarations.tsx';
+import { getPreset } from '../core/index.ts';
 import { canonicalizeSymbol } from '../core/index.ts';
 import { exportJson, exportMarkdown, exportLatex } from './export.ts';
 import { MENU } from '../../corpus/menu.ts';
@@ -165,6 +166,29 @@ export function App() {
       setSettings({ decls: declareSymbol(settings.decls, name, type) });
     },
     [setSettings, settings.decls],
+  );
+  // an edit inside the strip replaces one segment, keeping the rest
+  const replaceSegment = useCallback(
+    (index: number, next: string) => {
+      const segments = settings.decls.split(';').map((part) => part.trim()).filter(Boolean);
+      if (index < 0 || index >= segments.length) return;
+      segments[index] = next.trim();
+      setSettings({ decls: segments.join('; ') });
+    },
+    [setSettings, settings.decls],
+  );
+  const applyPreset = useCallback(
+    (id: string) => {
+      const preset = getPreset(id);
+      if (preset) setSettings({ decls: preset.decls });
+    },
+    [setSettings],
+  );
+  const copyDeclarationsLine = useCallback(
+    (text: string) => {
+      void navigator.clipboard?.writeText(text);
+    },
+    [],
   );
 
   // The header actions are the same on a wide screen and in the panel that
@@ -436,9 +460,13 @@ export function App() {
 
       <DeclarationsStrip
         decls={settings.decls}
+        source={source}
         chips={report?.chips ?? []}
         onDeclare={declare}
+        onReplaceSegment={replaceSegment}
         onEdit={() => setShowSettings(true)}
+        onCopySamba={copyDeclarationsLine}
+        onPreset={applyPreset}
       />
 
       <div className="min-h-[280px] flex-1 grid-cols-1 grid-rows-1 md:grid md:grid-cols-2">
