@@ -29,6 +29,7 @@
     "check:bundle": "node scripts/check-bundle-budget.mjs",
     "build:cli": "node scripts/build-cli.mjs",
     "build:pkg": "node scripts/copy-docs.mjs && node scripts/build-pkg.mjs",
+    "build:vscode": "node scripts/build-vscode.mjs",
     "gen:demo": "vite-node scripts/gen-demo.ts --write",
     "gen:tex": "vite-node scripts/gen-tex.ts --write",
     "gen:announcements": "vite-node scripts/gen-announcements.ts --write",
@@ -90,6 +91,9 @@
     "vite": "^8.0.12",
     "vite-node": "^6.0.0",
     "vitest": "^5.0.5",
+    "vscode-languageclient": "^11.0.0",
+    "vscode-languageserver": "^11.0.0",
+    "vscode-languageserver-textdocument": "^1.0.16",
     "zod": "^4.6.7"
   },
   "engines": {

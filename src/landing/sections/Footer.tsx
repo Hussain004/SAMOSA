@@ -28,6 +28,7 @@ export function Footer() {
             ['Notation', '/docs/NOTATION'],
             ['The CLI', '/docs/CLI'],
             ['The MCP server', '/docs/MCP'],
+            ['VS Code', '/docs/VSCODE'],
             ['Privacy', '/docs/PRIVACY'],
           ]}
         />

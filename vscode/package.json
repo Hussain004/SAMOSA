@@ -1,0 +1,76 @@
+{
+  "name": "samosa",
+  "displayName": "SAMOSA",
+  "description": "Checks every step of a matrix derivation, exactly, as you type. A linter for matrix algebra in your LaTeX.",
+  "version": "1.2.0",
+  "publisher": "Hussain004",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Hussain004/SAMOSA.git",
+    "directory": "vscode"
+  },
+  "homepage": "https://samosa-math.vercel.app",
+  "bugs": {
+    "url": "https://github.com/Hussain004/SAMOSA/issues"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Linters",
+    "Programming Languages",
+    "Other"
+  ],
+  "keywords": [
+    "latex",
+    "math",
+    "matrix",
+    "linter",
+    "linear-algebra",
+    "kalman-filter"
+  ],
+  "activationEvents": [
+    "onLanguage:latex",
+    "onLanguage:markdown"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "samosa.openInBrowser",
+        "title": "SAMOSA: open this derivation in SAMOSA"
+      },
+      {
+        "command": "samosa.copyCounterexample",
+        "title": "SAMOSA: copy the counterexample as NumPy"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "samosa.openInBrowser",
+          "when": "editorLangId =~ /latex|markdown/",
+          "group": "1_samosa"
+        },
+        {
+          "command": "samosa.copyCounterexample",
+          "when": "editorLangId =~ /latex|markdown/",
+          "group": "1_samosa"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "samosa.openInBrowser"
+        },
+        {
+          "command": "samosa.copyCounterexample"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "build": "node ../scripts/build-vscode.mjs"
+  },
+  "icon": "icon.png"
+}

@@ -22,3 +22,4 @@ public/docs
 .directory
 .coverage
 brag-output-*
+*.vsix
