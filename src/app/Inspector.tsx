@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { Report, StepResult } from '../core/index.ts';
 import { matrixLatex } from './matrix.ts';
 import { VERDICT_ICON, VERDICT_LABEL, VERDICT_TITLE, seedText, guaranteeSentence, whyTrustHref, formatBound } from './verdicts.ts';
+import { saveReportCardPng, plainTex } from './report-card.ts';
 import { Tex } from './tex.tsx';
 
 export interface InspectorProps {
@@ -53,12 +54,30 @@ export function Inspector({ step, report, explanation, onApplyFix, onCopy, onClo
             {guaranteeSentence(step)}
           </p>
         </div>
-        <button
-          onClick={onClose}
-          className="rounded border border-[var(--color-line)] px-2 py-1 text-[0.625rem] text-[var(--color-muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-text)]"
-        >
-          close
-        </button>
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <button
+            onClick={onClose}
+            className="rounded border border-[var(--color-line)] px-2 py-1 text-[0.625rem] text-[var(--color-muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-text)]"
+          >
+            close
+          </button>
+          <button
+            title="save this card as an image"
+            onClick={() => {
+              saveReportCardPng({
+                step,
+                latex: plainTex(step),
+                counterexample: explanation?.counterexample,
+                fixTitle: explanation?.fixes[0]?.title,
+              }).catch((error: unknown) => {
+                window.alert(`the image could not be saved: ${error instanceof Error ? error.message : String(error)}`);
+              });
+            }}
+            className="rounded border border-[var(--color-line)] px-2 py-1 text-[0.625rem] text-[var(--color-muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-text)]"
+          >
+            save as image
+          </button>
+        </div>
       </div>
 
       {step.layoutHint && (

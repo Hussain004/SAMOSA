@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 
 /**
@@ -311,6 +312,22 @@ test('the whole flow works with the keyboard alone', async ({ page }) => {
   await expect(rows.first()).toHaveAttribute('aria-selected', 'true', { timeout: 5_000 });
   await page.keyboard.press('ArrowDown');
   await expect(rows.nth(1)).toHaveAttribute('aria-selected', 'true', { timeout: 5_000 });
+});
+
+test('the card saves as an image', async ({ page }) => {
+  await type(page, JOSEPH);
+  await expect(page.locator('[data-verdict="wrong"]').first()).toBeVisible({ timeout: 15_000 });
+  await page.locator('[data-verdict="wrong"]').first().click();
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'save as image' }).click();
+  const download = await downloadPromise;
+  // the image carries the row, the verdict, the counterexample and the fix
+  expect(download.suggestedFilename()).toMatch(/^samosa-row-\d+-wrong\.png$/);
+  const bytes = readFileSync((await download.path())!);
+  // a real PNG, with content: not a 1 pixel stub and not empty
+  expect(bytes.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
+  expect(bytes.length).toBeGreaterThan(2000);
 });
 
 test('the light theme is remembered', async ({ page }) => {
