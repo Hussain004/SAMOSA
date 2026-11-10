@@ -11,7 +11,9 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  // locally, two or three browsers already fill the machine; twenty hammer
+  // one preview server into uselessness and flake the early tests
+  workers: process.env.CI ? 1 : 3,
   reporter: [['list']],
   use: {
     baseURL: 'http://localhost:4173',

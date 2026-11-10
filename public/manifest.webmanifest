@@ -1,0 +1,12 @@
+{
+  "name": "SAMOSA · the step auditor",
+  "short_name": "SAMOSA",
+  "description": "SAMOSA checks every step of a matrix derivation, exactly, in your browser. Nothing leaves your machine.",
+  "start_url": "/app/",
+  "display": "standalone",
+  "background_color": "#0b0a08",
+  "theme_color": "#e8b04b",
+  "icons": [
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

@@ -26,6 +26,9 @@ const DECLARATIONS = 'x_t, \\bar\\mu_t: n; z_t: m; C_t: m×n; Q_t: spd m; \\bar\
 test.beforeEach(async ({ page }) => {
   await page.goto('/app/');
   await page.waitForSelector('.cm-content');
+  // the rows survive the engine check: wait for the verdicts instead of
+  // racing the worker, so a loaded machine does not flake the suite
+  await page.waitForSelector('[data-step-id]', { timeout: 30_000 });
 });
 
 /** Puts a derivation in the editor. */
@@ -328,6 +331,40 @@ test('the card saves as an image', async ({ page }) => {
   // a real PNG, with content: not a 1 pixel stub and not empty
   expect(bytes.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
   expect(bytes.length).toBeGreaterThan(2000);
+});
+
+test('the app is installable and works offline-ish', async ({ page }) => {
+  await expect(page.locator('link[rel="manifest"]')).toHaveAttribute('href', '/manifest.webmanifest');
+  const manifest = await page.evaluate(async () => {
+    const res = await fetch('/manifest.webmanifest');
+    return res.json();
+  });
+  expect(manifest.name).toContain('SAMOSA');
+  expect(manifest.start_url).toBe('/app/');
+
+  // the service worker registers and activates
+  const state = await page.evaluate(async () => {
+    const regs = await navigator.serviceWorker.getRegistrations();
+    if (!regs.length) return { count: 0, active: null };
+    const sw = regs[0].active;
+    if (sw?.state === 'activated') return { count: regs.length, active: 'activated' };
+    // wait for activation
+    await new Promise((resolve) => {
+      const timer = setInterval(() => {
+        if (sw?.state === 'activated') {
+          clearInterval(timer);
+          resolve(null);
+        }
+      }, 100);
+      setTimeout(() => {
+        clearInterval(timer);
+        resolve(null);
+      }, 5000);
+    });
+    return { count: regs.length, active: regs[0].active?.state ?? null };
+  });
+  expect(state.count).toBeGreaterThan(0);
+  expect(state.active).toBe('activated');
 });
 
 test('the light theme is remembered', async ({ page }) => {

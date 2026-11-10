@@ -110,7 +110,13 @@ let pending = 0;
 let watchdog: number | undefined;
 
 /** A check that takes longer than this is a check that will not end. */
-const TIMEOUT_MS = 3000;
+/**
+ * The ceiling for one check. A derivation that takes longer than this is
+ * pathological, and the row says it was not checked. The engine answers
+ * healthy derivations in about a second, so ten seconds is generous, not
+ * soft.
+ */
+const TIMEOUT_MS = 10_000;
 
 function getWorker(): Worker {
   if (!worker) {

@@ -24,4 +24,14 @@
       }, 1000);
     }
   } catch (e) {}
+  // the app works on a plane: sw.js caches the assets and /app/, and keeps
+  // the landing page fresh from the network
+  try {
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        if (new URLSearchParams(location.search).has('nosw') || window.__SAMOSA_NO_SW) return;
+        navigator.serviceWorker.register('/sw.js').catch(function () {});
+      });
+    }
+  } catch (e) {}
 })();
