@@ -68,6 +68,8 @@ export function App() {
   const [mobilePane, setMobilePane] = useState<'rendered' | 'source'>('rendered');
   const [hoverStep, setHoverStep] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [undoToast, setUndoToast] = useState<{ row: number; previous: string } | null>(null);
+  const undoTimer = useRef<number | undefined>(undefined);
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const [theme, setTheme] = useState<'dark' | 'light'>(() =>
     window.localStorage.getItem('samosa-theme') === 'light' ? 'light' : 'dark',
@@ -151,6 +153,13 @@ export function App() {
     void navigator.clipboard?.writeText(text);
     setCopied(text);
     window.setTimeout(() => setCopied(''), 1200);
+  }, []);
+
+  // after a fix is applied, one line offers the way back for five seconds
+  const showUndo = useCallback((row: number, previous: string) => {
+    window.clearTimeout(undoTimer.current);
+    setUndoToast({ row, previous });
+    undoTimer.current = window.setTimeout(() => setUndoToast(null), 5000);
   }, []);
 
   const share = useCallback(() => {
@@ -575,7 +584,9 @@ export function App() {
               const offset = step.span.from;
               const from = Math.max(0, Math.min(source.length, fix.edit.span.from + offset));
               const to = Math.max(from, Math.min(source.length, fix.edit.span.to + offset));
+              const previous = source;
               setSource(source.slice(0, from) + fix.edit.insert + source.slice(to));
+              showUndo(step.row, previous);
             }}
             onCopy={copy}
             onClose={() => {
@@ -617,6 +628,25 @@ export function App() {
       </footer>
 
       <span className="sr-only" role="status" aria-live="polite">{summary}</span>
+      {undoToast && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded border border-[var(--color-line)] bg-[var(--color-panel)] px-4 py-2 text-xs shadow-2xl"
+        >
+          <span>Fixed row {undoToast.row}</span>
+          <button
+            onClick={() => {
+              setSource(undoToast.previous);
+              window.clearTimeout(undoTimer.current);
+              setUndoToast(null);
+            }}
+            className="rounded border border-[var(--color-gold)] px-2 py-0.5 text-[var(--color-gold)] hover:bg-[var(--color-gold)] hover:text-[var(--color-ink)]"
+          >
+            undo
+          </button>
+        </div>
+      )}
       <CommandPalette commands={commands} open={paletteOpen} onClose={() => setPaletteOpen(false)} />
     </main>
   );
@@ -679,6 +709,7 @@ function OverflowMenu({
   return (
     <details className="relative">
       <summary
+        role="button"
         aria-label="more actions"
         className="list-none cursor-pointer rounded border border-[var(--color-line)] px-2 py-1 text-[0.8125rem] leading-none text-[var(--color-muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-text)] marker:hidden"
       >

@@ -12,12 +12,6 @@ import { expect, test } from '@playwright/test';
  * derivation of their own and check that it is the one that comes back.
  */
 
-const DERIVATION = String.raw`\begin{align*}
-K_t &:= \Sigma_t C_t^\top Q_t^{-1} \\
-K_t &= \bar\Sigma_t C_t^\top \left(C_t \bar\Sigma_t C_t^\top + Q_t\right)^{-1}
-\end{align*}
-`;
-
 /** The Joseph form with the noise term missing: the step the engine can fix. */
 const JOSEPH = String.raw`\begin{align*}
 \Sigma_t &:= \left(C_t^\top Q_t^{-1} C_t + \bar\Sigma_t^{-1}\right)^{-1} \\
@@ -48,13 +42,14 @@ test('the default derivation is checked', async ({ page }) => {
 });
 
 test('a wrong step is flagged and the card opens', async ({ page }) => {
+  await page.locator('summary[aria-label="more actions"]').click();
   await page.getByRole('button', { name: 'Presets' }).click();
   await page.locator('textarea').fill(DECLARATIONS);
-  await type(page, DERIVATION);
-  await expect(page.getByText('wrong').first()).toBeVisible({ timeout: 15_000 });
+  await type(page, JOSEPH);
+  await expect(page.locator('[data-verdict="wrong"]').first()).toBeVisible({ timeout: 15_000 });
 
   // the card draws the counterexample, the two sides and the computed values
-  await page.getByText('wrong').first().click();
+  await page.locator('[data-verdict="wrong"]').first().click();
   const card = page.getByTestId('inspector');
   await expect(card.getByRole('heading', { name: 'the two sides' })).toBeVisible({ timeout: 15_000 });
   await expect(card.getByRole('heading', { name: 'computed by SAMOSA' })).toBeVisible();
@@ -67,19 +62,20 @@ test('a wrong step is flagged and the card opens', async ({ page }) => {
 });
 
 test('a quick fix applies', async ({ page }) => {
+  await page.locator('summary[aria-label="more actions"]').click();
   await page.getByRole('button', { name: 'Presets' }).click();
   await page.locator('textarea').fill(DECLARATIONS);
   await type(page, JOSEPH);
-  await expect(page.getByText('wrong').first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('[data-verdict="wrong"]').first()).toBeVisible({ timeout: 15_000 });
 
   // open the card of the wrong row
-  await page.getByText('wrong').first().click();
+  await page.locator('[data-verdict="wrong"]').first().click();
   const apply = page.getByRole('button', { name: 'apply' }).first();
   await expect(apply).toBeVisible({ timeout: 15_000 });
   await apply.click();
 
   // the row is right now
-  await expect(page.getByText('wrong').first()).toHaveCount(0, { timeout: 15_000 });
+  await expect(page.locator('[data-verdict="wrong"]').first()).toHaveCount(0, { timeout: 15_000 });
 
   // ctrl+z puts the row back the way it was, with the history of one edit,
   // not one whole-document replacement
@@ -87,14 +83,15 @@ test('a quick fix applies', async ({ page }) => {
   await page.keyboard.press('Control+Z');
   const restored = await page.locator('.cm-content').innerText();
   expect(restored).not.toContain('K_t Q_t K_t^\\top');
-  await expect(page.getByText('wrong').first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('[data-verdict="wrong"]').first()).toBeVisible({ timeout: 15_000 });
 });
 
 test('the share link round trips, with the derivation in it', async ({ page }) => {
+  await page.locator('summary[aria-label="more actions"]').click();
   await page.getByRole('button', { name: 'Presets' }).click();
   await page.locator('textarea').fill(DECLARATIONS);
   await type(page, JOSEPH);
-  await expect(page.getByText('wrong').first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('[data-verdict="wrong"]').first()).toBeVisible({ timeout: 15_000 });
 
   await page.getByRole('button', { name: 'Share' }).click();
   const hash = await page.evaluate(() => window.location.hash);
@@ -110,7 +107,7 @@ test('the share link round trips, with the derivation in it', async ({ page }) =
   expect(source).toContain('Sigma_t');
   expect(source).toContain('bar');
   // and the verdicts are the ones of that derivation
-  await expect(page.getByText('wrong').first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('[data-verdict="wrong"]').first()).toBeVisible({ timeout: 15_000 });
 });
 
 test('a broken link says so', async ({ page }) => {
@@ -152,7 +149,7 @@ test('nothing leaves the browser', async ({ page }) => {
       method: request.method(),
     });
   });
-  await type(page, DERIVATION);
+  await type(page, JOSEPH);
   await page.waitForTimeout(1500);
 
   // the derivation never appears in a URL
@@ -215,7 +212,7 @@ S S^\top &= I
   // the checker guesses the symbol is a matrix, and says so in the strip
   await expect(page.getByText('guessed').first()).toBeVisible();
   // one click declares it and the check re-runs
-  await page.getByRole('button', { name: 'spd n' }).click();
+  await page.getByRole('button', { name: 'spd n', exact: true }).click();
   await expect(page.getByText('S: spd n', { exact: true })).toBeVisible();
   // and the guess is gone, because the declaration took its place
   await expect(page.getByText('guessed')).toHaveCount(0);
@@ -304,11 +301,11 @@ test('the whole flow works with the keyboard alone', async ({ page }) => {
   // the editor takes the typing
   await page.locator('.cm-content').click();
   await page.keyboard.press('Control+A');
-  await page.keyboard.type(DERIVATION);
-  await expect(page.getByText('wrong').first()).toBeVisible({ timeout: 15_000 });
+  await page.keyboard.type(JOSEPH);
+  await expect(page.locator('[data-verdict="wrong"]').first()).toBeVisible({ timeout: 15_000 });
 
   // the rows are in the tab order: focus one, Enter opens its card, arrows move the selection
-  const rows = page.getByRole('option');
+  const rows = page.getByRole('listbox', { name: 'the rows of the derivation' }).getByRole('option');
   await rows.first().focus();
   await page.keyboard.press('Enter');
   await expect(rows.first()).toHaveAttribute('aria-selected', 'true', { timeout: 5_000 });
@@ -319,6 +316,7 @@ test('the whole flow works with the keyboard alone', async ({ page }) => {
 test('the light theme is remembered', async ({ page }) => {
   await page.goto('/app/');
   await page.waitForSelector('.cm-content');
+  await page.locator('summary[aria-label="more actions"]').click();
   await page.getByRole('button', { name: 'Light', exact: true }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
 
