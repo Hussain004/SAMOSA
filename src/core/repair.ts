@@ -394,6 +394,7 @@ function holdsWith(sh: RepairCtx, side: 'lhs' | 'rhs', candidate: Node): boolean
     const sampler = new Sampler(field, rng);
     const env = makeEnv(field, rng);
     env.defs = sh.defs;
+    env.sizes = new Map(setting);
     const values = sampleSymbols(sh.ctx, sh, setting, sampler);
     if (!values) return false;
     for (const [name, value] of values.entries()) if (value) env.values.set(name, value);
@@ -586,6 +587,7 @@ function typeChecks(sh: RepairCtx, rhs: Node): boolean {
     const sampler = new Sampler(field, rng);
     const env = makeEnv(field, rng);
     env.defs = sh.defs;
+    env.sizes = new Map(setting);
     const values = sampleSymbols(sh.ctx, sh, setting, sampler);
     if (!values) continue;
     for (const [n, value] of values.entries()) if (value) env.values.set(n, value);
@@ -627,6 +629,7 @@ function residualRepairs(sh: RepairCtx): Fix[] {
     const sampler = new Sampler(field, rng);
     const env = makeEnv(field, rng);
     env.defs = sh.defs;
+    env.sizes = new Map(setting);
     const values = sampleSymbols(sh.ctx, sh, setting, sampler);
     if (!values) return out;
     for (const [name, value] of values.entries()) if (value) env.values.set(name, value);

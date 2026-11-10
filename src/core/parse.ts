@@ -563,23 +563,13 @@ export class Parser {
     // the symbol keeps its subscript and its label, whatever happens to the scripts
     let node: Node = base;
     if (node.k === 'sym') {
-      // `p_i` and `z_j` are components of an indexed family, not a name with
-      // a time step. The engine has no model of index notation, so it says so
-      // instead of treating the component as a free scalar.
-      const indexNotation =
-        sub !== null &&
-        /^[ijk]$/.test(sub.trim()) &&
-        /^[A-Za-z]$/.test(baseLatex);
-      node = indexNotation
-        ? {
-            k: 'raw',
-            text: `an indexed symbol ${baseLatex}_${sub}`,
-            span: { from: node.span.from, to: spanEnd },
-          }
-        : this.makeSym(accents, baseLatex, sub, labelSup, {
-            from: node.span.from,
-            to: spanEnd,
-          });
+      // `p_i` and `z_j` are components when the base is a declared vector
+      // or matrix; the types layer decides that. Otherwise they are symbols
+      // of their own.
+      node = this.makeSym(accents, baseLatex, sub, labelSup, {
+        from: node.span.from,
+        to: spanEnd,
+      });
     }
 
     for (const script of scripts) {
@@ -1772,6 +1762,7 @@ export class Parser {
 
   private parseBigOp(t: Token): Node {
     let idx = 'i';
+    let idxTail: string[] = [];
     let lo: Node | null = null;
     let hi: Node | null = null;
 
@@ -1792,6 +1783,17 @@ export class Parser {
             lo = null;
           }
         }
+      } else {
+        // `\\sum_{ij}` is the double sum written as one operator: read it as
+        // \\sum_i \\sum_j, each with the rest of the letters
+        const multi = g.text.trim().match(/^([A-Za-z]{2,4})$/);
+        if (multi) {
+          const letters = multi[1].split('');
+          idx = letters[0];
+          idxTail = letters.slice(1);
+        } else {
+          idx = g.text.trim() || 'i';
+        }
       }
     }
     if (this.kind() === 'sup') {
@@ -1804,7 +1806,10 @@ export class Parser {
         hi = null;
       }
     }
-    const body = this.parseProduct();
+    let body = this.parseProduct();
+    for (const extra of idxTail.reverse()) {
+      body = { k: 'bigop', kind: t.value === 'sum' ? 'sum' : 'prod', idx: extra, lo: null, hi: null, body, span: body.span };
+    }
     return {
       k: 'bigop',
       kind: t.value === 'sum' ? 'sum' : 'prod',

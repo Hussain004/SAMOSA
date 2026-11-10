@@ -14,7 +14,9 @@
 
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { check, explain, analyzeSource, numericAbsDelta, inferType } from '../src/core/index.ts';
+import { check, explain, analyzeSource, numericAbsDelta, inferType, unifyShapes } from '../src/core/index.ts';
+import { collectDimVarsFor } from '../src/core/dims.ts';
+import { sizeSettings } from '../src/core/verdict/index.ts';
 import { F64Field } from '../src/core/fields/f64.ts';
 import { rngFor } from '../src/core/prng.ts';
 import { IDENTITIES } from '../corpus/cookbook/identities.ts';
@@ -104,16 +106,25 @@ for (const mutant of harmlessMutants) {
   // type inference registers the symbols in the context; the numeric
   // evaluation cannot see them before it runs
   for (const step of parsed.steps) {
-    if (step.lhs) inferType(parsed.ctx, step.lhs);
-    if (step.rhs) inferType(parsed.ctx, step.rhs);
+    const lhsTy = step.lhs ? inferType(parsed.ctx, step.lhs) : undefined;
+    const rhsTy = step.rhs ? inferType(parsed.ctx, step.rhs) : undefined;
+    // the audit unifies the two sides the way the checker does, or a fresh
+    // identity dimension never meets a product it cannot join
+    if (lhsTy?.t === 'mat' && rhsTy?.t === 'mat' && step.relation === '=') {
+      unifyShapes(parsed.ctx, lhsTy, rhsTy, step.span);
+    }
   }
   const step = parsed.steps.find((s) => s.row === mutant.row);
   if (!step) continue;
+  // the audit uses the same sizes the engine does, not a hand-picked one
+  const dimVars = collectDimVarsFor(parsed.ctx, step.lhs, step.rhs, parsed.defs);
+  const settings = sizeSettings(dimVars);
+  const oracleSetting = settings[0] ?? new Map([['n', 3]]);
   const run = numericAbsDelta(
     parsed.ctx,
     parsed.defs,
     step,
-    new Map([['n', 3]]),
+    oracleSetting,
     rngFor(0, 'cookbook-oracle', mutant.id),
     0,
     new F64Field(),

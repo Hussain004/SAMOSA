@@ -414,10 +414,52 @@ J &:= \frac{1}{2}\|y - X\beta\|^2 + \frac{\lambda}{2}\beta^\top \Sigma \beta \\
   {
     id: 'softmax',
     name: 'the gradient of the softmax cross entropy',
-    decls: '',
+    decls: 'z: n; p: n',
     source: String.raw`\begin{align*}
 J &:= -\sum_i p_i \log \frac{e^{z_i}}{\sum_j e^{z_j}} \\
-\frac{\partial J}{\partial z} &= \frac{e^z}{\sum_j e^{z_j}} - p
+\frac{\partial J}{\partial z} &= \left(\sum_k p_k\right) \frac{e^z}{\sum_j e^{z_j}} - p
+\end{align*}`,
+  },
+  // --------------------------------------------------------- the sums
+  {
+    id: 'inner-product-as-sum',
+    name: 'the inner product as a sum',
+    decls: 'x: n; y: n',
+    source: String.raw`\begin{align*}
+\sum_i x_i y_i &= x^\top y
+\end{align*}`,
+  },
+  {
+    id: 'trace-as-sum',
+    name: 'the trace of a matrix as a sum',
+    decls: 'A: n×n',
+    source: String.raw`\begin{align*}
+\operatorname{tr} A &= \sum_i A_{ii}
+\end{align*}`,
+  },
+  {
+    id: 'frobenius-as-double-sum',
+    name: 'the Frobenius inner product as a double sum',
+    decls: 'A: m×n; B: m×n',
+    source: String.raw`\begin{align*}
+\sum_i \sum_j A_{ij} B_{ij} &= \operatorname{tr}(A^\top B)
+\end{align*}`,
+  },
+  {
+    id: 'quadratic-of-ones',
+    name: 'the sum of every entry as a quadratic form',
+    decls: 'A: n×n; v: ones n',
+    source: String.raw`\begin{align*}
+\sum_i \sum_j A_{ij} &= v^\top A v
+\end{align*}`,
+  },
+  {
+    id: 'logsumexp-gradient',
+    name: 'the gradient of the log of a sum of exponentials',
+    decls: 'z: n',
+    source: String.raw`\begin{align*}
+L &:= \log\sum_j e^{z_j} \\
+\frac{\partial L}{\partial z} &= \frac{e^z}{\sum_j e^{z_j}}
 \end{align*}`,
   },
   {

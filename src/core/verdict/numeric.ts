@@ -237,6 +237,7 @@ export function numericAbsDelta<T>(
   const sampler = new Sampler(field, rng);
   const env = makeEnv(field, rng);
   env.defs = defs;
+  env.sizes = new Map(setting);
   const free = freeVariables(step);
   const sampled = sampleFor(ctx, step, defs, setting, sampler, free, trial);
   if (sampled === 'unknown') return null;
@@ -274,6 +275,7 @@ export function numericDelta<T>(
   const sampler = new Sampler(field, rng);
   const env = makeEnv(field, rng);
   env.defs = defs;
+  env.sizes = new Map(setting);
   const free = freeVariables(step);
   const sampled = sampleFor(ctx, step, defs, setting, sampler, free, trial);
   if (sampled === 'unknown') return null;

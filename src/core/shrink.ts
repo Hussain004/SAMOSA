@@ -105,6 +105,7 @@ export function shrinkCounterexample(
   const sampler = new Sampler(field, rngFor(seed, 'shrink'));
   const env = makeEnv(field, rngFor(seed, 'shrink'));
   env.defs = defs;
+  env.sizes = new Map(sizes);
   const values = new Map<string, Val<number>>();
   const scalarRng = rngFor(seed, 'scalar');
   for (const name of names) {
@@ -200,6 +201,7 @@ function searchSmallIntegers(
 
     const env = makeEnv(field, rng);
     env.defs = sh.defs;
+    env.sizes = new Map(sh.sizes);
     for (const [name, value] of values.entries()) env.values.set(name, value);
     try {
       const l = evalNode(field, sh.lhs, env);

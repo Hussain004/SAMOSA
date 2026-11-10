@@ -177,20 +177,20 @@ The method, the correction and the full list of what stops the rest are in
 [docs/COVERAGE.md](https://raw.githubusercontent.com/Hussain004/SAMOSA/master/docs/COVERAGE.md).
 
 <!-- gen:cookbook -->
-And the Cookbook: 89 identities in matrix algebra, calculus and stochastics,
+And the Cookbook: 94 identities in matrix algebra, calculus and stochastics,
 with the mistakes the catalog can make of them.
 
 | | |
 | --- | --- |
 | the false checkmarks | **0** |
-| the identities SAMOSA cannot check | **3** |
-| the mutation score | **329 of 331 (99.4%)** |
-| the harmless mutants, where the mistake changes nothing | **103** |
-| the raw rate | **329 of 434 (75.8%)** |
+| the identities SAMOSA cannot check | **2** |
+| the mutation score | **343 of 343 (100.0%)** |
+| the harmless mutants, where the mistake changes nothing | **107** |
+| the raw rate | **343 of 450 (76.2%)** |
 
-The plan's gate asks for 95% of the bugs caught; the mutation score is 99.4%,
+The plan's gate asks for 95% of the bugs caught; the mutation score is 100.0%,
 and every mutant the engine calls right is confirmed harmless by the float64
-oracle. The method, the misses and the 2 gaps the corpus found are
+oracle. The method, the misses and the 0 gaps the corpus found are
 in [docs/COOKBOOK.md](https://raw.githubusercontent.com/Hussain004/SAMOSA/master/docs/COOKBOOK.md).
 <!-- /gen:cookbook -->
 

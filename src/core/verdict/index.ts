@@ -483,7 +483,7 @@ function checkStep(
 
 /** Unifies the shapes of the two sides of an equality. */
 
-function unifyShapes(
+export function unifyShapes(
   ctx: TypeContext,
   a: { r: Dim; c: Dim },
   b: { r: Dim; c: Dim },

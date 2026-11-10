@@ -241,6 +241,7 @@ export function runExactTrial(
   const sampler = new Sampler(field, rng);
   const env = makeEnv(field, rng);
   env.defs = defs;
+  env.sizes = new Map(setting);
 
   const free = freeVariables(step);
   const sampled = sampleFor(ctx, step, defs, setting, sampler, free, trial);

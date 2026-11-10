@@ -242,10 +242,10 @@ describe('the constructs of a real paper', () => {
     expect(parsed.parts[0].rhs).toMatchObject({ k: 'op', op: 'mul' });
   });
 
-  it('names an indexed symbol instead of treating it as a scalar', () => {
+  it('reads an indexed symbol as a symbol, for the types layer to resolve', () => {
     const parsed = parseRow('', 'p_i = 0', 0, 0);
     expect(parsed.error).toBeUndefined();
-    expect(parsed.parts[0].lhs).toMatchObject({ k: 'raw', text: 'an indexed symbol p_i' });
+    expect(parsed.parts[0].lhs).toMatchObject({ k: 'sym', name: 'p_i' });
   });
 
   it('reads an ellipsis in a list', () => {

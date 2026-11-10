@@ -168,6 +168,7 @@ export function runImplicationTrial(
   const sampler = new Sampler(field, rng);
   const env = makeEnv(field, rng);
   env.defs = defs;
+  env.sizes = new Map(setting);
 
   const sampled = sampleFor(ctx, step, defs, setting, sampler);
   if (sampled === 'unknown') return { kind: 'unknown', message: 'could not sample an instance' };

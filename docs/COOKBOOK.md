@@ -8,7 +8,7 @@ row.
 
 ## What is in it
 
-`corpus/cookbook/identities.ts` holds 89 identities in matrix algebra, matrix
+`corpus/cookbook/identities.ts` holds 94 identities in matrix algebra, matrix
 calculus and stochastics, grown from the 48 the Cookbook started with: the
 Kronecker identities, the derivatives of the determinant and of the inverse,
 the block matrices and the Schur complements, the Householder and projection
@@ -27,13 +27,13 @@ Measured by `pnpm check:corpus`:
 <!-- gen:cookbook -->
 | | |
 | --- | --- |
-| the identities | 89 |
-| the mutants | 434 |
+| the identities | 94 |
+| the mutants | 450 |
 | **the false checkmarks** | **0** |
-| the identities SAMOSA cannot check | 3 |
-| the mutation score | 329 of 331 (**99.4%**) |
-| the harmless mutants the float64 oracle confirmed | 103 |
-| the raw rate | 329 of 434 (**75.8%**) |
+| the identities SAMOSA cannot check | 2 |
+| the mutation score | 343 of 343 (**100.0%**) |
+| the harmless mutants the float64 oracle confirmed | 107 |
+| the raw rate | 343 of 450 (**76.2%**) |
 <!-- /gen:cookbook -->
 
 The plan's gate G2 asks for 95% of the planted bugs caught with the expected
@@ -50,7 +50,6 @@ These are not lies, they are gaps:
 | --- | --- |
 | the spectral norm of a transpose | the unsquared norm \|2\| |
 | a stationary point | no value for x |
-| the gradient of the softmax cross entropy | an indexed symbol z_j |
 <!-- /gen:cookbook-gaps -->
 
 ### The misses
@@ -86,14 +85,21 @@ The corpus is not only a measurement. It found real bugs, and they are fixed:
   `\frac{\partial J}{\partial \beta}` differentiated with respect to an
   empty name; a bare `\partial` numerator is now read as an operator whose
   operand is the expression that follows
+- a sum with a size-variable bound, like `\sum_{i=1}^n`, unrolled against
+  the random scalar that `n` sampled as and never finished; a bound that
+  names a dimension variable is the current size, and a sum without a
+  given range names the one it inferred, with a chip
+- the indexed component of a vector or a matrix, `z_i` and `A_{ij}`, was
+  named and not read; it is the parent's entry now, and it is checked on
+  the sampled parent, so `\sum_i x_i y_i = x^\top y` holds
 
 ## The gates, honestly
 
 <!-- gen:cookbook-gates -->
 | gate | what the plan asks | what we measure |
 | --- | --- | --- |
-| G1: no false checkmark | the golden suite and the Cookbook | 0 false checkmarks in 89 identities, and 0 in the 16 Menu derivations |
-| G2: the bugs caught | 95%, with the repair in the top three | the mutation score is 99.4% (329 of 331, the 103 harmless mutants excluded and confirmed by the float64 oracle); the raw rate is 75.8% (329 of 434); the four planted bugs of the golden suite all get their expected repair in the top three |
+| G1: no false checkmark | the golden suite and the Cookbook | 0 false checkmarks in 94 identities, and 0 in the 16 Menu derivations |
+| G2: the bugs caught | 95%, with the repair in the top three | the mutation score is 100.0% (343 of 343, the 107 harmless mutants excluded and confirmed by the float64 oracle); the raw rate is 76.2% (343 of 450); the four planted bugs of the golden suite all get their expected repair in the top three |
 | G3: the parse coverage | 70% | 56.3%, measured in [COVERAGE.md](COVERAGE.md); the gate is not met |
 <!-- /gen:cookbook-gates -->
 

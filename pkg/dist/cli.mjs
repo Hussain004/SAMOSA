@@ -1061,12 +1061,7 @@ var Parser = class _Parser {
     }
     let node = base2;
     if (node.k === "sym") {
-      const indexNotation = sub2 !== null && /^[ijk]$/.test(sub2.trim()) && /^[A-Za-z]$/.test(baseLatex);
-      node = indexNotation ? {
-        k: "raw",
-        text: `an indexed symbol ${baseLatex}_${sub2}`,
-        span: { from: node.span.from, to: spanEnd }
-      } : this.makeSym(accents, baseLatex, sub2, labelSup, {
+      node = this.makeSym(accents, baseLatex, sub2, labelSup, {
         from: node.span.from,
         to: spanEnd
       });
@@ -2082,6 +2077,7 @@ var Parser = class _Parser {
   }
   parseBigOp(t) {
     let idx = "i";
+    let idxTail = [];
     let lo = null;
     let hi = null;
     if (this.kind() === "sub") {
@@ -2099,6 +2095,15 @@ var Parser = class _Parser {
             lo = null;
           }
         }
+      } else {
+        const multi = g.text.trim().match(/^([A-Za-z]{2,4})$/);
+        if (multi) {
+          const letters = multi[1].split("");
+          idx = letters[0];
+          idxTail = letters.slice(1);
+        } else {
+          idx = g.text.trim() || "i";
+        }
       }
     }
     if (this.kind() === "sup") {
@@ -2111,7 +2116,10 @@ var Parser = class _Parser {
         hi = null;
       }
     }
-    const body = this.parseProduct();
+    let body = this.parseProduct();
+    for (const extra of idxTail.reverse()) {
+      body = { k: "bigop", kind: t.value === "sum" ? "sum" : "prod", idx: extra, lo: null, hi: null, body, span: body.span };
+    }
     return {
       k: "bigop",
       kind: t.value === "sum" ? "sum" : "prod",
@@ -3658,6 +3666,20 @@ function inferType(ctx, node) {
       ctx.bound.add(node.idx);
       const t = inferType(ctx, node.body);
       ctx.bound = saved;
+      if (node.lo === null && node.hi === null) {
+        const hint = inferIndexBound(ctx, node.body, node.idx, node.span);
+        if (hint) {
+          node.lo = { k: "num", value: { n: 1, d: 1 }, span: node.span };
+          node.hi = hint.hi;
+          ctx.chips.push({
+            id: "index-bound",
+            span: node.span,
+            message: hint.message
+          });
+        }
+      }
+      if (node.lo) inferType(ctx, node.lo);
+      if (node.hi) inferType(ctx, node.hi);
       return t;
     }
     case "block": {
@@ -3727,6 +3749,21 @@ function symbolType(ctx, name, span) {
     });
     return ty;
   }
+  const component = componentOf(ctx, name);
+  if (component) {
+    const m = /^([A-Za-z]+)_([A-Za-z0-9]+)$/.exec(name);
+    if (m) symbolType(ctx, m[1], span);
+    ctx.symbols.set(name, {
+      name,
+      display: toDisplay(name),
+      ty: component.ty,
+      props: ["component"],
+      source: "inferred",
+      guessed: false,
+      assumption: component.assumption
+    });
+    return component.ty;
+  }
   const base2 = baseLetter(name);
   const guess = guessType(ctx, name, base2);
   ctx.symbols.set(name, {
@@ -3762,6 +3799,76 @@ function baseLetter(name) {
   const m = stripped.match(/^([A-Za-z]+)/);
   return m ? m[1] : stripped;
 }
+function inferIndexBound(ctx, body, idx, span) {
+  let answer = null;
+  const visit = (node) => {
+    if (!node || answer) return;
+    if (node.k === "sym") {
+      const m = /^([A-Za-z]+)_([A-Za-z0-9]+)$/.exec(node.name);
+      if (!m) return;
+      const [, base2, subText] = m;
+      const letters = subText.split("");
+      const pos = letters.indexOf(idx);
+      if (pos < 0) return;
+      const decl = ctx.decls.get(base2);
+      const info = ctx.symbols.get(base2);
+      const ty = info?.ty ?? (decl ? declType(decl) : void 0);
+      if (ty?.t !== "mat") return;
+      const dim = pos === 0 ? ty.r : ty.c;
+      const hi = dimNode(dim, span);
+      if (!hi) return;
+      const name = hi.k === "sym" ? hi.name : String(dim);
+      answer = { hi, message: `the range of ${idx} is 1..${name}, from the shape of ${name}` };
+      return;
+    }
+    if (node.k === "bigop") {
+      visit(node.body);
+      if (node.lo) visit(node.lo);
+      if (node.hi) visit(node.hi);
+      return;
+    }
+    if (node.k === "deriv") {
+      visit(node.f);
+      for (const w of node.wrt) visit(w);
+      return;
+    }
+    if (node.k === "expect") {
+      for (const arg of node.args) visit(arg);
+      return;
+    }
+    if (node.k === "block") {
+      for (const row of node.rows) for (const cell of row) visit(cell);
+      return;
+    }
+    if ("args" in node && Array.isArray(node.args)) {
+      for (const arg of node.args) visit(arg);
+    }
+  };
+  visit(body);
+  return answer;
+}
+function dimNode(d, span) {
+  if (typeof d === "number") return { k: "num", value: { n: d, d: 1 }, span };
+  if (d.v.startsWith("#")) return null;
+  return { k: "sym", name: d.v, display: toDisplay(d.v), span };
+}
+function componentOf(ctx, name) {
+  const m = /^([A-Za-z]+)_([A-Za-z0-9]+)$/.exec(name);
+  if (!m) return null;
+  const [, base2, subText] = m;
+  const decl = ctx.decls.get(base2);
+  const info = ctx.symbols.get(base2);
+  const ty = info?.ty ?? (decl ? declType(decl) : void 0);
+  if (!ty || ty.t !== "mat") return null;
+  const letters = subText.split("");
+  if (letters.length === 1 && ty.c === 1) {
+    return { ty: { t: "scalar" }, assumption: `${toDisplay(name)} is a component of ${toDisplay(base2)}` };
+  }
+  if (letters.length === 2 && ty.c !== 1) {
+    return { ty: { t: "scalar" }, assumption: `${toDisplay(name)} is a component of ${toDisplay(base2)}` };
+  }
+  return null;
+}
 function guessType(ctx, name, base2) {
   if (base2 === "I" && !name.includes("_")) {
     const d = freshDim(ctx);
@@ -3791,7 +3898,7 @@ function guessType(ctx, name, base2) {
     }
   }
   if (/^[nmdkNTTP]$/.test(base2) && !name.includes("_")) {
-    return { ty: { t: "scalar" }, props: [], assumption: `${name} is a size` };
+    return { ty: { t: "scalar" }, props: ["size"], assumption: `${name} is a size` };
   }
   if (/^[ijk]$/.test(base2) && ctx.bound.has(base2)) {
     return { ty: { t: "scalar" }, props: [], assumption: `${name} is an index` };
@@ -4533,6 +4640,11 @@ function collectDimVarsFor(ctx, lhs, rhs, defs) {
           roots.add(ctx.dims.find(d.v));
         }
       }
+      continue;
+    }
+    if (info.ty.t === "scalar" && info.props.some((p) => p === "size")) {
+      const root = ctx.dims.find(name);
+      if (ctx.pinned[root] === void 0 && fixedSize(ctx, root) === void 0) roots.add(root);
     }
   }
   const named = /* @__PURE__ */ new Map();
@@ -4990,6 +5102,10 @@ function sampledNames(step, defs, free = /* @__PURE__ */ new Set()) {
     const def = defs.get(name);
     if (def) collectSymbols(def, names);
   }
+  for (const name of [...names]) {
+    const cut = name.indexOf("_");
+    if (cut > 0) names.add(name.slice(0, cut));
+  }
   return [...names].filter((name) => !(defs.has(name) && !free.has(name)));
 }
 function sampleFor(ctx, step, defs, setting, sampler, free = /* @__PURE__ */ new Set(), variety = 0) {
@@ -5001,6 +5117,7 @@ function sampleFor(ctx, step, defs, setting, sampler, free = /* @__PURE__ */ new
     if (values.has(name)) continue;
     const info = ctx.symbols.get(name);
     if (!info) continue;
+    if (info.props.some((p) => p === "component")) continue;
     const peg = pegs.get(name) ?? 0;
     if (info.ty.t === "rv") {
       const dist = info.ty.dist;
@@ -5727,7 +5844,44 @@ var EvalError = class extends Error {
   }
 };
 function makeEnv(field, random2) {
-  return { field, values: /* @__PURE__ */ new Map(), defs: /* @__PURE__ */ new Map(), memo: /* @__PURE__ */ new Map(), quad: /* @__PURE__ */ new Map(), random: random2 };
+  return { field, values: /* @__PURE__ */ new Map(), defs: /* @__PURE__ */ new Map(), memo: /* @__PURE__ */ new Map(), quad: /* @__PURE__ */ new Map(), sizes: /* @__PURE__ */ new Map(), random: random2 };
+}
+function componentValue(f, node, env) {
+  if (node.k !== "sym") return null;
+  const m = /^([A-Za-z]+)_([A-Za-z0-9]+)$/.exec(node.name);
+  if (!m) return null;
+  const base2 = m[1];
+  const subText = m[2];
+  const baseVal = env.values.get(base2);
+  if (!baseVal || baseVal.k !== "m") return null;
+  const letters = subText.split("");
+  const indexOf = (letter, upper) => {
+    if (/^[0-9]+$/.test(letter)) {
+      const k2 = parseInt(letter, 10) - 1;
+      return k2 >= 0 && k2 < upper ? k2 : null;
+    }
+    const bound = env.values.get(letter);
+    if (!bound || bound.k !== "s") return null;
+    const k = f.toNumber(bound.v);
+    const idx = Math.round(k);
+    if (!Number.isFinite(k) || Math.abs(k - idx) > 1e-6) return null;
+    const zeroBased = idx - 1;
+    if (zeroBased < 0 || zeroBased >= upper) {
+      throw new EvalError(`the index ${letter} is out of bounds`);
+    }
+    return zeroBased;
+  };
+  const mat2 = baseVal.m;
+  if (mat2.c === 1) {
+    if (letters.length !== 1) return null;
+    const row2 = indexOf(letters[0], mat2.r);
+    return row2 === null ? null : scalar(mat2.d[row2]);
+  }
+  if (letters.length !== 2) return null;
+  const row = indexOf(letters[0], mat2.r);
+  const col = indexOf(letters[1], mat2.c);
+  if (row === null || col === null) return null;
+  return scalar(mat2.d[row * mat2.c + col]);
 }
 function requireMatrix(val, what) {
   if (isMatrixVal(val)) return val.m;
@@ -5756,6 +5910,8 @@ function evalNode(f, node, env) {
         env.memo.set(node.name, value);
         return value;
       }
+      const component = componentValue(f, node, env);
+      if (component) return component;
       throw new EvalError(`no value for ${node.name}`);
     }
     case "op":
@@ -5775,8 +5931,22 @@ function evalNode(f, node, env) {
     case "expect":
       return evalExpect(f, node, env);
     case "bigop": {
-      const lo = node.lo ? Math.round(f.toNumber(requireScalar(evalNode(f, node.lo, env), "a sum bound"))) : 1;
-      const hi = node.hi ? Math.round(f.toNumber(requireScalar(evalNode(f, node.hi, env), "a sum bound"))) : lo;
+      const bound = (node2, what) => {
+        if (node2.k === "sym" && env.sizes.has(node2.name)) return env.sizes.get(node2.name);
+        return Math.round(f.toNumber(requireScalar(evalNode(f, node2, env), what)));
+      };
+      const lo = node.lo ? bound(node.lo, "a sum bound") : 1;
+      if (node.hi === null) {
+        throw new EvalError("the range of the sum is not given");
+      }
+      const hi = bound(node.hi, "a sum bound");
+      const UNROLL_CAP = 1e3;
+      if (hi - lo > UNROLL_CAP) {
+        throw new EvalError(`the sum from ${lo} to ${hi} is too long to unroll`);
+      }
+      if (hi < lo) {
+        throw new EvalError(`the sum from ${lo} to ${hi} runs backwards`);
+      }
       let acc = null;
       for (let i = lo; i <= hi; i++) {
         const saved = env.values.get(node.idx);
@@ -6104,7 +6274,7 @@ function dualEnv(env, dual) {
     if (isScalarVal(val)) values.set(name, scalar({ v: val.v, t: dual.base.zero }));
     else values.set(name, { k: "m", m: toDual(dual.base, val.m) });
   }
-  return { field: dual, values, defs: env.defs, memo: /* @__PURE__ */ new Map(), quad: /* @__PURE__ */ new Map(), random: env.random };
+  return { field: dual, values, defs: env.defs, memo: /* @__PURE__ */ new Map(), quad: /* @__PURE__ */ new Map(), sizes: env.sizes, random: env.random };
 }
 function hyperEnv(env, hyper) {
   const values = /* @__PURE__ */ new Map();
@@ -6115,7 +6285,7 @@ function hyperEnv(env, hyper) {
       values.set(name, { k: "m", m: toHyperDual(hyper.base, val.m) });
     }
   }
-  return { field: hyper, values, defs: env.defs, memo: /* @__PURE__ */ new Map(), quad: /* @__PURE__ */ new Map(), random: env.random };
+  return { field: hyper, values, defs: env.defs, memo: /* @__PURE__ */ new Map(), quad: /* @__PURE__ */ new Map(), sizes: env.sizes, random: env.random };
 }
 function directionalDerivative(base2, fnNode, env, wrtName, baseValue, direction) {
   const dual = new DualField(base2);
@@ -6496,6 +6666,7 @@ function runExactTrial(step, ctx, defs, setting, p, rng, trial) {
   const sampler = new Sampler(field, rng);
   const env = makeEnv(field, rng);
   env.defs = defs;
+  env.sizes = new Map(setting);
   const free = freeVariables(step);
   const sampled = sampleFor(ctx, step, defs, setting, sampler, free, trial);
   if (sampled === "unknown") {
@@ -9004,6 +9175,7 @@ function numericDelta(ctx, defs, step, setting, rng, trial, field) {
   const sampler = new Sampler(field, rng);
   const env = makeEnv(field, rng);
   env.defs = defs;
+  env.sizes = new Map(setting);
   const free = freeVariables(step);
   const sampled = sampleFor(ctx, step, defs, setting, sampler, free, trial);
   if (sampled === "unknown") return null;
@@ -9138,6 +9310,7 @@ function runImplicationTrial(step, ctx, defs, setting, p, rng) {
   const sampler = new Sampler(field, rng);
   const env = makeEnv(field, rng);
   env.defs = defs;
+  env.sizes = new Map(setting);
   const sampled = sampleFor(ctx, step, defs, setting, sampler);
   if (sampled === "unknown") return { kind: "unknown", message: "could not sample an instance" };
   for (const [name, value] of sampled.values.entries()) env.values.set(name, value);
@@ -9292,6 +9465,7 @@ function checkProportionality(step, ctx, defs, opts, card) {
     const sampler = new Sampler(field, rng);
     const env = makeEnv(field, rng);
     env.defs = defs;
+    env.sizes = new Map(setting);
     const sampled = sampleFor(ctx, step, defs, setting, sampler);
     if (sampled === "unknown") {
       const message = "could not sample an instance";
@@ -10183,6 +10357,7 @@ function shrinkCounterexample(ctx, lhs, rhs, defs, sizes, seed, maxAttempts = 16
   const sampler = new Sampler(field, rngFor(seed, "shrink"));
   const env = makeEnv(field, rngFor(seed, "shrink"));
   env.defs = defs;
+  env.sizes = new Map(sizes);
   const values = /* @__PURE__ */ new Map();
   const scalarRng = rngFor(seed, "scalar");
   for (const name of names) {
@@ -10247,6 +10422,7 @@ function searchSmallIntegers(sh, range, seed, spent, maxAttempts) {
     if (!values.size) continue;
     const env = makeEnv(field, rng);
     env.defs = sh.defs;
+    env.sizes = new Map(sh.sizes);
     for (const [name, value] of values.entries()) env.values.set(name, value);
     try {
       const l = evalNode(field, sh.lhs, env);
@@ -10742,6 +10918,7 @@ function holdsWith(sh, side, candidate) {
     const sampler = new Sampler(field, rng);
     const env = makeEnv(field, rng);
     env.defs = sh.defs;
+    env.sizes = new Map(setting);
     const values = sampleSymbols(sh.ctx, sh, setting, sampler);
     if (!values) return false;
     for (const [name, value] of values.entries()) if (value) env.values.set(name, value);
@@ -10886,6 +11063,7 @@ function typeChecks(sh, rhs) {
     const sampler = new Sampler(field, rng);
     const env = makeEnv(field, rng);
     env.defs = sh.defs;
+    env.sizes = new Map(setting);
     const values = sampleSymbols(sh.ctx, sh, setting, sampler);
     if (!values) continue;
     for (const [n, value] of values.entries()) if (value) env.values.set(n, value);
@@ -10910,6 +11088,7 @@ function residualRepairs(sh) {
     const sampler = new Sampler(field, rng);
     const env = makeEnv(field, rng);
     env.defs = sh.defs;
+    env.sizes = new Map(setting);
     const values = sampleSymbols(sh.ctx, sh, setting, sampler);
     if (!values) return out;
     for (const [name, value] of values.entries()) if (value) env.values.set(name, value);

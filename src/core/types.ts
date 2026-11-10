@@ -302,6 +302,25 @@ export function inferType(ctx: TypeContext, node: Node): Ty {
       ctx.bound.add(node.idx);
       const t = inferType(ctx, node.body);
       ctx.bound = saved;
+      // a sum without an explicit range takes it from the shape of a
+      // component of its body: z_j with z: n is a sum over 1..n, and the
+      // row says so with a chip
+      if (node.lo === null && node.hi === null) {
+        const hint = inferIndexBound(ctx, node.body, node.idx, node.span);
+        if (hint) {
+          node.lo = { k: 'num', value: { n: 1, d: 1 }, span: node.span };
+          node.hi = hint.hi;
+          ctx.chips.push({
+            id: 'index-bound',
+            span: node.span,
+            message: hint.message,
+          });
+        }
+      }
+      // the bounds are worth typing too: the size symbol they carry is
+      // registered, and the dimension vars can be collected from it
+      if (node.lo) inferType(ctx, node.lo);
+      if (node.hi) inferType(ctx, node.hi);
       return t;
     }
     case 'block': {
@@ -381,6 +400,27 @@ export function symbolType(ctx: TypeContext, name: string, span: Span): Ty {
     return ty;
   }
 
+  // a component of a declared vector or matrix: `z_i` with `z: n`, and
+  // `A_{ij}` with `A: m×n`. The component is the parent's entry, so it is a
+  // scalar with no sampling of its own.
+  const component = componentOf(ctx, name);
+  if (component) {
+    // the parent is what the component IS: registering it here means the
+    // sampler draws it, so components have something to be read from
+    const m = /^([A-Za-z]+)_([A-Za-z0-9]+)$/.exec(name);
+    if (m) symbolType(ctx, m[1], span);
+    ctx.symbols.set(name, {
+      name,
+      display: toDisplay(name),
+      ty: component.ty,
+      props: ['component'],
+      source: 'inferred',
+      guessed: false,
+      assumption: component.assumption,
+    });
+    return component.ty;
+  }
+
   // the heuristics of F3
   const base = baseLetter(name);
   const guess = guessType(ctx, name, base);
@@ -419,6 +459,97 @@ function baseLetter(name: string): string {
   const stripped = name.replace(/^(\\[A-Za-z]+)+/, '');
   const m = stripped.match(/^([A-Za-z]+)/);
   return m ? m[1] : stripped;
+}
+
+/**
+ * The range a bare `\\sum_i` intends, from a component of its body.
+ *
+ * `z_j` with `z: n` is a component of z, and the sum runs over 1..n. The
+ * first subscript letter reads the row dimension, the second the column
+ * one; a vector has only the first.
+ */
+function inferIndexBound(
+  ctx: TypeContext,
+  body: Node,
+  idx: string,
+  span: Span,
+): { hi: Node; message: string } | null {
+  let answer: { hi: Node; message: string } | null = null;
+  const visit = (node: Node | undefined): void => {
+    if (!node || answer) return;
+    if (node.k === 'sym') {
+      const m = /^([A-Za-z]+)_([A-Za-z0-9]+)$/.exec(node.name);
+      if (!m) return;
+      const [, base, subText] = m;
+      const letters = subText.split('');
+      const pos = letters.indexOf(idx);
+      if (pos < 0) return;
+      const decl = ctx.decls.get(base);
+      const info = ctx.symbols.get(base);
+      const ty = info?.ty ?? (decl ? declType(decl) : undefined);
+      if (ty?.t !== 'mat') return;
+      const dim = pos === 0 ? ty.r : ty.c;
+      const hi = dimNode(dim, span);
+      if (!hi) return;
+      const name = hi.k === 'sym' ? hi.name : String(dim);
+      answer = { hi, message: `the range of ${idx} is 1..${name}, from the shape of ${name}` };
+      return;
+    }
+    if (node.k === 'bigop') {
+      visit(node.body);
+      if (node.lo) visit(node.lo);
+      if (node.hi) visit(node.hi);
+      return;
+    }
+    if (node.k === 'deriv') {
+      visit(node.f);
+      for (const w of node.wrt) visit(w);
+      return;
+    }
+    if (node.k === 'expect') {
+      for (const arg of node.args) visit(arg);
+      return;
+    }
+    if (node.k === 'block') {
+      for (const row of node.rows) for (const cell of row) visit(cell);
+      return;
+    }
+    if ('args' in node && Array.isArray((node as { args?: Node[] }).args)) {
+      for (const arg of (node as { args: Node[] }).args) visit(arg);
+    }
+  };
+  visit(body);
+  return answer;
+}
+
+/** A dimension as a node a bound can read: a number, or the name of a dimension variable. */
+function dimNode(d: Dim, span: Span): Node | null {
+  if (typeof d === 'number') return { k: 'num', value: { n: d, d: 1 }, span };
+  if (d.v.startsWith('#')) return null;
+  return { k: 'sym', name: d.v, display: toDisplay(d.v), span };
+}
+
+/**
+ * The component reading of a symbol: one or two letters of subscript on a
+ * letter base, where the base is a declared vector or matrix. A digit is a
+ * literal position, a letter is a bound index.
+ */
+function componentOf(ctx: TypeContext, name: string): { ty: Ty; assumption: string } | null {
+  const m = /^([A-Za-z]+)_([A-Za-z0-9]+)$/.exec(name);
+  if (!m) return null;
+  const [, base, subText] = m;
+  const decl = ctx.decls.get(base);
+  const info = ctx.symbols.get(base);
+  const ty = info?.ty ?? (decl ? declType(decl) : undefined);
+  if (!ty || ty.t !== 'mat') return null;
+  const letters = subText.split('');
+  if (letters.length === 1 && ty.c === 1) {
+    return { ty: { t: 'scalar' }, assumption: `${toDisplay(name)} is a component of ${toDisplay(base)}` };
+  }
+  if (letters.length === 2 && ty.c !== 1) {
+    return { ty: { t: 'scalar' }, assumption: `${toDisplay(name)} is a component of ${toDisplay(base)}` };
+  }
+  return null;
 }
 
 interface Guess {
@@ -462,7 +593,7 @@ function guessType(ctx: TypeContext, name: string, base: string): Guess {
   }
   // the dimension variables
   if (/^[nmdkNTTP]$/.test(base) && !name.includes('_')) {
-    return { ty: { t: 'scalar' }, props: [], assumption: `${name} is a size` };
+    return { ty: { t: 'scalar' }, props: ['size'], assumption: `${name} is a size` };
   }
   // the index variables
   if (/^[ijk]$/.test(base) && ctx.bound.has(base)) {

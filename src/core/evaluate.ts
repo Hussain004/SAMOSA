@@ -57,11 +57,60 @@ export interface EvalEnv<T> {
   memo: Map<string, Val<T>>;
   /** the random variables, with the roots of their covariances */
   quad: Map<string, QuadVar<any>>;
+  /** the sizes of the current instance: the dimension variables */
+  sizes: Map<string, number>;
   random: Rng;
 }
 
 export function makeEnv<T>(field: Field<T>, random: Rng): EvalEnv<T> {
-  return { field, values: new Map(), defs: new Map(), memo: new Map(), quad: new Map(), random };
+  return { field, values: new Map(), defs: new Map(), memo: new Map(), quad: new Map(), sizes: new Map(), random };
+}
+
+/**
+ * The value of an indexed component, like `z_i` or `A_{ij}`.
+ *
+ * The component is not a free symbol: it is an entry of the vector or matrix
+ * the base names, read with the index the enclosing sum bound in the
+ * environment. A digit is a literal position; a letter is a bound variable.
+ * Components are deliberately not memoized, because they depend on the
+ * bound values.
+ */
+function componentValue<T>(f: Field<T>, node: Node, env: EvalEnv<T>): Val<T> | null {
+  if (node.k !== 'sym') return null;
+  const m = /^([A-Za-z]+)_([A-Za-z0-9]+)$/.exec(node.name);
+  if (!m) return null;
+  const base = m[1];
+  const subText = m[2];
+  const baseVal = env.values.get(base);
+  if (!baseVal || baseVal.k !== 'm') return null;
+  const letters = subText.split('');
+  const indexOf = (letter: string, upper: number): number | null => {
+    if (/^[0-9]+$/.test(letter)) {
+      const k = parseInt(letter, 10) - 1;
+      return k >= 0 && k < upper ? k : null;
+    }
+    const bound = env.values.get(letter);
+    if (!bound || bound.k !== 's') return null;
+    const k = f.toNumber(bound.v);
+    const idx = Math.round(k);
+    if (!Number.isFinite(k) || Math.abs(k - idx) > 1e-6) return null;
+    const zeroBased = idx - 1;
+    if (zeroBased < 0 || zeroBased >= upper) {
+      throw new EvalError(`the index ${letter} is out of bounds`);
+    }
+    return zeroBased;
+  };
+  const mat = baseVal.m;
+  if (mat.c === 1) {
+    if (letters.length !== 1) return null;
+    const row = indexOf(letters[0], mat.r);
+    return row === null ? null : scalar(mat.d[row]);
+  }
+  if (letters.length !== 2) return null;
+  const row = indexOf(letters[0], mat.r);
+  const col = indexOf(letters[1], mat.c);
+  if (row === null || col === null) return null;
+  return scalar(mat.d[row * mat.c + col]);
 }
 
 function requireMatrix<T>(val: Val<T>, what: string): Mat<T> {
@@ -96,6 +145,9 @@ export function evalNode<T>(f: Field<T>, node: Node, env: EvalEnv<T>): Val<T> {
         env.memo.set(node.name, value);
         return value;
       }
+      // a component of a declared vector or matrix, not a free symbol
+      const component = componentValue(f, node, env);
+      if (component) return component;
       throw new EvalError(`no value for ${node.name}`);
     }
     case 'op':
@@ -116,8 +168,27 @@ export function evalNode<T>(f: Field<T>, node: Node, env: EvalEnv<T>): Val<T> {
     case 'expect':
       return evalExpect(f, node, env);
     case 'bigop': {
-      const lo = node.lo ? Math.round(f.toNumber(requireScalar(evalNode(f, node.lo, env), 'a sum bound'))) : 1;
-      const hi = node.hi ? Math.round(f.toNumber(requireScalar(evalNode(f, node.hi, env), 'a sum bound'))) : lo;
+      // a bare bound that names a dimension variable is the current size of
+      // the instance, not a random scalar: sum_{i=1}^n runs to n
+      const bound = (node: Node, what: string): number => {
+        if (node.k === 'sym' && env.sizes.has(node.name)) return env.sizes.get(node.name)!;
+        return Math.round(f.toNumber(requireScalar(evalNode(f, node, env), what)));
+      };
+      const lo = node.lo ? bound(node.lo, 'a sum bound') : 1;
+      if (node.hi === null) {
+        throw new EvalError('the range of the sum is not given');
+      }
+      const hi = bound(node.hi, 'a sum bound');
+      // an unrolled sum is a polynomial of the body, and the row is honest
+      // about that degree only while the range is small: a random scalar
+      // bound used to unroll billions of terms and hang the engine
+      const UNROLL_CAP = 1000;
+      if (hi - lo > UNROLL_CAP) {
+        throw new EvalError(`the sum from ${lo} to ${hi} is too long to unroll`);
+      }
+      if (hi < lo) {
+        throw new EvalError(`the sum from ${lo} to ${hi} runs backwards`);
+      }
       let acc: Val<T> | null = null;
       for (let i = lo; i <= hi; i++) {
         const saved = env.values.get(node.idx);
@@ -496,7 +567,7 @@ function dualEnv<T>(env: EvalEnv<T>, dual: DualField<Field<T>>): EvalEnv<DualVal
     if (isScalarVal(val)) values.set(name, scalar({ v: val.v, t: dual.base.zero }));
     else values.set(name, { k: 'm', m: toDual(dual.base, val.m) });
   }
-  return { field: dual, values, defs: env.defs, memo: new Map(), quad: new Map(), random: env.random };
+  return { field: dual, values, defs: env.defs, memo: new Map(), quad: new Map(), sizes: env.sizes, random: env.random };
 }
 
 function hyperEnv<T>(env: EvalEnv<T>, hyper: HyperDualField<Field<T>>): EvalEnv<HyperDualValue> {
@@ -508,7 +579,7 @@ function hyperEnv<T>(env: EvalEnv<T>, hyper: HyperDualField<Field<T>>): EvalEnv<
       values.set(name, { k: 'm', m: toHyperDual(hyper.base, val.m) });
     }
   }
-  return { field: hyper, values, defs: env.defs, memo: new Map(), quad: new Map(), random: env.random };
+  return { field: hyper, values, defs: env.defs, memo: new Map(), quad: new Map(), sizes: env.sizes, random: env.random };
 }
 
 /**

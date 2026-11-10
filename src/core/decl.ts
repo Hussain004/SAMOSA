@@ -37,6 +37,8 @@ export type Prop =
   | 'ident'
   | 'zero'
   | 'ones'
+  | 'component'
+  | 'size'
   | { rank: Dim }
   | { commutes: string };
 

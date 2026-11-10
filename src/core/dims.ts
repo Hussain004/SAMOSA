@@ -66,6 +66,13 @@ export function collectDimVarsFor(
           roots.add(ctx.dims.find(d.v));
         }
       }
+      continue;
+    }
+    // a bare size symbol is a dimension variable too: a step that only
+    // mentions n as a sum bound is an n-sized question
+    if (info.ty.t === 'scalar' && info.props.some((p) => p === 'size')) {
+      const root = ctx.dims.find(name);
+      if (ctx.pinned[root] === undefined && fixedSize(ctx, root) === undefined) roots.add(root);
     }
   }
 

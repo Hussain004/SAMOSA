@@ -265,6 +265,12 @@ export function sampledNames(step: Step, defs: Map<string, Node>, free: Set<stri
     const def = defs.get(name);
     if (def) collectSymbols(def, names);
   }
+  // a component names its parent: `x_i` is read from `x`, so the parent
+  // must be sampled even though the row never writes it out
+  for (const name of [...names]) {
+    const cut = name.indexOf('_');
+    if (cut > 0) names.add(name.slice(0, cut));
+  }
   return [...names].filter((name) => !(defs.has(name) && !free.has(name)));
 }
 
@@ -288,6 +294,8 @@ export function sampleFor<T>(
     if (values.has(name)) continue;
     const info = ctx.symbols.get(name);
     if (!info) continue;
+    // a component has no sampling of its own: it is an entry of the parent
+    if (info.props.some((p) => p === 'component')) continue;
     const peg = pegs.get(name) ?? 0;
     if (info.ty.t === 'rv') {
       // a random variable: sample the root of its covariance, so that the

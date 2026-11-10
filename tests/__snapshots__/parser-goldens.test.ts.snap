@@ -1212,6 +1212,63 @@ exports[`the parser, on every row of the Menu and the Cookbook > cookbook/frob-n
 }
 `;
 
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/frobenius-as-double-sum row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "bigop": "sum",
+        "body": {
+          "bigop": "sum",
+          "body": {
+            "args": [
+              {
+                "sym": "A_ij",
+              },
+              {
+                "sym": "B_ij",
+              },
+            ],
+            "op": "mul",
+          },
+          "hi": null,
+          "idx": "j",
+          "lo": null,
+        },
+        "hi": null,
+        "idx": "i",
+        "lo": null,
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "args": [
+                  {
+                    "sym": "A",
+                  },
+                ],
+                "op": "T",
+              },
+              {
+                "sym": "B",
+              },
+            ],
+            "op": "mul",
+          },
+        ],
+        "call": "tr",
+      },
+    },
+  ],
+}
+`;
+
 exports[`the parser, on every row of the Menu and the Cookbook > cookbook/frobenius-gradient row 1 1`] = `
 {
   "parts": [
@@ -2320,6 +2377,52 @@ exports[`the parser, on every row of the Menu and the Cookbook > cookbook/identi
       "relation": "=",
       "rhs": {
         "sym": "A",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/inner-product-as-sum row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "bigop": "sum",
+        "body": {
+          "args": [
+            {
+              "sym": "x_i",
+            },
+            {
+              "sym": "y_i",
+            },
+          ],
+          "op": "mul",
+        },
+        "hi": null,
+        "idx": "i",
+        "lo": null,
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "sym": "x",
+              },
+            ],
+            "op": "T",
+          },
+          {
+            "sym": "y",
+          },
+        ],
+        "op": "mul",
       },
     },
   ],
@@ -4148,6 +4251,93 @@ exports[`the parser, on every row of the Menu and the Cookbook > cookbook/logdet
 }
 `;
 
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/logsumexp-gradient row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "sym": "L",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": ":=",
+      "rhs": {
+        "args": [
+          {
+            "bigop": "sum",
+            "body": {
+              "args": [
+                {
+                  "sym": "z_j",
+                },
+              ],
+              "call": "exp",
+            },
+            "hi": null,
+            "idx": "j",
+            "lo": null,
+          },
+        ],
+        "call": "log",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/logsumexp-gradient row 2 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "deriv": {
+          "sym": "L",
+        },
+        "form": "grad",
+        "order": 1,
+        "wrt": [
+          {
+            "sym": "z",
+          },
+        ],
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "sym": "z",
+              },
+            ],
+            "call": "exp",
+          },
+          {
+            "bigop": "sum",
+            "body": {
+              "args": [
+                {
+                  "sym": "z_j",
+                },
+              ],
+              "call": "exp",
+            },
+            "hi": null,
+            "idx": "j",
+            "lo": null,
+          },
+        ],
+        "op": "div",
+      },
+    },
+  ],
+}
+`;
+
 exports[`the parser, on every row of the Menu and the Cookbook > cookbook/orthogonal-transpose-inverse row 1 1`] = `
 {
   "parts": [
@@ -5020,6 +5210,58 @@ exports[`the parser, on every row of the Menu and the Cookbook > cookbook/quadra
           },
           {
             "sym": "x",
+          },
+        ],
+        "op": "mul",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/quadratic-of-ones row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "bigop": "sum",
+        "body": {
+          "bigop": "sum",
+          "body": {
+            "sym": "A_ij",
+          },
+          "hi": null,
+          "idx": "j",
+          "lo": null,
+        },
+        "hi": null,
+        "idx": "i",
+        "lo": null,
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "args": [
+                  {
+                    "sym": "v",
+                  },
+                ],
+                "op": "T",
+              },
+              {
+                "sym": "A",
+              },
+            ],
+            "op": "mul",
+          },
+          {
+            "sym": "v",
           },
         ],
         "op": "mul",
@@ -6026,7 +6268,7 @@ exports[`the parser, on every row of the Menu and the Cookbook > cookbook/softma
             "body": {
               "args": [
                 {
-                  "raw": "an indexed symbol p_i",
+                  "sym": "p_i",
                 },
                 {
                   "args": [
@@ -6035,7 +6277,7 @@ exports[`the parser, on every row of the Menu and the Cookbook > cookbook/softma
                         {
                           "args": [
                             {
-                              "raw": "an indexed symbol z_i",
+                              "sym": "z_i",
                             },
                           ],
                           "call": "exp",
@@ -6045,13 +6287,13 @@ exports[`the parser, on every row of the Menu and the Cookbook > cookbook/softma
                           "body": {
                             "args": [
                               {
-                                "raw": "an indexed symbol z_j",
+                                "sym": "z_j",
                               },
                             ],
                             "call": "exp",
                           },
                           "hi": null,
-                          "idx": "i",
+                          "idx": "j",
                           "lo": null,
                         },
                       ],
@@ -6100,29 +6342,43 @@ exports[`the parser, on every row of the Menu and the Cookbook > cookbook/softma
           {
             "args": [
               {
-                "args": [
-                  {
-                    "sym": "z",
-                  },
-                ],
-                "call": "exp",
-              },
-              {
                 "bigop": "sum",
                 "body": {
-                  "args": [
-                    {
-                      "raw": "an indexed symbol z_j",
-                    },
-                  ],
-                  "call": "exp",
+                  "sym": "p_k",
                 },
                 "hi": null,
-                "idx": "i",
+                "idx": "k",
                 "lo": null,
               },
+              {
+                "args": [
+                  {
+                    "args": [
+                      {
+                        "sym": "z",
+                      },
+                    ],
+                    "call": "exp",
+                  },
+                  {
+                    "bigop": "sum",
+                    "body": {
+                      "args": [
+                        {
+                          "sym": "z_j",
+                        },
+                      ],
+                      "call": "exp",
+                    },
+                    "hi": null,
+                    "idx": "j",
+                    "lo": null,
+                  },
+                ],
+                "op": "div",
+              },
             ],
-            "op": "div",
+            "op": "mul",
           },
           {
             "sym": "p",
@@ -6300,6 +6556,36 @@ exports[`the parser, on every row of the Menu and the Cookbook > cookbook/symmet
       "relation": "=",
       "rhs": {
         "sym": "S",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/trace-as-sum row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "args": [
+          {
+            "sym": "A",
+          },
+        ],
+        "call": "tr",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "bigop": "sum",
+        "body": {
+          "sym": "A_ii",
+        },
+        "hi": null,
+        "idx": "i",
+        "lo": null,
       },
     },
   ],
