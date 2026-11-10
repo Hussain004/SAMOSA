@@ -68,6 +68,8 @@ export function App() {
   const [mobilePane, setMobilePane] = useState<'rendered' | 'source'>('rendered');
   const [hoverStep, setHoverStep] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheetHeight, setSheetHeight] = useState<number | null>(null);
+  const sheetDrag = useRef<{ startY: number; startHeight: number } | null>(null);
   const [undoToast, setUndoToast] = useState<{ row: number; previous: string } | null>(null);
   const undoTimer = useRef<number | undefined>(undefined);
   const [inspectorOpen, setInspectorOpen] = useState(true);
@@ -169,6 +171,37 @@ export function App() {
     window.history.replaceState(null, '', `#v1.${url.split('#v1.')[1]}`);
     copy(url);
   }, [copy, settings, source]);
+
+  // the bottom sheet: a drag handle, two snap points, a flick to dismiss
+  const sheetVh = () => (typeof window === 'undefined' ? 800 : window.innerHeight);
+  const sheetIsPhone = typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches;
+  const onSheetPointerDown = (e: React.PointerEvent<HTMLElement>) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    sheetDrag.current = { startY: e.clientY, startHeight: sheetHeight ?? Math.round(sheetVh() * 0.4) };
+  };
+  const onSheetPointerMove = (e: React.PointerEvent<HTMLElement>) => {
+    const drag = sheetDrag.current;
+    if (!drag) return;
+    const next = drag.startHeight + (drag.startY - e.clientY);
+    const min = Math.round(sheetVh() * 0.18);
+    const max = Math.round(sheetVh() * 0.92);
+    setSheetHeight(Math.max(min, Math.min(max, next)));
+  };
+  const onSheetPointerUp = () => {
+    const drag = sheetDrag.current;
+    sheetDrag.current = null;
+    if (!drag) return;
+    const v = sheetHeight ?? Math.round(sheetVh() * 0.4);
+    if (v < sheetVh() * 0.22) {
+      // below a quarter of the screen, the sheet is dismissed
+      setSheetOpen(false);
+      setSheetHeight(null);
+      return;
+    }
+    const snap40 = Math.round(sheetVh() * 0.4);
+    const snap85 = Math.round(sheetVh() * 0.85);
+    setSheetHeight(Math.abs(v - snap40) <= Math.abs(v - snap85) ? snap40 : snap85);
+  };
 
   const declare = useCallback(
     (name: string, type: string) => {
@@ -379,12 +412,12 @@ export function App() {
         </div>
       )}
 
-      <div className="flex shrink-0 border-b border-[var(--color-line)] text-[0.625rem] md:hidden">
+      <div className="flex shrink-0 border-b border-[var(--color-line)] md:hidden">
         {(['rendered', 'source'] as const).map((pane) => (
           <button
             key={pane}
             onClick={() => setMobilePane(pane)}
-            className={`flex-1 px-3 py-2 uppercase tracking-wider ${
+            className={`flex min-h-[44px] flex-1 items-center justify-center text-[0.8125rem] uppercase tracking-wider ${
               mobilePane === pane ? 'text-[var(--color-gold)]' : 'text-[var(--color-faint)]'
             }`}
           >
@@ -544,10 +577,19 @@ export function App() {
       <section
         className={`${
           sheetOpen ? 'flex' : 'hidden'
-        } fixed inset-x-0 bottom-0 z-40 max-h-[70vh] min-h-0 flex-col rounded-t-xl border-t border-[var(--color-line)] bg-[var(--color-panel)] shadow-2xl md:static md:z-auto md:flex md:flex-none md:rounded-none md:bg-transparent md:shadow-none ${
+        } fixed inset-x-0 bottom-0 z-40 min-h-0 flex-col rounded-t-xl border-t border-[var(--color-line)] bg-[var(--color-panel)] shadow-2xl md:static md:z-auto md:flex md:flex-none md:rounded-none md:bg-transparent md:shadow-none ${
           inspectorOpen ? 'md:max-h-[38vh] md:min-h-[160px]' : 'md:max-h-none md:min-h-0'
         }`}
+        style={sheetIsPhone && sheetOpen ? { height: sheetHeight ?? Math.round(sheetVh() * 0.4) } : undefined}
       >
+        <div
+          aria-hidden="true"
+          className="mx-auto my-2 h-1.5 w-12 shrink-0 cursor-grab touch-none rounded-full bg-[var(--color-line)] active:cursor-grabbing md:hidden"
+          onPointerDown={onSheetPointerDown}
+          onPointerMove={onSheetPointerMove}
+          onPointerUp={onSheetPointerUp}
+          onPointerCancel={onSheetPointerUp}
+        />
         <div className="flex items-center justify-between px-3 py-1.5">
           <span className="pane-title">inspector</span>
           <div className="flex items-center gap-3">
