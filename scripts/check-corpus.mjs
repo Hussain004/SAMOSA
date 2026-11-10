@@ -12,7 +12,9 @@
  *   node scripts/check-corpus.mjs
  */
 
-import { check, explain } from '../src/core/index.ts';
+import { check, explain, analyzeSource, numericDelta, inferType } from '../src/core/index.ts';
+import { F64Field } from '../src/core/fields/f64.ts';
+import { rngFor } from '../src/core/prng.ts';
 import { IDENTITIES } from '../corpus/cookbook/identities.ts';
 import { allMutants } from '../corpus/cookbook/mutants.ts';
 
@@ -72,7 +74,7 @@ for (const mutant of allMutants(IDENTITIES)) {
   if (step.verdict === 'ok') {
     // the mistake happens to be harmless: the two sides are still equal, so
     // there is nothing to catch
-    harmlessMutants.push({ id: identity.id, row: mutant.row, rule: mutant.rule });
+    harmlessMutants.push({ id: identity.id, row: mutant.row, rule: mutant.rule, source: mutant.source, text: mutant.text });
     continue;
   }
   missedMutants.push({
@@ -85,26 +87,57 @@ for (const mutant of allMutants(IDENTITIES)) {
   });
 }
 
-const caught = mutants - missedMutants.length - harmlessMutants.length;
-const rate = mutants ? (caught / mutants) * 100 : 0;
-
-console.log(`the cookbook: ${IDENTITIES.length} identities, ${mutants} mutants`);
-console.log(`  the false checkmarks: ${falseCheckmarks.length}`);
-for (const item of falseCheckmarks) {
-  console.log(`    ${item.id} row ${item.row}: ${item.verdict}, ${item.message}`);
-}
-console.log(`  the identities SAMOSA cannot check: ${uncheckedIdentities.length}`);
-for (const item of uncheckedIdentities.slice(0, 10)) {
-  console.log(`    ${item.id} row ${item.row}: ${item.message}`);
-}
-console.log(`  the caught mutants: ${caught} of ${mutants} (${rate.toFixed(1)}%)`);
-console.log(`  the harmless mutants, where the mistake changes nothing: ${harmlessMutants.length}`);
-for (const item of missedMutants.slice(0, 20)) {
-  console.log(
-    `    missed: ${item.id} row ${item.row} (${item.rule}) -> ${item.verdict}: ${item.message} | ${item.text.slice(0, 50)}`,
+// the harmless mutants are audited with the float64 oracle, here in the
+// check itself: a mutant the engine calls right is harmless only when an
+// independent kit agrees, and a mutant the oracle cannot decide counts as
+// missed, never as harmless
+const verifiedHarmlessMutants = [];
+const unverifiableMutants = [];
+for (const mutant of harmlessMutants) {
+  const identity = IDENTITIES.find((i) => i.id === mutant.id);
+  const parsed = analyzeSource(mutant.source, { decls: identity.decls });
+  // type inference registers the symbols in the context; the numeric
+  // evaluation cannot see them before it runs
+  for (const step of parsed.steps) {
+    if (step.lhs) inferType(parsed.ctx, step.lhs);
+    if (step.rhs) inferType(parsed.ctx, step.rhs);
+  }
+  const step = parsed.steps.find((s) => s.row === mutant.row);
+  if (!step) continue;
+  const run = numericDelta(
+    parsed.ctx,
+    parsed.defs,
+    step,
+    new Map([['n', 3]]),
+    rngFor(0, 'cookbook-oracle', mutant.id),
+    0,
+    new F64Field(),
   );
+  if (run === null || run === 'domain') {
+    unverifiableMutants.push(mutant);
+    missedMutants.push({ ...mutant, verdict: 'ok', message: 'the oracle could not decide; counted as missed' });
+    continue;
+  }
+  if (run.shapeMessage !== undefined) {
+    // the oracle says the shapes do not agree either way, which the engine
+    // should have called a shape catch
+    missedMutants.push({ ...mutant, verdict: 'ok', message: `the oracle saw the shape: ${run.shapeMessage}` });
+    continue;
+  }
+  if (run.delta <= 1e-9) {
+    verifiedHarmlessMutants.push(mutant);
+    continue;
+  }
+  console.error(`the false checkmark: ${mutant.id} row ${mutant.row} (${mutant.rule}) had the wrong green light`);
+  process.exit(1);
 }
-if (missedMutants.length > 20) console.log(`    ... and ${missedMutants.length - 20} more`);
+
+const caught = mutants - missedMutants.length - verifiedHarmlessMutants.length;
+// the mutation score, the way the literature computes it: equivalent
+// mutants (checked harmless) leave the denominator
+const score = mutants - verifiedHarmlessMutants.length > 0 ? (caught / (mutants - verifiedHarmlessMutants.length)) * 100 : 100;
+// and the raw rate, the harsh one, kept in the open
+const rawRate = mutants ? (caught / mutants) * 100 : 100;
 
 // the repairs: for every mutant, the fix should be in the top three
 let withRepair = 0;
@@ -119,7 +152,25 @@ for (const mutant of allMutants(IDENTITIES)) {
   const explanation = explain(mutant.source, step.id, { decls: identity.decls });
   if (explanation.fixes.length > 0) withRepair++;
 }
+
+console.log(`the cookbook: ${IDENTITIES.length} identities, ${mutants} mutants`);
+console.log(`  the false checkmarks: ${falseCheckmarks.length}`);
+for (const item of falseCheckmarks) {
+  console.log(`    ${item.id} row ${item.row}: ${item.verdict}, ${item.message}`);
+}
+console.log(`  the identities SAMOSA cannot check: ${uncheckedIdentities.length}`);
+for (const item of uncheckedIdentities.slice(0, 10)) {
+  console.log(`    ${item.id} row ${item.row}: ${item.message}`);
+}
+console.log(`  the mutation score: ${caught} of ${mutants - verifiedHarmlessMutants.length} (${score.toFixed(1)}%), excluding ${verifiedHarmlessMutants.length} harmless mutants the oracle confirmed`);
+console.log(`  the raw rate: ${caught} of ${mutants} (${rawRate.toFixed(1)}%)`);
+console.log(`  the mutants the oracle could not decide: ${unverifiableMutants.length}, counted as missed`);
 console.log(`  the mutants with a fix on offer: ${withRepair} of ${total}`);
+for (const item of missedMutants) {
+  console.log(
+    `    missed: ${item.id} row ${item.row} (${item.rule}) -> ${item.verdict}: ${item.message} | ${(item.text ?? '').slice(0, 60)}`,
+  );
+}
 
 if (falseCheckmarks.length) {
   // a false checkmark is the one thing the corpus cannot forgive

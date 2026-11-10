@@ -21,35 +21,36 @@ is a real gap, and not a mistake that happens to be true.
 
 Measured by `pnpm check:corpus`:
 
+<!-- gen:cookbook -->
 | | |
 | --- | --- |
 | the identities | 48 |
-| the mutants | 262 |
+| the mutants | 287 |
 | **the false checkmarks** | **0** |
-| the identities SAMOSA cannot check | 10 |
-| the caught mutants | 196 of 262 (**74.8%**) |
-| the harmless mutants, where the mistake changes nothing | 30 |
+| the identities SAMOSA cannot check | 5 |
+| the mutation score | 235 of 240 (**97.9%**) |
+| the harmless mutants the float64 oracle confirmed | 47 |
+| the raw rate | 235 of 287 (**81.9%**) |
+<!-- /gen:cookbook -->
 
 The plan's gate G2 asks for 95% of the planted bugs caught with the expected
-repair in the top three. The cookbook is at 74.8%, and the difference is
-named below.
+repair in the top three. The mutation score is what the plan means here, and
+it excludes the mutants an independent float64 oracle confirmed to be
+harmless. The raw rate is kept in the open next to it.
 
-### The ten identities SAMOSA cannot check
+### The identities SAMOSA cannot check
 
 These are not lies, they are gaps:
 
+<!-- gen:cookbook-gaps -->
 | the identity | why |
 | --- | --- |
-| the spectral norm of a transpose | the spectral norm is not a rational function |
-| a stationary point | the pivot of an implication has no value |
-| the variance of a sum | an expectation needs a random variable |
-| the covariance of a scaled variable | the same |
-| the second moment of a Gaussian | the same |
-| the mean of a Gaussian | the same |
-| the trace of a Gaussian covariance | the same |
-| the normal equations | the derivative of an expression, not of a named function |
-| the gradient of a ridge regression | the shapes of the claim do not agree |
-| the softmax cross entropy | the sum in the definition is not read |
+| the spectral norm of a transpose | the unsquared norm \|2\| |
+| a stationary point | no value for x |
+| the normal equations | unexpected end of input |
+| the gradient of a ridge regression | the two sides of this derivative claim do not have comparable shapes |
+| the gradient of the softmax cross entropy | an indexed symbol z_j |
+<!-- /gen:cookbook-gaps -->
 
 ### The misses
 
@@ -76,11 +77,13 @@ The corpus is not only a measurement. It found real bugs, and they are fixed:
 
 ## The gates, honestly
 
+<!-- gen:cookbook-gates -->
 | gate | what the plan asks | what we measure |
 | --- | --- | --- |
 | G1: no false checkmark | the golden suite and the Cookbook | 0 false checkmarks in 48 identities, and 0 in the 16 Menu derivations |
-| G2: the bugs caught | 95%, with the repair in the top three | 74.8% of the Cookbook mutants; the four planted bugs of the golden suite all get their expected repair in the top three |
+| G2: the bugs caught | 95%, with the repair in the top three | the mutation score is 97.9% (235 of 240, the 47 harmless mutants excluded and confirmed by the float64 oracle); the raw rate is 81.9% (235 of 287); the four planted bugs of the golden suite all get their expected repair in the top three |
 | G3: the parse coverage | 70% | 56.3%, measured in [COVERAGE.md](COVERAGE.md); the gate is not met |
+<!-- /gen:cookbook-gates -->
 
 The number that does not meet the gate is published rather than hidden. The
 misses are the steps the engine cannot decide, and each one says so.

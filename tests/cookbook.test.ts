@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { check, analyzeSource, numericDelta } from '../src/core/index.ts';
+import { check, analyzeSource, numericDelta, inferType } from '../src/core/index.ts';
 import { F64Field } from '../src/core/fields/f64.ts';
 import { IDENTITIES } from '../corpus/cookbook/identities.ts';
 import { allMutants } from '../corpus/cookbook/mutants.ts';
@@ -120,16 +120,26 @@ describe('the cookbook', () => {
   });
 
   it('the harmless mutants hold under the float64 oracle', () => {
-    // the one missing piece of the second audit: an independent oracle, over
-    // float64 at n = 3 and a tolerance of 1e-9, has to agree with the engine on
-    // every mutant the catalog calls harmless, or the engine called it right
-    // by luck and the catalogue is a lie
+    // the one missing piece of the second audit: every mutant the engine
+    // calls right is equal on independent hardware, or the engine called it
+    // right by luck and the catalogue is a lie. The oracle cannot decide
+    // every instance it is given, and an undecided instance makes no claim
+    // either way, but a decided one must agree
+    let verified = 0;
     for (const mutant of allMutants(IDENTITIES)) {
       const identity = IDENTITIES.find((i) => i.id === mutant.id);
       if (!identity) continue;
+      const verdict = check(mutant.source, { decls: identity.decls });
+      const verdictStep = verdict.steps.find((s) => s.row === mutant.row);
+      if (verdictStep?.verdict !== 'ok') continue;
       const parsed = analyzeSource(mutant.source, { decls: identity.decls });
+      // the numeric evaluation registers the symbols only after inference
+      for (const step of parsed.steps) {
+        if (step.lhs) inferType(parsed.ctx, step.lhs);
+        if (step.rhs) inferType(parsed.ctx, step.rhs);
+      }
       const step = parsed.steps.find((s) => s.row === mutant.row);
-      if (!step || step.verdict !== 'ok') continue;
+      if (!step) continue;
       const run = numericDelta(
         parsed.ctx,
         parsed.defs,
@@ -142,7 +152,10 @@ describe('the cookbook', () => {
       if (run === null || run === 'domain') continue;
       expect(run.shapeMessage, `${mutant.id} row ${mutant.row}`).toBeUndefined();
       expect(run.delta, `${mutant.id} row ${mutant.row}`).toBeLessThanOrEqual(1e-9);
+      verified++;
     }
+    // and the audit is real: a silent oracle here used to pass this test
+    expect(verified).toBeGreaterThan(20);
   });
 
   it('the README carries the numbers the engine runs', () => {
