@@ -26,6 +26,7 @@ export const samosaTheme = EditorView.theme(
     '.cm-gutters': { backgroundColor: 'transparent', color: 'var(--color-faint)' },
     '.cm-activeLine': { backgroundColor: 'var(--color-wash)' },
     '.cm-activeLineGutter': { backgroundColor: 'transparent', color: 'var(--color-muted)' },
+    '.samosa-hoverLine': { backgroundColor: '#e8b04b0d' },
     '.cm-lintRange-error': {
       backgroundImage: 'none',
       borderBottom: '1px wavy var(--color-tamarind)',

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { EditorState, Transaction } from '@codemirror/state';
-import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter } from '@codemirror/view';
+import { EditorState, StateEffect, StateField, Transaction } from '@codemirror/state';
+import { EditorView, Decoration, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, type DecorationSet } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
 import { lintGutter, lintKeymap, setDiagnostics, type Diagnostic as CmDiagnostic } from '@codemirror/lint';
 import { StreamLanguage, bracketMatching, indentOnInput } from '@codemirror/language';
@@ -16,7 +16,32 @@ export interface EditorProps {
   onSelectStep: (id: string) => void;
   /** the spot the bug game: the squiggles would give the answer away */
   hideDiagnostics?: boolean;
+  /** the step the other pane hovers, if any */
+  hoverStep?: string | null;
+  onHoverStep?: (id: string | null) => void;
 }
+
+/**
+ * The line of the editor that belongs to the step the other pane hovers.
+ * The decoration maps through edits, so hovering survives typing.
+ */
+const setHoverLine = StateEffect.define<number | null>();
+
+const hoverLineField = StateField.define<DecorationSet>({
+  create: () => Decoration.none,
+  update(decos, tr) {
+    let next = tr.docChanged ? decos.map(tr.changes) : decos;
+    for (const effect of tr.effects) {
+      if (effect.is(setHoverLine)) {
+        next = effect.value === null ? Decoration.none : Decoration.set([hoverLine.range(effect.value)]);
+      }
+    }
+    return next;
+  },
+  provide: (field) => EditorView.decorations.from(field),
+});
+
+const hoverLine = Decoration.line({ class: 'samosa-hoverLine' });
 
 /**
  * The source pane.
@@ -31,16 +56,22 @@ export function SourceEditor({
   selectedStep,
   onSelectStep,
   hideDiagnostics,
+  hoverStep,
+  onHoverStep,
 }: EditorProps) {
   const host = useRef<HTMLDivElement | null>(null);
   const view = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
   const onSelectRef = useRef(onSelectStep);
+  const onHoverRef = useRef(onHoverStep);
+  const reportRef = useRef(report);
 
   // the callbacks are read from the refs, so the editor is created once
   useEffect(() => {
     onChangeRef.current = onChange;
     onSelectRef.current = onSelectStep;
+    onHoverRef.current = onHoverStep;
+    reportRef.current = report;
   });
 
   useEffect(() => {
@@ -60,8 +91,20 @@ export function SourceEditor({
         samosaTheme,
         keymap.of([...defaultKeymap, ...historyKeymap, ...lintKeymap, indentWithTab]),
         EditorView.lineWrapping,
+        hoverLineField,
         EditorView.updateListener.of((u) => {
           if (u.docChanged) onChangeRef.current(u.state.doc.toString());
+          if (u.selectionSet || u.docChanged) {
+            const head = u.state.selection.main.head;
+            const hoverRef = onHoverRef.current;
+            const currentReport = reportRef.current;
+            if (hoverRef && currentReport) {
+              const step = currentReport.steps.find(
+                (s) => head >= s.span.from && head <= s.span.to,
+              );
+              hoverRef(step?.id ?? null);
+            }
+          }
         }),
       ],
     });
@@ -135,6 +178,18 @@ export function SourceEditor({
     }
     v.dispatch(setDiagnostics(v.state, diagnostics));
   }, [report, selectedStep, hideDiagnostics]);
+
+  // the other pane said which row is being hovered; decorate its line
+  useEffect(() => {
+    const v = view.current;
+    if (!v) return;
+    const step = reportRef.current?.steps.find((s) => s.id === hoverStep);
+    if (step && hoverStep) {
+      v.dispatch({ effects: setHoverLine.of(step.span.from) });
+    } else {
+      v.dispatch({ effects: setHoverLine.of(null) });
+    }
+  }, [hoverStep]);
 
   return <div className="h-full min-h-0 overflow-hidden" ref={host} />;
 }

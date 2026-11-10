@@ -66,6 +66,7 @@ export function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [headerMenu, setHeaderMenu] = useState(false);
   const [mobilePane, setMobilePane] = useState<'rendered' | 'source'>('rendered');
+  const [hoverStep, setHoverStep] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const [theme, setTheme] = useState<'dark' | 'light'>(() =>
@@ -464,6 +465,8 @@ export function App() {
               selectedStep={selectedStep}
               onSelectStep={select}
               hideDiagnostics={spotTheBug && !revealed}
+              hoverStep={hoverStep}
+              onHoverStep={setHoverStep}
             />
           </div>
         </section>
@@ -479,6 +482,8 @@ export function App() {
               report={report}
               busy={busy}
               selectedStep={selectedStep}
+              hoverStep={hoverStep}
+              onHoverStep={setHoverStep}
               onSelectStep={(id) => {
                 select(id);
                 // on a phone the card is a bottom sheet, so a tap opens it
@@ -487,8 +492,6 @@ export function App() {
                   setSheetOpen(true);
                 }
               }}
-              hoverStep={null}
-              onHoverStep={() => {}}
               spotTheBug={spotTheBug}
               guess={guess}
               revealed={revealed}
