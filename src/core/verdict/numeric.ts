@@ -184,7 +184,10 @@ export function checkNumeric(
         trialsPerSize: NUMERIC_TRIALS,
         sizes,
         maxDelta: decMax,
-        assumptions,
+        assumptions: [
+          ...assumptions,
+          `numeric: ${NUMERIC_TRIALS} instances at each of ${sizes.length} sizes, max relative difference ${decMax === 0 ? '0' : decMax.toExponential(1)}, no probability bound`,
+        ],
       },
       message: 'the two sides agree to 50 digits',
       annotation: step.annotation,

@@ -6397,13 +6397,28 @@ exports[`the parser, on every row of the Menu and the Cookbook > cookbook/spectr
     {
       "conclusion": null,
       "lhs": {
-        "raw": "the unsquared norm \\|2\\|",
+        "args": [
+          {
+            "args": [
+              {
+                "sym": "A",
+              },
+            ],
+            "op": "T",
+          },
+        ],
+        "op": "norm",
       },
       "premise": null,
       "proportionalTo": null,
       "relation": "=",
       "rhs": {
-        "raw": "the unsquared norm \\|2\\|",
+        "args": [
+          {
+            "sym": "A",
+          },
+        ],
+        "op": "norm",
       },
     },
   ],

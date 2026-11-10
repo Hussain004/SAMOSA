@@ -19,6 +19,7 @@ import type { Field } from './types.ts';
  */
 export class GFpField implements Field<number> {
   readonly name = 'GF(p)';
+  readonly eps = 1e-9;
   readonly zero = 0;
   readonly one = 1;
   /** pi is not in a finite field, so this is a rational approximation of it */

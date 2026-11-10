@@ -201,6 +201,64 @@ export function hadamard<T>(f: Field<T>, a: Mat<T>, b: Mat<T>): Mat<T> {
   return { r: a.r, c: a.c, d };
 }
 
+/**
+ * The unsquared norm: \|x\| for a vector, the spectral norm for a matrix.
+ *
+ * A vector norm is sqrt(x'x). A matrix norm is the largest singular value,
+ * found by power iteration on A'A. A fixed cap keeps it honest: if it has
+ * not converged by then, the caller gets a DomainError, and the answer is
+ * never a quiet approximation.
+ */
+export function matNorm<T>(f: Field<T>, a: Mat<T>): T {
+  if (a.c === 1) {
+    return f.sqrt(inner(f, a, a));
+  }
+  const at = transpose(a);
+  const g = matMul(f, at, a);
+  // a fixed start, the all-ones vector, so no randomness hides in the answer
+  let v: Mat<T> = { r: g.r, c: 1, d: new Array(g.r).fill(f.one) };
+  const initialNorm = f.sqrt(inner(f, v, v));
+  if (initialNorm === 0) return f.zero;
+  v = matScale(f, f.inv(initialNorm), v);
+  let lambda = f.zero;
+  let converged = false;
+  let lambdaPrev: T | null = null;
+  for (let i = 0; i < 500; i++) {
+    const gv = matMul(f, g, v);
+    const gvNorm = f.sqrt(inner(f, gv, gv));
+    if (gvNorm === 0) {
+      // A'A is the zero matrix: the norm is zero
+      return f.zero;
+    }
+    const vNew = matScale(f, f.inv(gvNorm), gv);
+    const lambdaNew = inner(f, vNew, matMul(f, g, vNew));
+    v = vNew;
+    const residual = norm2(f, matSub(f, matMul(f, g, v), matScale(f, lambdaNew, v)));
+    // converged when lambda stopped moving exactly (the 50 digit case,
+    // where the fixpoint is reached), or when the residual of
+    // G v - lambda v is negligible relative to lambda (float64)
+    const delta = lambdaPrev === null ? null : f.abs(f.sub(lambdaNew, lambdaPrev));
+    lambdaPrev = lambdaNew;
+    lambda = lambdaNew;
+    if (delta !== null && f.eq(delta, f.zero)) {
+      converged = true;
+      break;
+    }
+    // float64 has a noise floor around 1e-31; the 50 digit field reaches far
+    // below 1e-35, which is what the verdict needs
+    let tiny = f.one;
+    for (let k = 0; k < (f.name === 'f64' ? 13 : 37); k++) tiny = f.mul(tiny, f.fromRational(1, 10));
+    if (i > 10 && f.cmp(residual, f.mul(f.abs(lambda), tiny)) <= 0) {
+      converged = true;
+      break;
+    }
+  }
+  if (!converged) {
+    throw new DomainError('the spectral norm did not converge');
+  }
+  return f.sqrt(lambda);
+}
+
 /** Frobenius inner product, summed over every entry. */
 export function inner<T>(f: Field<T>, a: Mat<T>, b: Mat<T>): T {
   if (a.r !== b.r || a.c !== b.c) throw new Error('shape mismatch in inner');

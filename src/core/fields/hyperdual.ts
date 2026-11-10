@@ -22,6 +22,7 @@ export interface HyperDualValue<F = any> {
 
 export class HyperDualField<F extends Field<any>> implements Field<HyperDualValue> {
   readonly name: string;
+  readonly eps = 1e-9;
   readonly zero: HyperDualValue;
   readonly one: HyperDualValue;
   readonly pi: HyperDualValue;

@@ -138,6 +138,10 @@ function renderOp(node: Extract<Node, { k: 'op' }>): string {
       return `\\left\\|${a[0]}\\right\\|^{2}`;
     case 'frob':
       return `\\left\\|${a[0]}\\right\\|_{F}^{2}`;
+    case 'norm':
+      return `\\left\\|${a[0]}\\right\\|`;
+    case 'normF':
+      return `\\left\\|${a[0]}\\right\\|_{F}`;
     case 'vec':
       return `\\operatorname{vec}\\left(${a[0]}\\right)`;
     case 'diag':

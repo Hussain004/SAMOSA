@@ -745,6 +745,8 @@ function opType(ctx: TypeContext, node: Extract<Node, { k: 'op' }>): Ty {
     case 'det':
     case 'norm2':
     case 'frob':
+    case 'norm':
+    case 'normF':
     case 'abs':
       return { t: 'scalar' };
     case 'adj': {
@@ -1006,6 +1008,8 @@ export function degreeOf(
         }
         case 'norm2':
         case 'frob':
+        case 'norm':
+        case 'normF':
         case 'abs':
         case 'inner':
           return { n: 2 * args[0].n, d: 2 * args[0].d };

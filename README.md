@@ -183,10 +183,10 @@ with the mistakes the catalog can make of them.
 | | |
 | --- | --- |
 | the false checkmarks | **0** |
-| the identities SAMOSA cannot check | **2** |
+| the identities SAMOSA cannot check | **1** |
 | the mutation score | **343 of 343 (100.0%)** |
-| the harmless mutants, where the mistake changes nothing | **107** |
-| the raw rate | **343 of 450 (76.2%)** |
+| the harmless mutants, where the mistake changes nothing | **108** |
+| the raw rate | **343 of 451 (76.1%)** |
 
 The plan's gate asks for 95% of the bugs caught; the mutation score is 100.0%,
 and every mutant the engine calls right is confirmed harmless by the float64

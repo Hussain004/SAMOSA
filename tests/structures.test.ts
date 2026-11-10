@@ -101,6 +101,8 @@ const TRUE_FRIENDS: Array<Item & { holds?: boolean; pending?: string }> = [
     decls: 'x ~ N(\\mu, \\Sigma); y ~ N(\\nu, \\Lambda); \\mu, \\nu: n; \\Sigma, \\Lambda: spd n',
     holds: true,
   },
+  { name: 'the spectral norm of a transpose is the spectral norm', src: String.raw`\|A^\top\| = \|A\|`, decls: 'A: n×n', holds: true },
+  { name: 'the Frobenius norm of a transpose is the Frobenius norm', src: String.raw`\|A^\top\|_F = \|A\|_F`, decls: 'A: n×n', holds: true },
 ];
 
 /**
@@ -126,6 +128,7 @@ const FALSE_FRIENDS: Array<Item & { caught?: boolean }> = [
   { name: 'subtraction does not commute', src: String.raw`A - B = B - A`, decls: 'A, B: n×n', caught: true },
   { name: 'a quotient is not the product', src: String.raw`A / B = A B`, decls: 'A, B: n×n', caught: true },
   { name: 'the squared norm does not split a sum', src: String.raw`\|u + v\|^2 = \|u\|^2 + \|v\|^2`, decls: 'u, v: n', caught: true },
+  { name: 'the unsquared norm does not split a sum', src: String.raw`\|u + v\| = \|u\| + \|v\|`, decls: 'u, v: n', caught: true },
   { name: 'an inner product is not the product of the norms', src: String.raw`\langle u, v \rangle = \|u\| \|v\|`, decls: 'u, v: n' },
   { name: 'a squared inner product is not the product of the squared norms', src: String.raw`\langle u, v \rangle^2 = \|u\|^2 \|v\|^2`, decls: 'u, v: n', caught: true },
   { name: 'the Frobenius norm does not split a sum', src: String.raw`\|A + B\|_F^2 = \|A\|_F^2 + \|B\|_F^2`, decls: 'A, B: n×n', caught: true },

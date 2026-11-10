@@ -28,12 +28,12 @@ Measured by `pnpm check:corpus`:
 | | |
 | --- | --- |
 | the identities | 94 |
-| the mutants | 450 |
+| the mutants | 451 |
 | **the false checkmarks** | **0** |
-| the identities SAMOSA cannot check | 2 |
+| the identities SAMOSA cannot check | 1 |
 | the mutation score | 343 of 343 (**100.0%**) |
-| the harmless mutants the float64 oracle confirmed | 107 |
-| the raw rate | 343 of 450 (**76.2%**) |
+| the harmless mutants the float64 oracle confirmed | 108 |
+| the raw rate | 343 of 451 (**76.1%**) |
 <!-- /gen:cookbook -->
 
 The plan's gate G2 asks for 95% of the planted bugs caught with the expected
@@ -48,7 +48,6 @@ These are not lies, they are gaps:
 <!-- gen:cookbook-gaps -->
 | the identity | why |
 | --- | --- |
-| the spectral norm of a transpose | the unsquared norm \|2\| |
 | a stationary point | no value for x |
 <!-- /gen:cookbook-gaps -->
 
@@ -99,7 +98,7 @@ The corpus is not only a measurement. It found real bugs, and they are fixed:
 | gate | what the plan asks | what we measure |
 | --- | --- | --- |
 | G1: no false checkmark | the golden suite and the Cookbook | 0 false checkmarks in 94 identities, and 0 in the 16 Menu derivations |
-| G2: the bugs caught | 95%, with the repair in the top three | the mutation score is 100.0% (343 of 343, the 107 harmless mutants excluded and confirmed by the float64 oracle); the raw rate is 76.2% (343 of 450); the four planted bugs of the golden suite all get their expected repair in the top three |
+| G2: the bugs caught | 95%, with the repair in the top three | the mutation score is 100.0% (343 of 343, the 108 harmless mutants excluded and confirmed by the float64 oracle); the raw rate is 76.1% (343 of 451); the four planted bugs of the golden suite all get their expected repair in the top three |
 | G3: the parse coverage | 70% | 78.9% of the claim rows of the sample parse end to end, measured in [COVERAGE.md](COVERAGE.md); the gate is met |
 <!-- /gen:cookbook-gates -->
 

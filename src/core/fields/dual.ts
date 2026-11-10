@@ -20,6 +20,7 @@ export interface DualValue<F = any> {
 
 export class DualField<F extends Field<any>> implements Field<DualValue> {
   readonly name: string;
+  readonly eps = 1e-13;
   readonly zero: DualValue;
   readonly one: DualValue;
   readonly pi: DualValue;

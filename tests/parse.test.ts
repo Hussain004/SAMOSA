@@ -83,7 +83,7 @@ describe('conditioning and the long delimiters', () => {
 
   it('reads the long norm delimiters', () => {
     const row = parseRow('', String.raw`\lVert x \rVert = 1`, 0, 0);
-    expect(row.parts[0].lhs).toMatchObject({ k: 'raw', text: String.raw`the unsquared norm \|2\|` });
+    expect(row.parts[0].lhs).toMatchObject({ k: 'op', op: 'norm' });
   });
 
   it('checks a squared long norm', () => {

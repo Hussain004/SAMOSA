@@ -23,6 +23,8 @@ export type Op =
   | 'inner'
   | 'norm2'
   | 'frob'
+  | 'norm'
+  | 'normF'
   | 'vec'
   | 'diag'
   | 'abs'

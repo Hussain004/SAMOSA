@@ -2313,6 +2313,8 @@ var Parser = class _Parser {
       if (kind === "F" || kind === "f") return { k: "op", op: "frob", args: [inner2], span };
       return { k: "op", op: "norm2", args: [inner2], span };
     }
+    if (kind === "F" || kind === "f") return { k: "op", op: "normF", args: [inner2], span };
+    if (kind === "2" || kind === "") return { k: "op", op: "norm", args: [inner2], span };
     return { k: "raw", text: `the unsquared norm \\|${kind}\\|`, span: { from: open.from, to: scriptEnd } };
   }
   parseBars() {
@@ -4110,6 +4112,8 @@ function opType(ctx, node) {
     case "det":
     case "norm2":
     case "frob":
+    case "norm":
+    case "normF":
     case "abs":
       return { t: "scalar" };
     case "adj": {
@@ -4342,6 +4346,8 @@ function degreeOf(ctx, node, sizes, defs) {
         }
         case "norm2":
         case "frob":
+        case "norm":
+        case "normF":
         case "abs":
         case "inner":
           return { n: 2 * args[0].n, d: 2 * args[0].d };
@@ -4603,6 +4609,48 @@ function hadamard(f, a, b) {
   const d = new Array(a.r * a.c);
   for (let i2 = 0; i2 < d.length; i2++) d[i2] = f.mul(a.d[i2], b.d[i2]);
   return { r: a.r, c: a.c, d };
+}
+function matNorm(f, a) {
+  if (a.c === 1) {
+    return f.sqrt(inner(f, a, a));
+  }
+  const at = transpose(a);
+  const g = matMul(f, at, a);
+  let v = { r: g.r, c: 1, d: new Array(g.r).fill(f.one) };
+  const initialNorm = f.sqrt(inner(f, v, v));
+  if (initialNorm === 0) return f.zero;
+  v = matScale(f, f.inv(initialNorm), v);
+  let lambda = f.zero;
+  let converged = false;
+  let lambdaPrev = null;
+  for (let i2 = 0; i2 < 500; i2++) {
+    const gv = matMul(f, g, v);
+    const gvNorm = f.sqrt(inner(f, gv, gv));
+    if (gvNorm === 0) {
+      return f.zero;
+    }
+    const vNew = matScale(f, f.inv(gvNorm), gv);
+    const lambdaNew = inner(f, vNew, matMul(f, g, vNew));
+    v = vNew;
+    const residual = norm2(f, matSub(f, matMul(f, g, v), matScale(f, lambdaNew, v)));
+    const delta = lambdaPrev === null ? null : f.abs(f.sub(lambdaNew, lambdaPrev));
+    lambdaPrev = lambdaNew;
+    lambda = lambdaNew;
+    if (delta !== null && f.eq(delta, f.zero)) {
+      converged = true;
+      break;
+    }
+    let tiny = f.one;
+    for (let k = 0; k < (f.name === "f64" ? 13 : 37); k++) tiny = f.mul(tiny, f.fromRational(1, 10));
+    if (i2 > 10 && f.cmp(residual, f.mul(f.abs(lambda), tiny)) <= 0) {
+      converged = true;
+      break;
+    }
+  }
+  if (!converged) {
+    throw new DomainError("the spectral norm did not converge");
+  }
+  return f.sqrt(lambda);
 }
 function inner(f, a, b) {
   if (a.r !== b.r || a.c !== b.c) throw new Error("shape mismatch in inner");
@@ -4942,6 +4990,7 @@ function addValues(f, a, b) {
 // src/core/fields/gfp.ts
 var GFpField = class {
   name = "GF(p)";
+  eps = 1e-9;
   zero = 0;
   one = 1;
   /** pi is not in a finite field, so this is a rational approximation of it */
@@ -5383,6 +5432,7 @@ function isRational(node, ctx, defs, seen) {
     }
     case "op": {
       if (node.op === "abs" || node.op === "sqrtm") return false;
+      if (node.op === "norm" || node.op === "normF") return false;
       if (node.op === "pow" && node.args[1]?.k === "num" && node.args[1].value.d !== 1) return false;
       return node.args.every((a) => isRational(a, ctx, defs, seen));
     }
@@ -5705,6 +5755,7 @@ var Sampler = class {
 // src/core/fields/dual.ts
 var DualField = class {
   name;
+  eps = 1e-13;
   zero;
   one;
   pi;
@@ -5796,6 +5847,7 @@ var DualField = class {
 // src/core/fields/hyperdual.ts
 var HyperDualField = class {
   name;
+  eps = 1e-9;
   zero;
   one;
   pi;
@@ -6331,6 +6383,10 @@ function evalOp(f, op, args, _env) {
       return scalar(norm2(f, requireMatrix(args[0], "a squared norm")));
     case "frob":
       return scalar(norm2(f, requireMatrix(args[0], "a Frobenius norm")));
+    case "norm":
+      return scalar(matNorm(f, requireMatrix(args[0], "a norm")));
+    case "normF":
+      return scalar(f.sqrt(norm2(f, requireMatrix(args[0], "a Frobenius norm"))));
     case "vec":
       return { k: "m", m: vec(requireMatrix(args[0], "a vectorisation")) };
     case "diag":
@@ -6878,6 +6934,7 @@ function runExactTrial(step, ctx, defs, setting, p, rng, trial) {
 // src/core/fields/f64.ts
 var F64Field = class {
   name = "f64";
+  eps = 1e-13;
   zero = 0;
   one = 1;
   pi = Math.PI;
@@ -9125,6 +9182,7 @@ var decimal_default = Decimal;
 // src/core/fields/dec.ts
 var DecField = class {
   name = "decimal(50)";
+  eps = 1e-45;
   zero;
   one;
   /** pi, to fifty digits */
@@ -9336,7 +9394,10 @@ function checkNumeric(step, ctx, defs, opts, card) {
         trialsPerSize: NUMERIC_TRIALS,
         sizes,
         maxDelta: decMax,
-        assumptions
+        assumptions: [
+          ...assumptions,
+          `numeric: ${NUMERIC_TRIALS} instances at each of ${sizes.length} sizes, max relative difference ${decMax === 0 ? "0" : decMax.toExponential(1)}, no probability bound`
+        ]
       },
       message: "the two sides agree to 50 digits",
       annotation: step.annotation
@@ -10271,6 +10332,10 @@ function renderOp(node) {
       return `\\left\\|${a[0]}\\right\\|^{2}`;
     case "frob":
       return `\\left\\|${a[0]}\\right\\|_{F}^{2}`;
+    case "norm":
+      return `\\left\\|${a[0]}\\right\\|`;
+    case "normF":
+      return `\\left\\|${a[0]}\\right\\|_{F}`;
     case "vec":
       return `\\operatorname{vec}\\left(${a[0]}\\right)`;
     case "diag":

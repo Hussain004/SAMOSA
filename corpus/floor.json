@@ -1,7 +1,7 @@
 {
   "identities": 94,
   "mutationScore": 100,
-  "rawRate": 76.2,
+  "rawRate": 76.1,
   "falseCheckmarks": 0,
   "note": "The launch floor. The mutation score is what the plan's G2 means, the raw rate keeps the harmless mutants in the open. A change that lowers either number is a regression, and `pnpm check:corpus` fails it. The file is lowered only deliberately, in a commit that names the reason."
 }

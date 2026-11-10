@@ -39,6 +39,8 @@ export function isRational(node: Node, ctx: TypeContext, defs: Map<string, Node>
       // |x| and the matrix root need an order or positivity, which GF(p) has
       // not, so they force numeric mode (review 3.2)
       if (node.op === 'abs' || node.op === 'sqrtm') return false;
+      // an unsquared norm needs an order too, and 50 digits, so numeric mode
+      if (node.op === 'norm' || node.op === 'normF') return false;
       // a fractional power is a root, which GF(p) has not either
       if (node.op === 'pow' && node.args[1]?.k === 'num' && node.args[1].value.d !== 1) return false;
       return node.args.every((a) => isRational(a, ctx, defs, seen));

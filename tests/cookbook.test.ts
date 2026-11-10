@@ -21,7 +21,6 @@ const CATCHES = ['wrong', 'shape'];
 
 /** The identities the engine cannot check yet, and why they are named. */
 const CANNOT_CHECK = new Set([
-  'spectral-norm-of-transpose',
   'stationary-point',
   'riccati',
 ]);

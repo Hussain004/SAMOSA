@@ -3,6 +3,7 @@ import type { Field } from './types.ts';
 /** Plain float64 arithmetic. Fast, and the first pass of every numeric check. */
 export class F64Field implements Field<number> {
   readonly name = 'f64';
+  readonly eps = 1e-13;
   readonly zero = 0;
   readonly one = 1;
   readonly pi = Math.PI;

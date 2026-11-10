@@ -23,6 +23,8 @@ export interface Field<T> {
   isZero(a: T): boolean;
   eq(a: T, b: T): boolean;
   /** Ordering helper for the real fields; finite fields have no order. */
+  /** A hint of the working precision; used to stop iterations at the right depth. */
+  readonly eps?: number;
   cmp(a: T, b: T): number;
   abs(a: T): T;
   sqrt(a: T): T;

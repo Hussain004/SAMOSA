@@ -2020,6 +2020,9 @@ export class Parser {
       if (kind === 'F' || kind === 'f') return { k: 'op', op: 'frob', args: [inner], span };
       return { k: 'op', op: 'norm2', args: [inner], span };
     }
+    // the unsquared norms: checked over the reals only, at 50 digits
+    if (kind === 'F' || kind === 'f') return { k: 'op', op: 'normF', args: [inner], span };
+    if (kind === '2' || kind === '') return { k: 'op', op: 'norm', args: [inner], span };
     return { k: 'raw', text: `the unsquared norm \\|${kind}\\|`, span: { from: open.from, to: scriptEnd } };
   }
 

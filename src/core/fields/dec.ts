@@ -10,6 +10,7 @@ import type { Field } from './types.ts';
  */
 export class DecField implements Field<Decimal> {
   readonly name = 'decimal(50)';
+  readonly eps = 1e-45;
   readonly zero: Decimal;
   readonly one: Decimal;
   /** pi, to fifty digits */

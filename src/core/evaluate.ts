@@ -26,6 +26,7 @@ import {
   type Mat,
 } from './linalg.ts';
 import type { Node } from './ir.ts';
+import { matNorm } from './linalg.ts';
 import { degreeInVar, evaluateExpectation, ruleFor, type QuadVar } from './quadrature.ts';
 import { isMatrixVal, isScalarVal, scalar, type Val } from './value.ts';
 import type { Rng } from './prng.ts';
@@ -485,6 +486,10 @@ function evalOp<T>(f: Field<T>, op: string, args: Val<T>[], _env: EvalEnv<T>): V
       return scalar(norm2(f, requireMatrix(args[0], 'a squared norm')));
     case 'frob':
       return scalar(norm2(f, requireMatrix(args[0], 'a Frobenius norm')));
+    case 'norm':
+      return scalar(matNorm(f, requireMatrix(args[0], 'a norm')));
+    case 'normF':
+      return scalar(f.sqrt(norm2(f, requireMatrix(args[0], 'a Frobenius norm'))));
     case 'vec':
       return { k: 'm', m: vec(requireMatrix(args[0], 'a vectorisation')) };
     case 'diag':
