@@ -13736,6 +13736,163 @@ function bytesToBase64Url(bytes) {
   return out.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
+// mcp/tools.ts
+var SHARE_BASE = process.env.SAMOSA_SHARE_BASE ?? "https://samosa-math.vercel.app";
+function shareUrl(source, declarations, base2 = SHARE_BASE) {
+  return shareLink(base2, { src: source, decls: declarations });
+}
+function summarise(report) {
+  const counts = { ok: 0, wrong: 0, shape: 0, unchecked: 0, defined: 0, inconclusive: 0 };
+  for (const step of report.steps) counts[step.verdict] += 1;
+  const parts = [];
+  if (counts.ok) parts.push(`${counts.ok} hold`);
+  if (counts.wrong) parts.push(`${counts.wrong} wrong`);
+  if (counts.shape) parts.push(`${counts.shape} shape error`);
+  if (counts.inconclusive) parts.push(`${counts.inconclusive} inconclusive`);
+  if (counts.unchecked) parts.push(`${counts.unchecked} not checked`);
+  if (counts.defined) parts.push(`${counts.defined} defined`);
+  return `${report.steps.length} rows: ${parts.join(", ")}`;
+}
+function stepSpan(step) {
+  return { line: step.line ?? null, from: step.span.from, to: step.span.to };
+}
+function handleCheckDerivation(args) {
+  const report = check(args.latex, {
+    decls: args.declarations,
+    preset: args.preset,
+    seed: args.seed
+  });
+  const explanations = explainAll(
+    args.latex,
+    { decls: args.declarations, preset: args.preset, seed: args.seed },
+    8,
+    report
+  );
+  const structured = {
+    summary: summarise(report),
+    // the declarations that could not be read, so the agent hears what the
+    // user wrote that did nothing (review 5.5)
+    warnings: report.diagnostics.filter((d) => d.severity !== "error").map((d) => d.message),
+    steps: report.steps.map((step) => {
+      const explanation = explanations.get(step.id);
+      return {
+        row: step.row,
+        verdict: step.verdict,
+        mode: step.mode ?? null,
+        message: step.message,
+        relation: step.relation,
+        card: step.card,
+        span: stepSpan(step),
+        lhsSpan: step.lhsSpan ?? null,
+        rhsSpan: step.rhsSpan ?? null,
+        fixes: explanation?.fixes ?? [],
+        counterexample: explanation?.counterexample ?? null
+      };
+    }),
+    shareUrl: shareUrl(args.latex, args.declarations)
+  };
+  return { structured, text: summarise(report) };
+}
+function handleCheckStep(args) {
+  const step = checkStep2(args.lhs, args.rhs, { decls: args.declarations });
+  const source = `${args.lhs} = ${args.rhs}`;
+  const explanation = explain(source, "s0", { decls: args.declarations });
+  const structured = {
+    summary: `${step.verdict}: ${step.message}`,
+    steps: [
+      {
+        row: step.row,
+        verdict: step.verdict,
+        mode: step.mode ?? null,
+        message: step.message,
+        relation: step.relation,
+        card: step.card,
+        span: stepSpan(step),
+        lhsSpan: step.lhsSpan ?? null,
+        rhsSpan: step.rhsSpan ?? null,
+        fixes: explanation.fixes,
+        counterexample: explanation.counterexample ?? null
+      }
+    ],
+    shareUrl: shareUrl(source, args.declarations)
+  };
+  return { structured, text: `${step.verdict}: ${step.message}` };
+}
+function handleFindCounterexample(args) {
+  const source = `${args.lhs} = ${args.rhs}`;
+  const explanation = explain(source, "s0", { decls: args.declarations });
+  const text = explanation.counterexample ? explanation.counterexample.numpy : "no counterexample was found";
+  return {
+    structured: {
+      summary: text,
+      steps: [],
+      fixes: explanation.fixes
+    },
+    text
+  };
+}
+function handleSuggestDeclarations(args) {
+  const report = check(args.latex, {});
+  const chips = report.chips ?? [];
+  const guessed = chips.filter((chip) => chip.id === "shape-guess").map((chip) => chip.symbol);
+  const harvested = chips.filter((chip) => chip.id === "harvested").map((chip) => ({
+    message: chip.message,
+    symbol: chip.symbol
+  }));
+  const guessDecls = guessed.map((symbol) => `${symbol}: n\xD7n`);
+  const harvestDecls = harvested.map(({ message }) => {
+    const cut = message.indexOf(",");
+    return cut > 0 ? message.slice(0, cut) : message;
+  });
+  const decls = [...guessDecls, ...harvestDecls].join("; ");
+  const samosaComment = decls ? `% samosa: ${decls}` : "";
+  const structured = {
+    declarations: decls,
+    samosaComment,
+    guessed,
+    harvested: harvested.map(({ message, symbol }) => ({ symbol, origin: message })),
+    note: "the guesses are the engine default: every guessed symbol is a square matrix. Declare structure (spd, sym, an n-vector, a distribution) to make the guesses honest.",
+    summary: decls ? `${guessDecls.length} guessed, ${harvestDecls.length} harvested` : "nothing to declare; SAMOSA read every symbol from the text or had no need to guess"
+  };
+  return {
+    structured,
+    text: structured.summary
+  };
+}
+function handleExplainStep(args) {
+  const report = check(args.latex, {
+    decls: args.declarations,
+    preset: args.preset,
+    seed: args.seed
+  });
+  const step = report.steps.find((s) => s.row === args.row);
+  if (!step) {
+    const rows = report.steps.map((s) => s.row).join(", ");
+    const text = `no row ${args.row}; the rows are ${rows}`;
+    return { structured: { summary: text, row: args.row, error: text }, text };
+  }
+  const explanation = explain(args.latex, step.id, {
+    decls: args.declarations,
+    preset: args.preset,
+    seed: args.seed
+  }, report);
+  const structured = {
+    row: step.row,
+    verdict: step.verdict,
+    mode: step.mode ?? null,
+    message: step.message,
+    relation: step.relation,
+    card: step.card,
+    span: stepSpan(step),
+    lhsSpan: step.lhsSpan ?? null,
+    rhsSpan: step.rhsSpan ?? null,
+    fixes: explanation?.fixes ?? [],
+    counterexample: explanation?.counterexample ?? null,
+    shareUrl: shareUrl(args.latex, args.declarations)
+  };
+  return { structured, text: `${step.verdict}: ${step.message}` };
+}
+
 // mcp/server.ts
 var VERSION = true ? "1.2.0" : "0.0.0-dev";
 var server = new McpServer({ name: "samosa", version: VERSION });
@@ -13761,22 +13918,6 @@ var reportSchema = z.object({
   warnings: z.array(z.string()),
   shareUrl: z.string().optional()
 }).passthrough();
-function summarise(report) {
-  const counts = { ok: 0, wrong: 0, shape: 0, unchecked: 0, defined: 0, inconclusive: 0 };
-  for (const step of report.steps) counts[step.verdict] += 1;
-  const parts = [];
-  if (counts.ok) parts.push(`${counts.ok} hold`);
-  if (counts.wrong) parts.push(`${counts.wrong} wrong`);
-  if (counts.shape) parts.push(`${counts.shape} shape error`);
-  if (counts.inconclusive) parts.push(`${counts.inconclusive} inconclusive`);
-  if (counts.unchecked) parts.push(`${counts.unchecked} not checked`);
-  if (counts.defined) parts.push(`${counts.defined} defined`);
-  return `${report.steps.length} rows: ${parts.join(", ")}`;
-}
-var shareBase = process.env.SAMOSA_SHARE_BASE ?? "https://samosa-math.vercel.app";
-function shareUrl(source, declarations) {
-  return shareLink(shareBase, { src: source, decls: declarations });
-}
 server.registerTool(
   "check_derivation",
   {
@@ -13791,39 +13932,9 @@ server.registerTool(
     outputSchema: reportSchema
   },
   async (args) => {
-    const report = check(args.latex, {
-      decls: args.declarations,
-      preset: args.preset,
-      seed: args.seed
-    });
-    const explanations = explainAll(
-      args.latex,
-      { decls: args.declarations, preset: args.preset, seed: args.seed },
-      8,
-      report
-    );
-    const structured = {
-      summary: summarise(report),
-      // the declarations that could not be read, so the agent hears what the
-      // user wrote that did nothing (review 5.5)
-      warnings: report.diagnostics.filter((d) => d.severity !== "error").map((d) => d.message),
-      steps: report.steps.map((step) => {
-        const explanation = explanations.get(step.id);
-        return {
-          row: step.row,
-          verdict: step.verdict,
-          mode: step.mode ?? null,
-          message: step.message,
-          relation: step.relation,
-          card: step.card,
-          fixes: explanation?.fixes ?? [],
-          counterexample: explanation?.counterexample ?? null
-        };
-      }),
-      shareUrl: shareUrl(args.latex, args.declarations)
-    };
+    const { structured, text } = handleCheckDerivation(args);
     return {
-      content: [{ type: "text", text: summarise(report) }],
+      content: [{ type: "text", text }],
       structuredContent: structured
     };
   }
@@ -13842,27 +13953,9 @@ server.registerTool(
     outputSchema: reportSchema
   },
   async (args) => {
-    const step = checkStep2(args.lhs, args.rhs, { decls: args.declarations });
-    const source = `${args.lhs} = ${args.rhs}`;
-    const explanation = explain(source, "s0", { decls: args.declarations });
-    const structured = {
-      summary: `${step.verdict}: ${step.message}`,
-      steps: [
-        {
-          row: step.row,
-          verdict: step.verdict,
-          mode: step.mode ?? null,
-          message: step.message,
-          relation: step.relation,
-          card: step.card,
-          fixes: explanation.fixes,
-          counterexample: explanation.counterexample ?? null
-        }
-      ],
-      shareUrl: shareUrl(source, args.declarations)
-    };
+    const { structured, text } = handleCheckStep(args);
     return {
-      content: [{ type: "text", text: `${step.verdict}: ${step.message}` }],
+      content: [{ type: "text", text }],
       structuredContent: structured
     };
   }
@@ -13880,18 +13973,157 @@ server.registerTool(
     outputSchema: reportSchema
   },
   async (args) => {
-    const source = `${args.lhs} = ${args.rhs}`;
-    const explanation = explain(source, "s0", { decls: args.declarations });
-    const text = explanation.counterexample ? explanation.counterexample.numpy : "no counterexample was found";
+    const { structured, text } = handleFindCounterexample(args);
     return {
       content: [{ type: "text", text }],
-      structuredContent: {
-        summary: text,
-        steps: [],
-        fixes: explanation.fixes
-      }
+      structuredContent: structured
     };
   }
 );
+server.registerTool(
+  "suggest_declarations",
+  {
+    title: "Suggest declarations for an undeclared derivation",
+    description: "Reads a derivation nobody declared and returns what SAMOSA guessed and what it read from the text, as a compact declaration string you can pass straight back to check_derivation. Two calls from an undeclared derivation to an all-\u2713 one.",
+    inputSchema: {
+      latex: z.string().describe("the derivation, as a LaTeX align block")
+    },
+    outputSchema: z.object({
+      declarations: z.string(),
+      samosaComment: z.string(),
+      guessed: z.array(z.string()),
+      harvested: z.array(z.object({ symbol: z.string().optional(), origin: z.string() })),
+      note: z.string(),
+      summary: z.string()
+    })
+  },
+  async (args) => {
+    const { structured, text } = handleSuggestDeclarations(args);
+    return {
+      content: [{ type: "text", text }],
+      structuredContent: structured
+    };
+  }
+);
+server.registerTool(
+  "explain_step",
+  {
+    title: "Explain one row of a derivation",
+    description: "Checks the whole derivation, then returns the explanation for one row only: the verdict, the guarantee card, the fixes and the counterexample. Cheaper than check_derivation with all explanations when an agent is iterating on one row.",
+    inputSchema: {
+      latex: z.string().describe("the derivation, as a LaTeX align block"),
+      row: z.number().int().min(1).describe("the 1-based row number, as check_derivation reports them"),
+      declarations: z.string().optional(),
+      preset: z.string().optional(),
+      seed: z.number().int().min(0).max(4294967295).optional()
+    },
+    outputSchema: z.object({
+      row: z.number(),
+      verdict: z.string(),
+      mode: z.string().nullable(),
+      message: z.string(),
+      relation: z.string(),
+      card: z.object({
+        trialsPerSize: z.number(),
+        sizes: z.array(z.record(z.string(), z.number())),
+        primes: z.array(z.number()).optional(),
+        degree: z.number().optional(),
+        bound: z.number().optional(),
+        assumptions: z.array(z.string()),
+        seed: z.number()
+      })
+    }).passthrough()
+  },
+  async (args) => {
+    const { structured, text } = handleExplainStep(args);
+    return {
+      content: [{ type: "text", text }],
+      structuredContent: structured
+    };
+  }
+);
+var NOTATION = true ? "# Notation\n\nWhat SAMOSA reads, and how it reads it.\n\n## Rows\n\nSAMOSA looks for the math of a document:\n\n* LaTeX: `align`, `align*`, `aligned`, `gather`, `gather*`, `split`,\n  `equation`, `equation*`, `multline`, `eqnarray`, `displaymath`, `array`.\n* Markdown: `$$ ... $$` blocks.\n* A bare paste: every line is a row.\n\nInside a math environment, `\\\\` starts a new row and `&` is the alignment\nmarker. Both are removed before the row is parsed.\n\n## Symbols\n\nA symbol is a base letter, the accents on it, a subscript, and a label\nsuperscript. So:\n\n| Written | The symbol |\n| --- | --- |\n| `\\hat{x}_{k\\|k-1}` | one symbol, shown as x\u0302_{k\\|k-1} |\n| `\\bar\\Sigma_t` | a different symbol from `\\Sigma_t` |\n| `x` | a vector or a matrix, depending on the declarations |\n| `e` | Euler's number, unless it is subscripted |\n\nA run of letters is a product of single letter symbols: `cuv^\\top` is c\ntimes u times v transpose. The only exceptions are the known functions and\nthe functions you declared.\n\nA symbol you declared as a value is a factor, never a function, so\n`A (B + C)` and `x (y + z)` are products. An undeclared lowercase name before\na parenthesis, `f(x)`, is a call.\n\n`a \\times b` between two column vectors is the cross product, which makes\nboth of them size 3. Anywhere else `\\times` is the ordinary product.\n\n## Scripts\n\n| Written | Read as |\n| --- | --- |\n| `A^\\top`, `A^T`, `A^{\\mathsf T}` | the transpose |\n| `A^{-1}` | the inverse |\n| `A^{-\\top}`, `A^{-T}` | the inverse transpose |\n| `A^{2}` | the square, or the power, depending on the shape |\n| `A^{1/2}`, `A^{-1/2}` | the principal square root and its inverse, numeric mode only |\n| `x^{1/3}`, `x^{-2/3}`, `x^{\\frac{3}{2}}` | a rational power of a scalar, numeric mode only; an odd root keeps the sign of a negative number, an even root of one is outside the domain |\n| `A^{-2}` | the inverse of the square, and exact |\n| `A^{1/3}` | not read for a matrix: a question, with the reason |\n| `A^\\dagger` | the pseudo inverse, numeric mode only |\n| `P^+`, `x^*` | a label, folded into the name |\n| `x_{k\\|k-1}` | part of the name |\n| `\\sqrt[k]{x}` | the k-th root, `x^{1/k}`, for a whole number k |\n| `\\begin{bmatrix} \u2026 \\end{bmatrix}` | a block matrix, the blocks are its rows |\n| `\\|A\\|_F` | the Frobenius norm |\n| `\\|A\\|` | the spectral norm, with a chip |\n\n## Functions\n\n`\\exp`, `\\log`, `\\ln`, `\\sin`, `\\cos`, `\\tan`, `\\tanh`, `\\sqrt`, `\\det`,\n`\\operatorname{tr}`, `\\sigma` (the sigmoid), `\\operatorname{Var}`,\n`\\operatorname{Cov}`, and the densities `\\mathcal{N}` and `\\mathcal{U}`.\n\n`\\operatorname{Var}(g)` is `E[g g^\\top] - E[g] E[g]^\\top`, so the variance of a\nvector is its covariance matrix, and `g` can be any polynomial of the random\nvariables: `\\operatorname{Var}(A x)` and `\\operatorname{Var}(x + y)` are read\nas written. `\\operatorname{Cov}(g, h)` is `E[g h^\\top] - E[g] E[h]^\\top`. Two\nrandom variables declared apart are independent, and `x \\sim\n\\mathcal{N}(0, \\Sigma)` has mean zero.\n\nEverything else is a symbol, unless you declared it as a function with\n`f: fn n\u21921`.\n\n## Derivatives\n\n| Written | Read as |\n| --- | --- |\n| `\\frac{\\partial f}{\\partial x}` | the gradient or the Jacobian |\n| `\\frac{\\partial^2 f}{\\partial x\\,\\partial x^\\top}` | the Hessian |\n| `\\frac{\\partial f}{\\partial x^2}` | the Hessian, for a vector x |\n| `\\nabla_x f` | the gradient |\n| `\\mathrm{d}f` | the differential |\n\nThe denominator layout is the default: the gradient of a scalar with respect\nto a vector has the shape of that vector. The numerator layout can be\nswitched on, and the two are told apart by their shapes.\n\n## Relations\n\n| Written | Read as |\n| --- | --- |\n| `=` | an identity, checked |\n| `:=`, `\\coloneqq` | a definition |\n| `=>`, `\\implies` | an implication, checked by constraint completion |\n| `\\iff` | both directions |\n| `\\propto` | proportionality, checked over the reals |\n| `\\le`, `\\ge`, `<`, `>` | not checked in v1 |\n| `\\approx` | not checked in v1 |\n\n## Declarations\n\nThe compact syntax, for the editor, the CLI and the MCP server:\n\n```\nnames : type\nnames ~ distribution\nname := latex\ndimvar = number\n```\n\nThe types are:\n\n| Type | Meaning |\n| --- | --- |\n| `n` | a column vector of size n |\n| `n\xD7m` | a matrix |\n| `scalar` | a number |\n| `pos` | a strictly positive number, over the reals |\n| `int` | an integer |\n| `fn n\u21921` | a function |\n| `sym n`, `spd n`, `psd n`, `orth n`, `rot n`, `diag n`, `triu n`, `tril n`, `skew n`, `idem n`, `proj n`, `unit n`, `stoch n` | a matrix with that structure |\n| `rank 3 n\xD7n` | a matrix of that rank |\n\n`orth n` is the orthogonal group O(n), the matrices whose transpose is\ntheir inverse; `rot n` is the spelling for the rotations, the orthogonal\nmatrices with determinant one.\n\n`ident n`, `zero n`, `ones n`, `unit n` and `stoch n` are matrices of that\nsize, so `ident n` is the n by n identity, `zero n` the zero matrix, `ones n`\nthe matrix of ones, `unit n` a unit vector and `stoch n` a stochastic matrix.\nA `pos` symbol is a strictly positive number, so over the reals the sampler\ndraws a small positive magnitude; over a finite field no number is positive,\nso there it draws a field element.\n\nThe LaTeX forms are read as well:\n\n```latex\nA, B \\in \\mathbb{R}^{n\\times n}\n\\Sigma \\succ 0\nQ^\\top Q = I\nA = A^\\top\nx \\sim \\mathcal{N}(\\mu, \\Sigma)\nf: \\mathbb{R}^n \\to \\mathbb{R}\n```\n\n## The presets\n\nOne click of a preset fills the declarations. Every preset is editable, and\nediting one does not change the others.\n\n| Preset | The symbols |\n| --- | --- |\n| Kalman (Thrun) | A, B, C, \u03A3\u0304, Q as the measurement noise, R as the process noise |\n| Kalman (H, P, R) | the same, in the other convention |\n| Linear regression | X, y, w and the normal equations |\n| Logistic regression | X, w, b and the sigmoid |\n| MLP backprop | one hidden layer, W1, W2 and the deltas |\n| Attention | Q, K, V and the scaled scores |\n| Gaussian conditioning | the blocks of a joint Gaussian |\n| LQR | the Riccati recursion |\n| PCA | the covariance and its eigen decomposition |\n" : (() => {
+  try {
+    return readFileSync(resolve(process.cwd(), "docs/NOTATION.md"), "utf8");
+  } catch {
+    return fallback("notation");
+  }
+})();
+var COOKBOOK = true ? "# The Cookbook\n\n94 identities, measured by the engine, none of them allowed to pass with a wrong checkmark.\n\n- transpose-of-sum: the transpose of a sum\n- transpose-of-product: the transpose of a product\n- transpose-of-transpose: the transpose of a transpose\n- product-of-sums: a product of two sums\n- inverse-of-product: the inverse of a product\n- inverse-of-inverse: the inverse of an inverse\n- inverse-of-transpose: the inverse of a transpose\n- left-inverse: a left inverse is a left inverse\n- right-inverse: a right inverse is a right inverse\n- inverse-of-sum: the inverse of a sum, in the Woodbury form\n- det-of-product: the determinant of a product\n- det-of-transpose: the determinant of a transpose\n- det-of-inverse: the determinant of an inverse\n- det-lemma: the matrix determinant lemma\n- sherman-morrison: the Sherman-Morrison formula\n- trace-cyclic: the trace of a product is cyclic\n- trace-of-sum: the trace of a sum\n- trace-of-transpose: the trace of a transpose\n- trace-of-product-of-transpose: the trace of a product with a transpose\n- frob-norm-of-transpose: the Frobenius norm of a transpose\n- spectral-norm-of-transpose: the spectral norm of a transpose\n- quadratic-form: the transpose of a quadratic form\n- assoc: the product is associative\n- identity-product: the identity is the neutral element\n- transpose-of-scalar-product: the transpose of a product of three\n- kron-of-sum: the Kronecker product of a sum\n- hadamard-of-sum: the Hadamard product of a sum\n- gradient-of-quadratic: the gradient of a quadratic form\n- gradient-of-quadratic-matrix: the gradient of a matrix quadratic form\n- hessian-of-quadratic: the Hessian of a quadratic form\n- gradient-of-transpose: the gradient of a transpose\n- gradient-of-sum: the gradient of a sum\n- stationary-point: a stationary point\n- variance-of-sum: the variance of a sum\n- covariance-of-scaled: the covariance of a scaled variable\n- gaussian-moment: the second moment of a Gaussian\n- gaussian-mean: the mean of a Gaussian\n- gaussian-trace: the trace of a Gaussian covariance\n- kalman-covariance: the covariance of the Kalman update\n- kalman-gain: the Kalman gain\n- joseph-form: the Joseph form\n- push-through: the push-through identity\n- woodbury: the Woodbury identity\n- riccati: the Riccati recursion\n- least-squares: the normal equations\n- ridge-gradient: the gradient of a ridge regression\n- softmax: the gradient of the softmax cross entropy\n- inner-product-as-sum: the inner product as a sum\n- trace-as-sum: the trace of a matrix as a sum\n- frobenius-as-double-sum: the Frobenius inner product as a double sum\n- quadratic-of-ones: the sum of every entry as a quadratic form\n- logsumexp-gradient: the gradient of the log of a sum of exponentials\n- kl-of-gaussians: the KL of two Gaussians\n- kron-mixed-product: the mixed product of Kronecker products\n- kron-transpose: the transpose of a Kronecker product\n- kron-trace: the trace of a Kronecker product\n- kron-inverse: the inverse of a Kronecker product\n- kron-conjugate-inverse: the inverse of a conjugated Kronecker product\n- det-of-product-of-transpose: the determinant of a Gram matrix\n- det-of-householder: the determinant of a Householder reflection\n- schur-complement-determinant: the Schur complement determinant lemma\n- schur-complement-determinant-of-d: the Schur complement determinant lemma, the other way round\n- block-triangular-determinant: the determinant of a block triangular matrix\n- logdet-of-inverse: the log determinant of an inverse\n- logdet-of-product: the log determinant of a product\n- logdet-gradient: the gradient of the log determinant\n- det-gradient: the gradient of the determinant\n- frobenius-gradient: the gradient of the squared Frobenius norm\n- quadratic-symmetric-gradient: the gradient of a quadratic form\n- quadratic-norm-gradient: the gradient of a squared norm\n- trace-gradient: the gradient of a trace\n- trace-inverse-gradient: the gradient of the trace of an inverse\n- inverse-trace-gradient: the gradient of the trace of an inverse, the simple one\n- bilinear-gradient: the gradient of a bilinear form\n- block-trace: the trace of a block matrix\n- block-transpose: the transpose of a block matrix\n- block-sum: a block matrix is the sum of its blocks\n- block-triangular-inverse: the inverse of a block triangular matrix\n- skew-symmetric: a difference with its transpose is skew symmetric\n- symmetrized-sum: a sum with its transpose is symmetric\n- householder-symmetric: a Householder matrix is symmetric\n- householder-orthogonal: a Householder matrix is orthogonal\n- householder-annihilates-vector: a Householder matrix flips its own vector\n- projection-idempotent: an orthogonal projection is idempotent\n- projection-symmetric: an orthogonal projection is symmetric\n- projection-annihilates: an orthogonal projection leaves its own range alone\n- residual-projection: the residual of a projection is zero\n- projection-complement: the complement of a projection is a projection\n- orthogonal-transpose-inverse: an orthogonal matrix is its transpose inverse\n- hadamard-transpose: the transpose of a Hadamard product\n- outer-product-square: an outer product squared is a multiple of itself\n- outer-product-trace: the trace of an outer product\n- expectation-quadratic-of-normal: the second moment of a normal vector\n- expectation-of-normal-vector: the mean of a normal vector" : (() => {
+  try {
+    const source = readFileSync(resolve(process.cwd(), "corpus/cookbook/identities.ts"), "utf8");
+    const pairs = [...source.matchAll(/id: '([^']+)',\s*\n\s*name: '([^']+)',/g)];
+    if (!pairs.length) return fallback("cookbook");
+    return `# The Cookbook
+
+${pairs.length} identities, measured by the engine, none of them allowed to pass with a wrong checkmark.
+
+` + pairs.map(([, id, name]) => `- \`${id}\`: ${name}`).join("\n");
+  } catch {
+    return fallback("cookbook");
+  }
+})();
+server.registerResource(
+  "notation",
+  "samosa://docs/notation",
+  {
+    description: "SAMOSA notation: every construct and what SAMOSA does with it",
+    mimeType: "text/markdown"
+  },
+  async (uri) => ({
+    contents: [{ uri: uri.href, mimeType: "text/markdown", text: NOTATION }]
+  })
+);
+server.registerResource(
+  "cookbook",
+  "samosa://cookbook",
+  {
+    description: "the Cookbook: every identity SAMOSA measures itself against, id and name",
+    mimeType: "text/markdown"
+  },
+  async (uri) => ({
+    contents: [{ uri: uri.href, mimeType: "text/markdown", text: COOKBOOK }]
+  })
+);
+server.registerPrompt(
+  "check-my-derivation",
+  {
+    title: "Check my derivation",
+    description: "The workflow: declare, check, fix, check again, present with the guarantee.",
+    argsSchema: {
+      latex: z.string().describe("the derivation, as a LaTeX align block, one step per row").optional()
+    }
+  },
+  (args) => ({
+    messages: [
+      {
+        role: "user",
+        content: {
+          type: "text",
+          text: [
+            "Check this derivation with SAMOSA, in this order:",
+            "1. Call suggest_declarations with the latex, and take the compact declaration string it returns.",
+            "2. Call check_derivation with the latex and those declarations.",
+            "3. For every row marked wrong or shape, call explain_step for that row, and read the counterexample and the fixes.",
+            "4. Fix the rows. Check again. Never present a derivation that still has a wrong or shape row.",
+            "5. If a row is unchecked, say so, and say why: inequalities and non-polynomial expectations are not checked.",
+            "6. Include the shareUrl from the report so the reader can open every step.",
+            "",
+            args.latex ? `The derivation:
+${args.latex}` : "The derivation is the one in the current file."
+          ].join("\n")
+        }
+      }
+    ]
+  })
+);
 var serverTransport = new StdioServerTransport();
 await server.connect(serverTransport);
+export {
+  handleCheckDerivation,
+  handleCheckStep,
+  handleExplainStep,
+  handleFindCounterexample,
+  handleSuggestDeclarations,
+  summarise
+};

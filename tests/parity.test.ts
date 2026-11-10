@@ -86,3 +86,63 @@ describe('the same verdict everywhere', () => {
     expect(withoutComment.chips.some((c) => c.id === 'shape-guess')).toBe(true);
   });
 });
+
+describe('the MCP tools for agents', () => {
+  const woodbury = MENU.find((m) => m.id === 'woodbury')!;
+
+  it('suggest_declarations returns what the engine guessed, as a compact declaration string', async () => {
+    const { handleSuggestDeclarations } = await import('../mcp/tools.ts');
+    const { structured } = handleSuggestDeclarations({ latex: woodbury.source });
+    expect(structured.declarations).toBe('A: n×n; U: n×n; C: n×n; V: n×n');
+    expect(structured.guessed).toEqual(['A', 'U', 'C', 'V']);
+  });
+
+  it('two calls go from undeclared LaTeX to an all-hold result', async () => {
+    const { handleSuggestDeclarations, handleCheckDerivation } = await import('../mcp/tools.ts');
+    const first = handleSuggestDeclarations({ latex: woodbury.source });
+    const second = handleCheckDerivation({ latex: woodbury.source, declarations: first.structured.declarations as string });
+    const rows = (second.structured.steps as Array<{ verdict: string }>).map((s) => s.verdict);
+    expect(rows).toEqual(['ok']);
+  });
+
+  it('every step carries the span an agent needs to edit the text', async () => {
+    const { handleCheckDerivation } = await import('../mcp/tools.ts');
+    const { structured } = handleCheckDerivation({ latex: woodbury.source, declarations: woodbury.decls });
+    const steps = structured.steps as Array<{ row: number; span: { from: number; to: number }; text?: string }>;
+    for (const [index, step] of steps.entries()) {
+      expect(step.span.to, `row ${step.row}`).toBeGreaterThan(step.span.from);
+      expect(step.row).toBe(index + 1);
+    }
+  });
+
+  it('explain_step returns one row only, with the fix', async () => {
+    const kalman = MENU.find((m) => m.id === 'kalman')!;
+    const declared = check(kalman.bugSource!, { decls: kalman.decls });
+    const wrong = declared.steps.find((s) => s.verdict === 'wrong')!;
+    const { handleExplainStep } = await import('../mcp/tools.ts');
+    const { structured } = handleExplainStep({
+      latex: kalman.bugSource!,
+      row: wrong.row,
+      declarations: kalman.decls,
+    });
+    expect(structured.verdict).toBe('wrong');
+    expect(structured.row).toBe(wrong.row);
+    expect(Array.isArray(structured.fixes)).toBe(true);
+    expect((structured.fixes as Array<unknown>).length).toBeGreaterThan(0);
+  });
+
+  it('explain_step names the row that does not exist', async () => {
+    const { handleExplainStep } = await import('../mcp/tools.ts');
+    const { structured } = handleExplainStep({ latex: woodbury.source, row: 99, declarations: woodbury.decls });
+    expect(String(structured.error)).toContain('no row 99');
+  });
+
+  it('the guessed declarations round trip through check_derivation', async () => {
+    const { handleCheckDerivation } = await import('../mcp/tools.ts');
+    const { structured } = handleCheckDerivation({
+      latex: woodbury.source,
+      declarations: 'A: spd n',
+    });
+    expect(structured.summary).toContain('1 hold');
+  });
+});

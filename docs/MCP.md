@@ -46,7 +46,9 @@ Checks every row of a derivation.
 | `seed` | the seed of the sampling |
 
 The answer has a summary, one entry per row with the verdict, the mode and
-the guarantee card, and a share link.
+the guarantee card, and a share link. Every step carries its exact span
+`{ line, from, to }` into the source, so an agent can edit the exact text
+it checked.
 
 ### `check_step`
 
@@ -56,6 +58,54 @@ Checks one equation, for instance `A^T A x = A^T b`.
 
 Looks for small values that break an equation, and returns them with a NumPy
 snippet that reproduces them.
+
+### `suggest_declarations`
+
+Reads a derivation nobody declared and returns what SAMOSA had to guess,
+as a compact declaration string you can pass straight back to
+`check_derivation`. Everything SAMOSA guessed is reported honestly:
+every guessed symbol is a square matrix, and the note in the answer says
+so. Declare the structure yourself (`spd`, `sym`, a vector of size `n`, a
+distribution) when the guess matters.
+
+### `explain_step`
+
+Checks the whole derivation, then returns the explanation for one row only:
+the verdict, the guarantee card, the fixes and the counterexample. Cheaper
+than `check_derivation` when an agent is iterating on a single row.
+
+```json
+{ "latex": "...", "row": 9, "declarations": "x_t: n; z_t: m; C_t: m×n; Q_t: spd m; \\bar\\Sigma_t: spd n" }
+```
+
+## The resources
+
+| Resource | What it holds |
+| --- | --- |
+| `samosa://docs/notation` | every construct SAMOSA reads, and what it does with it |
+| `samosa://cookbook` | the 94 identities the engine is measured against, by id and name |
+
+Both ship inside the npm package, so an agent can read them without a
+checkout.
+
+## The prompt
+
+`check-my-derivation` is the skill as a prompt: declare, check, fix, check
+again, and present the result with the share link. Call it with the
+derivation in the arguments, or empty with the derivation already in the
+file.
+
+## From undeclared to all-✓, in two calls
+
+```text
+→ suggest_declarations(latex)
+← declarations: "A: n×n; U: n×n; C: n×n; V: n×n"  (every one a guess, honestly labelled)
+→ check_derivation(latex, declarations=that string)
+← 1 rows: 1 hold
+```
+
+That is the loop the skill drives: guess, check, fix what comes back wrong,
+check again.
 
 ## The Agent Skill
 

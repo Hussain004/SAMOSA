@@ -17,6 +17,19 @@ mkdirSync(out, { recursive: true });
 // cannot drift from the code that was released
 const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'));
 
+// the two MCP resources, bundled into the single-file server, so the npm
+// package carries everything an agent needs without a checkout
+const notation = readFileSync(resolve(root, 'docs/NOTATION.md'), 'utf8');
+const identitiesSource = readFileSync(resolve(root, 'corpus/cookbook/identities.ts'), 'utf8');
+const cookbookPairs = [...identitiesSource.matchAll(/id: '([^']+)',\s*\n\s*name: '([^']+)',/g)];
+if (cookbookPairs.length < 90) {
+  throw new Error('the cookbook resource could not be generated: parsed only ' + cookbookPairs.length + ' identities');
+}
+const cookbookHeader = '# The Cookbook';
+const cookbookBody = cookbookPairs.length + ' identities, measured by the engine, none of them allowed to pass with a wrong checkmark.';
+const cookbookList = cookbookPairs.map(([, id, name]) => '- ' + id + ': ' + name).join('\n');
+const cookbook = cookbookHeader + '\n\n' + cookbookBody + '\n\n' + cookbookList;
+
 const shared = {
   bundle: true,
   format: 'esm',
@@ -29,6 +42,8 @@ const shared = {
   define: {
     SAMOSA_VERSION: JSON.stringify(pkg.version),
     SAMOSA_ENGINE_VERSION: JSON.stringify(pkg.version),
+    SAMOSA_DOCS_NOTATION: JSON.stringify(notation),
+    SAMOSA_COOKBOOK: JSON.stringify(cookbook),
   },
 };
 

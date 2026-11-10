@@ -28,11 +28,15 @@ reproducible.
    ```bash
    npx -y -p samosa-math samosa check - --format json < derivation.tex
    ```
-4. Fix every row marked `wrong` or `shape`, using the counterexample and the
-   fixes in the report. Then check it again.
+
+   Or, in two calls: `suggest_declarations` returns what the engine had to
+   guess as a compact declaration string; pass it to `check_derivation`.
+4. For a row marked `wrong` or `shape`, call `explain_step` for that row
+   and read the counterexample and the fixes. Fix every such row. Check again.
 5. Never present a derivation that still has a `wrong` or a `shape` row.
 6. If a row comes back as `unchecked`, say so, and say why: SAMOSA does not
-   check inequalities, limits or non polynomial expectations.
+   check inequalities, limits or non polynomial expectations. Inequalities are
+   searched for counterexamples, never certified.
 7. Include the share link from the report, so the person can open every step.
 
 ## What the verdicts mean
