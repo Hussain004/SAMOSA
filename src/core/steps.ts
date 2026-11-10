@@ -294,7 +294,11 @@ function splitMathContent(src: string, from: number, to: number, where: string):
           continue;
         }
         envDepth++;
-        i += 7;
+        // the env name and its closing brace are not mathematics: step
+        // past them, or the stray brace is counted as a group and every
+        // row after a block matrix that carries braces never splits
+        const closeBrace = content.indexOf('}', i);
+        i = closeBrace >= 0 ? closeBrace + 1 : i + 7;
         continue;
       }
       if (next.startsWith('\\end{')) {
@@ -306,7 +310,8 @@ function splitMathContent(src: string, from: number, to: number, where: string):
           continue;
         }
         envDepth = Math.max(0, envDepth - 1);
-        i += 5;
+        const closeBrace = content.indexOf('}', i);
+        i = closeBrace >= 0 ? closeBrace + 1 : i + 5;
         continue;
       }
       if (next.startsWith('\\iffalse')) {

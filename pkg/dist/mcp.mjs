@@ -2882,7 +2882,8 @@ function splitMathContent(src, from, to, where) {
           continue;
         }
         envDepth++;
-        i2 += 7;
+        const closeBrace = content.indexOf("}", i2);
+        i2 = closeBrace >= 0 ? closeBrace + 1 : i2 + 7;
         continue;
       }
       if (next.startsWith("\\end{")) {
@@ -2894,7 +2895,8 @@ function splitMathContent(src, from, to, where) {
           continue;
         }
         envDepth = Math.max(0, envDepth - 1);
-        i2 += 5;
+        const closeBrace = content.indexOf("}", i2);
+        i2 = closeBrace >= 0 ? closeBrace + 1 : i2 + 5;
         continue;
       }
       if (next.startsWith("\\iffalse")) {
@@ -4361,6 +4363,9 @@ function matDet(f, a) {
     }
   }
   return det;
+}
+function matSolve(f, a, b) {
+  return matMul(f, matInv(f, a), b);
 }
 function kron(f, a, b) {
   const r = a.r * b.r;
@@ -10922,14 +10927,36 @@ function residualRepairs(sh) {
   }
   if (samples.length < 2) return out;
   const terms = candidateTerms(sh);
+  const flat = [];
+  for (const s of samples) flat.push(...s.diff);
+  const usable = [];
   for (const [text, term] of terms) {
+    const entries = [];
+    let ok = true;
+    for (const { env, diff } of samples) {
+      try {
+        const t = evalNode(field, term, env);
+        if (t.k !== "m" || t.m.d.length !== diff.length) {
+          ok = false;
+          break;
+        }
+        entries.push(...t.m.d);
+      } catch {
+        ok = false;
+        break;
+      }
+    }
+    if (!ok) continue;
+    usable.push({ text, node: term, entries });
+  }
+  for (const { text, node, entries } of usable) {
     sh.spent.n++;
-    const scale = matchesScale(field, term, samples);
+    const scale = matchesScaleValues(field, entries, samples);
     if (scale === null || scale === 0) continue;
     const patched = {
       k: "op",
       op: "add",
-      args: [sh.rhs, term],
+      args: [sh.rhs, node],
       span: sh.rhs.span
     };
     if (renderNode(patched) === renderNode(sh.rhs)) continue;
@@ -10942,9 +10969,118 @@ function residualRepairs(sh) {
       detail: text,
       side: "rhs"
     });
-    if (out.length >= 3) break;
+    if (out.length >= 3) return out;
+  }
+  if (usable.length >= 2) {
+    for (let i2 = 0; i2 < usable.length && out.length < 3; i2++) {
+      for (let j = i2 + 1; j < usable.length && out.length < 3; j++) {
+        const coefs = solveSmall(field, usable, [i2, j], flat);
+        if (coefs) pushResidualFix(sh, out, [
+          { c: coefs[0], text: usable[i2].text, node: usable[i2].node },
+          { c: coefs[1], text: usable[j].text, node: usable[j].node }
+        ]);
+      }
+    }
+  }
+  if (usable.length <= 48) {
+    for (let i2 = 0; i2 < usable.length && out.length < 3; i2++) {
+      for (let j = i2 + 1; j < usable.length && out.length < 3; j++) {
+        for (let k = j + 1; k < usable.length && out.length < 3; k++) {
+          const coefs = solveSmall(field, usable, [i2, j, k], flat);
+          if (coefs) pushResidualFix(sh, out, [
+            { c: coefs[0], text: usable[i2].text, node: usable[i2].node },
+            { c: coefs[1], text: usable[j].text, node: usable[j].node },
+            { c: coefs[2], text: usable[k].text, node: usable[k].node }
+          ]);
+        }
+      }
+    }
   }
   return out;
+}
+var SMALL_NICE_SCALES = [-2, -1, -0.5, 0.5, 1, 2];
+function coefText(c) {
+  const mag = Math.abs(c);
+  const sign2 = c >= 0 ? "+" : "-";
+  const coeff = mag === 1 ? "" : mag === 0.5 ? "\\frac{1}{2}" : `${mag}`;
+  return `${sign2}${coeff ? ` ${coeff}` : ""}`;
+}
+function smallNum(c) {
+  if (Math.abs(c) === 0.5) return { k: "num", value: { n: 1, d: 2 }, span: { from: 0, to: 0 } };
+  return { k: "num", value: { n: Math.abs(c), d: 1 }, span: { from: 0, to: 0 } };
+}
+function patchWith(sh, terms) {
+  let acc = sh.rhs;
+  for (const { c, node } of terms) {
+    const mag = Math.abs(c);
+    const scaled = mag === 1 ? node : { k: "op", op: "mul", args: [smallNum(c), node], span: node.span };
+    acc = {
+      k: "op",
+      op: c >= 0 ? "add" : "sub",
+      args: [acc, scaled],
+      span: sh.rhs.span
+    };
+  }
+  return acc;
+}
+function pushResidualFix(sh, out, terms) {
+  const text = terms.map(({ c, text: t }) => `${coefText(c)} ${pretty(t)}`).join(" ");
+  const patched = patchWith(sh, terms);
+  if (renderNode(patched) === renderNode(sh.rhs)) return;
+  const insert = `${renderNode(sh.rhs)} ${text}`;
+  const verified = holdsWith(sh, "rhs", patched);
+  out.push({
+    kind: "residual",
+    title: `this step is off by exactly ${text}`,
+    edit: { span: sh.rhs.span, insert },
+    verified,
+    detail: terms.map(({ text: t }) => t).join(" + "),
+    side: "rhs"
+  });
+}
+function equationSubsets(n, k) {
+  const out = [];
+  if (k === 2) {
+    for (let i2 = 0; i2 < n; i2++) for (let j = i2 + 1; j < n; j++) out.push([i2, j]);
+    return out;
+  }
+  for (let i2 = 0; i2 < n; i2++)
+    for (let j = i2 + 1; j < n; j++)
+      for (let k2 = j + 1; k2 < n; k2++) out.push([i2, j, k2]);
+  return out;
+}
+function solveSmall(field, terms, idxs, flat) {
+  const k = idxs.length;
+  const nEq = Math.min(8, flat.length);
+  for (const subset of equationSubsets(nEq, k)) {
+    try {
+      const A = mat(k, k, (r, c) => terms[idxs[c]].entries[subset[r]]);
+      const b = mat(k, 1, (r) => flat[subset[r]]);
+      const x2 = matSolve(field, A, b);
+      const coefs = idxs.map((_, c) => x2.d[c]);
+      const accepted = coefs.map((c) => {
+        for (const s of SMALL_NICE_SCALES) {
+          const den = Math.abs(s % 1) > 0 ? 2 : 1;
+          const num = Math.abs(s % 1) > 0 ? s < 0 ? -1 : 1 : s;
+          if (field.fromRational(num, den) === c) return s;
+        }
+        return null;
+      });
+      if (accepted.some((c) => c === null)) continue;
+      let ok = true;
+      for (let e = 0; e < flat.length && ok; e++) {
+        let acc = 0;
+        for (let c = 0; c < k; c++) {
+          acc = field.add(acc, field.mul(x2.d[c], terms[idxs[c]].entries[e]));
+        }
+        if (acc !== flat[e]) ok = false;
+      }
+      if (ok) return accepted;
+    } catch {
+      continue;
+    }
+  }
+  return null;
 }
 function candidateTerms(sh) {
   const terms = /* @__PURE__ */ new Map();
@@ -10992,25 +11128,25 @@ function candidateTerms(sh) {
   }
   return terms;
 }
-function matchesScale(field, term, samples) {
-  const termValues = [];
-  for (const { env, diff } of samples) {
-    let value;
-    try {
-      const t = evalNode(field, term, env);
-      if (t.k !== "m") return null;
-      value = t.m.d;
-    } catch {
-      return null;
-    }
-    if (value.length !== diff.length) return null;
-    termValues.push(value);
+function matchesScaleValues(field, termValues, samples) {
+  const termValuesPerSample = [];
+  let at = 0;
+  for (const { diff } of samples) {
+    termValuesPerSample.push(termValues.slice(at, at + diff.length));
+    at += diff.length;
   }
-  const scale = niceScale(field, field.div(samples[0].diff[0], termValues[0][0]));
+  let scale = null;
+  for (let s = 0; s < termValuesPerSample.length && scale === null; s++) {
+    for (let i2 = 0; i2 < termValuesPerSample[s].length; i2++) {
+      if (termValuesPerSample[s][i2] === 0) continue;
+      scale = niceScale(field, field.div(samples[s].diff[i2], termValuesPerSample[s][i2]));
+      if (scale) break;
+    }
+  }
   if (scale === null) return null;
   for (let s = 0; s < samples.length; s++) {
     for (let i2 = 0; i2 < samples[s].diff.length; i2++) {
-      if (field.mul(field.fromRational(scale.n, scale.d), termValues[s][i2]) !== samples[s].diff[i2]) {
+      if (field.mul(field.fromRational(scale.n, scale.d), termValuesPerSample[s][i2]) !== samples[s].diff[i2]) {
         return null;
       }
     }
