@@ -19,6 +19,18 @@ import { allMutants } from '../corpus/cookbook/mutants.ts';
 /** The verdicts that count as a catch. */
 const CATCHES = ['wrong', 'shape'];
 
+/**
+ * The identities that carry no claim row, and why. A silent identity is a
+ * hole in the suite, so adding one here has to be a decision that shows up
+ * in review; anything not listed fails the check.
+ */
+const SILENT_ALLOWED = new Map([
+  // the discrete algebraic Riccati equation is a fixed point written as a
+  // definition; the claim you would write re-expands the definition forever,
+  // so this engine cannot evaluate it yet
+  ['riccati', 'the fixed point re-expands the definition forever'],
+]);
+
 const falseCheckmarks = [];
 const uncheckedIdentities = [];
 const missedMutants = [];
@@ -29,6 +41,14 @@ let mutants = 0;
 for (const identity of IDENTITIES) {
   const report = check(identity.source, { decls: identity.decls });
   checked++;
+  // an identity with no claim row is not an identity at all: it is a
+  // definition with no checking in it, and it would silently pass and
+  // silently ship (this is how kl-of-gaussians rotted)
+  const claimRows = report.steps.filter((s) => s.relation !== 'defined');
+  if (claimRows.length === 0 && !SILENT_ALLOWED.has(identity.id)) {
+    console.error(`the identity ${identity.id} has no claim row; nothing is checked in it`);
+    process.exit(1);
+  }
   for (const step of report.steps) {
     // a definition is not a claim, so it is not a checkmark
     if (step.relation === 'defined') continue;

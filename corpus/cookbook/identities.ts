@@ -344,15 +344,18 @@ J &:= \frac{1}{2} x^\top A x \\
     name: 'the covariance of the Kalman update',
     decls: 'C: m×n; Q: spd m; R: spd n',
     source: String.raw`\begin{align*}
-\Sigma &:= \left(C^\top Q^{-1} C + R^{-1}\right)^{-1}
+\Sigma &:= \left(C^\top Q^{-1} C + R^{-1}\right)^{-1} \\
+\Sigma^{-1} &= C^\top Q^{-1} C + R^{-1}
 \end{align*}`,
   },
   {
     id: 'kalman-gain',
     name: 'the Kalman gain',
-    decls: 'C: m×n; Q: spd m; \\Sigma: spd n',
+    decls: 'C: m×n; Q: spd m; \\bar\\Sigma: spd n',
     source: String.raw`\begin{align*}
-K &:= \Sigma C^\top Q^{-1}
+\Sigma &:= \left(C^\top Q^{-1} C + \bar\Sigma^{-1}\right)^{-1} \\
+K &:= \Sigma C^\top Q^{-1} \\
+K &= \bar\Sigma C^\top \left(C \bar\Sigma C^\top + Q\right)^{-1}
 \end{align*}`,
   },
   {
@@ -419,10 +422,10 @@ J &:= -\sum_i p_i \log \frac{e^{z_i}}{\sum_j e^{z_j}} \\
   {
     id: 'kl-of-gaussians',
     name: 'the KL of two Gaussians',
-    decls: '\\mu: n; \\nu: n; \\Sigma: spd n; \\Tau: spd n',
+    decls: '\\mu: n; \\nu: n; \\Sigma: spd n; T: spd n',
     source: String.raw`\begin{align*}
-D &= \frac{1}{2}\operatorname{tr}\left(\Sigma^{-1}\left(\tau + (\mu - \nu)(\mu - \nu)^\top\right)\right)
-- \frac{n}{2} + \frac{1}{2}\log\frac{\det(\Sigma)}{\det(\tau)}
+D &:= \frac{1}{2}\left(\operatorname{tr}\left(\Sigma^{-1}\left(T + (\mu - \nu)(\mu - \nu)^\top\right)\right) - \operatorname{tr}(\Sigma^{-1}\Sigma) + \log\frac{\det\Sigma}{\det T}\right) \\
+D - \frac{1}{2}(\mu - \nu)^\top \Sigma^{-1}(\mu - \nu) &= \frac{1}{2}\left(\operatorname{tr}(\Sigma^{-1}T) - \operatorname{tr}(\Sigma^{-1}\Sigma) + \log\frac{\det\Sigma}{\det T}\right)
 \end{align*}`,
   },
 ];

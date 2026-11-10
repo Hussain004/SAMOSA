@@ -230,18 +230,14 @@ h_1 &:= \sigma(W_1 x + b_1) \\
     id: 'kl-gauss',
     title: 'The KL of two Gaussians',
     blurb: 'The formula everybody copies.',
-    decls: 'mu: n; \\mu_p: n; \\mu_q: n; \\Sigma: spd n; \\Sigma_p: spd n; \\Sigma_q: spd n',
+    decls: '\\mu: n; \\mu_p: n; \\mu_q: n; \\Sigma: spd n; \\Sigma_p: spd n; \\Sigma_q: spd n',
     source: String.raw`\begin{align*}
-D_0 &:= \frac{1}{2}\left(\operatorname{tr}(\Sigma^{-1}\Sigma) - n + \log\frac{\det\Sigma}{\det\Sigma} + (\mu - \mu)^\top \Sigma^{-1}(\mu - \mu)\right) \\
-D_0 &= 0 \\
-D &:= \frac{1}{2}\left(\operatorname{tr}(\Sigma_q^{-1}\Sigma_p) - n + \log\frac{\det\Sigma_q}{\det\Sigma_p} + (\mu_p - \mu_q)^\top \Sigma_q^{-1}(\mu_p - \mu_q)\right) \\
-D - \frac{1}{2}(\mu_p - \mu_q)^\top \Sigma_q^{-1}(\mu_p - \mu_q) &= \frac{1}{2}\left(\operatorname{tr}(\Sigma_q^{-1}\Sigma_p) - n + \log\frac{\det\Sigma_q}{\det\Sigma_p}\right)
+D &:= \frac{1}{2}\left(\operatorname{tr}(\Sigma_q^{-1}\Sigma_p) - \operatorname{tr}(\Sigma_q^{-1}\Sigma_q) + \log\frac{\det\Sigma_q}{\det\Sigma_p} + (\mu_p - \mu_q)^\top \Sigma_q^{-1}(\mu_p - \mu_q)\right) \\
+D - \frac{1}{2}(\mu_p - \mu_q)^\top \Sigma_q^{-1}(\mu_p - \mu_q) &= \frac{1}{2}\left(\operatorname{tr}(\Sigma_q^{-1}\Sigma_p) - \operatorname{tr}(\Sigma_q^{-1}\Sigma_q) + \log\frac{\det\Sigma_q}{\det\Sigma_p}\right)
 \end{align*}`,
     bugSource: String.raw`\begin{align*}
-D_0 &:= \frac{1}{2}\left(\operatorname{tr}(\Sigma^{-1}\Sigma) - n + \log\frac{\det\Sigma}{\det\Sigma} + (\mu - \mu)^\top \Sigma^{-1}(\mu - \mu)\right) \\
-D_0 &= 0 \\
-D &:= \frac{1}{2}\left(\operatorname{tr}(\Sigma_q^{-1}\Sigma_p) - n + \log\frac{\det\Sigma_p}{\det\Sigma_q} + (\mu_p - \mu_q)^\top \Sigma_q^{-1}(\mu_p - \mu_q)\right) \\
-D - \frac{1}{2}(\mu_p - \mu_q)^\top \Sigma_q^{-1}(\mu_p - \mu_q) &= \frac{1}{2}\left(\operatorname{tr}(\Sigma_q^{-1}\Sigma_p) - n + \log\frac{\det\Sigma_q}{\det\Sigma_p}\right)
+D &:= \frac{1}{2}\left(\operatorname{tr}(\Sigma_q^{-1}\Sigma_p) - \operatorname{tr}(\Sigma_q^{-1}\Sigma_q) + \log\frac{\det\Sigma_p}{\det\Sigma_q} + (\mu_p - \mu_q)^\top \Sigma_q^{-1}(\mu_p - \mu_q)\right) \\
+D - \frac{1}{2}(\mu_p - \mu_q)^\top \Sigma_q^{-1}(\mu_p - \mu_q) &= \frac{1}{2}\left(\operatorname{tr}(\Sigma_q^{-1}\Sigma_p) - \operatorname{tr}(\Sigma_q^{-1}\Sigma_q) + \log\frac{\det\Sigma_q}{\det\Sigma_p}\right)
 \end{align*}`,
   },
   {

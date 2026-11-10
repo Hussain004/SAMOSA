@@ -1618,7 +1618,133 @@ exports[`the parser, on every row of the Menu and the Cookbook > cookbook/kalman
 }
 `;
 
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/kalman-covariance row 2 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "args": [
+          {
+            "sym": "\\Sigma",
+          },
+        ],
+        "op": "inv",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "args": [
+                  {
+                    "args": [
+                      {
+                        "sym": "C",
+                      },
+                    ],
+                    "op": "T",
+                  },
+                  {
+                    "args": [
+                      {
+                        "sym": "Q",
+                      },
+                    ],
+                    "op": "inv",
+                  },
+                ],
+                "op": "mul",
+              },
+              {
+                "sym": "C",
+              },
+            ],
+            "op": "mul",
+          },
+          {
+            "args": [
+              {
+                "sym": "R",
+              },
+            ],
+            "op": "inv",
+          },
+        ],
+        "op": "add",
+      },
+    },
+  ],
+}
+`;
+
 exports[`the parser, on every row of the Menu and the Cookbook > cookbook/kalman-gain row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "sym": "\\Sigma",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": ":=",
+      "rhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "args": [
+                  {
+                    "args": [
+                      {
+                        "args": [
+                          {
+                            "sym": "C",
+                          },
+                        ],
+                        "op": "T",
+                      },
+                      {
+                        "args": [
+                          {
+                            "sym": "Q",
+                          },
+                        ],
+                        "op": "inv",
+                      },
+                    ],
+                    "op": "mul",
+                  },
+                  {
+                    "sym": "C",
+                  },
+                ],
+                "op": "mul",
+              },
+              {
+                "args": [
+                  {
+                    "sym": "\\bar\\Sigma",
+                  },
+                ],
+                "op": "inv",
+              },
+            ],
+            "op": "add",
+          },
+        ],
+        "op": "inv",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/kalman-gain row 2 1`] = `
 {
   "parts": [
     {
@@ -1663,6 +1789,80 @@ exports[`the parser, on every row of the Menu and the Cookbook > cookbook/kalman
 }
 `;
 
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/kalman-gain row 3 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "sym": "K",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "sym": "\\bar\\Sigma",
+              },
+              {
+                "args": [
+                  {
+                    "sym": "C",
+                  },
+                ],
+                "op": "T",
+              },
+            ],
+            "op": "mul",
+          },
+          {
+            "args": [
+              {
+                "args": [
+                  {
+                    "args": [
+                      {
+                        "args": [
+                          {
+                            "sym": "C",
+                          },
+                          {
+                            "sym": "\\bar\\Sigma",
+                          },
+                        ],
+                        "op": "mul",
+                      },
+                      {
+                        "args": [
+                          {
+                            "sym": "C",
+                          },
+                        ],
+                        "op": "T",
+                      },
+                    ],
+                    "op": "mul",
+                  },
+                  {
+                    "sym": "Q",
+                  },
+                ],
+                "op": "add",
+              },
+            ],
+            "op": "inv",
+          },
+        ],
+        "op": "mul",
+      },
+    },
+  ],
+}
+`;
+
 exports[`the parser, on every row of the Menu and the Cookbook > cookbook/kl-of-gaussians row 1 1`] = `
 {
   "parts": [
@@ -1673,24 +1873,24 @@ exports[`the parser, on every row of the Menu and the Cookbook > cookbook/kl-of-
       },
       "premise": null,
       "proportionalTo": null,
-      "relation": "=",
+      "relation": ":=",
       "rhs": {
         "args": [
           {
             "args": [
               {
+                "num": "1/1",
+              },
+              {
+                "num": "2/1",
+              },
+            ],
+            "op": "div",
+          },
+          {
+            "args": [
+              {
                 "args": [
-                  {
-                    "args": [
-                      {
-                        "num": "1/1",
-                      },
-                      {
-                        "num": "2/1",
-                      },
-                    ],
-                    "op": "div",
-                  },
                   {
                     "args": [
                       {
@@ -1706,7 +1906,7 @@ exports[`the parser, on every row of the Menu and the Cookbook > cookbook/kl-of-
                           {
                             "args": [
                               {
-                                "sym": "\\tau",
+                                "sym": "T",
                               },
                               {
                                 "args": [
@@ -1749,35 +1949,29 @@ exports[`the parser, on every row of the Menu and the Cookbook > cookbook/kl-of-
                     ],
                     "call": "tr",
                   },
-                ],
-                "op": "mul",
-              },
-              {
-                "args": [
                   {
-                    "sym": "n",
-                  },
-                  {
-                    "num": "2/1",
-                  },
-                ],
-                "op": "div",
-              },
-            ],
-            "op": "sub",
-          },
-          {
-            "args": [
-              {
-                "args": [
-                  {
-                    "num": "1/1",
-                  },
-                  {
-                    "num": "2/1",
+                    "args": [
+                      {
+                        "args": [
+                          {
+                            "args": [
+                              {
+                                "sym": "\\Sigma",
+                              },
+                            ],
+                            "op": "inv",
+                          },
+                          {
+                            "sym": "\\Sigma",
+                          },
+                        ],
+                        "op": "mul",
+                      },
+                    ],
+                    "call": "tr",
                   },
                 ],
-                "op": "div",
+                "op": "sub",
               },
               {
                 "args": [
@@ -1794,7 +1988,7 @@ exports[`the parser, on every row of the Menu and the Cookbook > cookbook/kl-of-
                       {
                         "args": [
                           {
-                            "sym": "\\tau",
+                            "sym": "T",
                           },
                         ],
                         "call": "det",
@@ -1806,10 +2000,186 @@ exports[`the parser, on every row of the Menu and the Cookbook > cookbook/kl-of-
                 "call": "log",
               },
             ],
+            "op": "add",
+          },
+        ],
+        "op": "mul",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/kl-of-gaussians row 2 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "args": [
+          {
+            "sym": "D",
+          },
+          {
+            "args": [
+              {
+                "args": [
+                  {
+                    "args": [
+                      {
+                        "args": [
+                          {
+                            "num": "1/1",
+                          },
+                          {
+                            "num": "2/1",
+                          },
+                        ],
+                        "op": "div",
+                      },
+                      {
+                        "args": [
+                          {
+                            "args": [
+                              {
+                                "sym": "\\mu",
+                              },
+                              {
+                                "sym": "\\nu",
+                              },
+                            ],
+                            "op": "sub",
+                          },
+                        ],
+                        "op": "T",
+                      },
+                    ],
+                    "op": "mul",
+                  },
+                  {
+                    "args": [
+                      {
+                        "sym": "\\Sigma",
+                      },
+                    ],
+                    "op": "inv",
+                  },
+                ],
+                "op": "mul",
+              },
+              {
+                "args": [
+                  {
+                    "sym": "\\mu",
+                  },
+                  {
+                    "sym": "\\nu",
+                  },
+                ],
+                "op": "sub",
+              },
+            ],
             "op": "mul",
           },
         ],
-        "op": "add",
+        "op": "sub",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "num": "1/1",
+              },
+              {
+                "num": "2/1",
+              },
+            ],
+            "op": "div",
+          },
+          {
+            "args": [
+              {
+                "args": [
+                  {
+                    "args": [
+                      {
+                        "args": [
+                          {
+                            "args": [
+                              {
+                                "sym": "\\Sigma",
+                              },
+                            ],
+                            "op": "inv",
+                          },
+                          {
+                            "sym": "T",
+                          },
+                        ],
+                        "op": "mul",
+                      },
+                    ],
+                    "call": "tr",
+                  },
+                  {
+                    "args": [
+                      {
+                        "args": [
+                          {
+                            "args": [
+                              {
+                                "sym": "\\Sigma",
+                              },
+                            ],
+                            "op": "inv",
+                          },
+                          {
+                            "sym": "\\Sigma",
+                          },
+                        ],
+                        "op": "mul",
+                      },
+                    ],
+                    "call": "tr",
+                  },
+                ],
+                "op": "sub",
+              },
+              {
+                "args": [
+                  {
+                    "args": [
+                      {
+                        "args": [
+                          {
+                            "sym": "\\Sigma",
+                          },
+                        ],
+                        "call": "det",
+                      },
+                      {
+                        "args": [
+                          {
+                            "sym": "T",
+                          },
+                        ],
+                        "call": "det",
+                      },
+                    ],
+                    "op": "div",
+                  },
+                ],
+                "call": "log",
+              },
+            ],
+            "op": "add",
+          },
+        ],
+        "op": "mul",
       },
     },
   ],
@@ -4674,167 +5044,6 @@ exports[`the parser, on every row of the Menu and the Cookbook > menu/kl-gauss r
     {
       "conclusion": null,
       "lhs": {
-        "sym": "D_0",
-      },
-      "premise": null,
-      "proportionalTo": null,
-      "relation": ":=",
-      "rhs": {
-        "args": [
-          {
-            "args": [
-              {
-                "num": "1/1",
-              },
-              {
-                "num": "2/1",
-              },
-            ],
-            "op": "div",
-          },
-          {
-            "args": [
-              {
-                "args": [
-                  {
-                    "args": [
-                      {
-                        "args": [
-                          {
-                            "args": [
-                              {
-                                "args": [
-                                  {
-                                    "sym": "\\Sigma",
-                                  },
-                                ],
-                                "op": "inv",
-                              },
-                              {
-                                "sym": "\\Sigma",
-                              },
-                            ],
-                            "op": "mul",
-                          },
-                        ],
-                        "call": "tr",
-                      },
-                      {
-                        "sym": "n",
-                      },
-                    ],
-                    "op": "sub",
-                  },
-                  {
-                    "args": [
-                      {
-                        "args": [
-                          {
-                            "args": [
-                              {
-                                "sym": "\\Sigma",
-                              },
-                            ],
-                            "call": "det",
-                          },
-                          {
-                            "args": [
-                              {
-                                "sym": "\\Sigma",
-                              },
-                            ],
-                            "call": "det",
-                          },
-                        ],
-                        "op": "div",
-                      },
-                    ],
-                    "call": "log",
-                  },
-                ],
-                "op": "add",
-              },
-              {
-                "args": [
-                  {
-                    "args": [
-                      {
-                        "args": [
-                          {
-                            "args": [
-                              {
-                                "sym": "\\mu",
-                              },
-                              {
-                                "sym": "\\mu",
-                              },
-                            ],
-                            "op": "sub",
-                          },
-                        ],
-                        "op": "T",
-                      },
-                      {
-                        "args": [
-                          {
-                            "sym": "\\Sigma",
-                          },
-                        ],
-                        "op": "inv",
-                      },
-                    ],
-                    "op": "mul",
-                  },
-                  {
-                    "args": [
-                      {
-                        "sym": "\\mu",
-                      },
-                      {
-                        "sym": "\\mu",
-                      },
-                    ],
-                    "op": "sub",
-                  },
-                ],
-                "op": "mul",
-              },
-            ],
-            "op": "add",
-          },
-        ],
-        "op": "mul",
-      },
-    },
-  ],
-}
-`;
-
-exports[`the parser, on every row of the Menu and the Cookbook > menu/kl-gauss row 2 1`] = `
-{
-  "parts": [
-    {
-      "conclusion": null,
-      "lhs": {
-        "sym": "D_0",
-      },
-      "premise": null,
-      "proportionalTo": null,
-      "relation": "=",
-      "rhs": {
-        "num": "0/1",
-      },
-    },
-  ],
-}
-`;
-
-exports[`the parser, on every row of the Menu and the Cookbook > menu/kl-gauss row 3 1`] = `
-{
-  "parts": [
-    {
-      "conclusion": null,
-      "lhs": {
         "sym": "D",
       },
       "premise": null,
@@ -4881,7 +5090,25 @@ exports[`the parser, on every row of the Menu and the Cookbook > menu/kl-gauss r
                         "call": "tr",
                       },
                       {
-                        "sym": "n",
+                        "args": [
+                          {
+                            "args": [
+                              {
+                                "args": [
+                                  {
+                                    "sym": "\\Sigma_q",
+                                  },
+                                ],
+                                "op": "inv",
+                              },
+                              {
+                                "sym": "\\Sigma_q",
+                              },
+                            ],
+                            "op": "mul",
+                          },
+                        ],
+                        "call": "tr",
                       },
                     ],
                     "op": "sub",
@@ -4971,7 +5198,7 @@ exports[`the parser, on every row of the Menu and the Cookbook > menu/kl-gauss r
 }
 `;
 
-exports[`the parser, on every row of the Menu and the Cookbook > menu/kl-gauss row 4 1`] = `
+exports[`the parser, on every row of the Menu and the Cookbook > menu/kl-gauss row 2 1`] = `
 {
   "parts": [
     {
@@ -5087,7 +5314,25 @@ exports[`the parser, on every row of the Menu and the Cookbook > menu/kl-gauss r
                     "call": "tr",
                   },
                   {
-                    "sym": "n",
+                    "args": [
+                      {
+                        "args": [
+                          {
+                            "args": [
+                              {
+                                "sym": "\\Sigma_q",
+                              },
+                            ],
+                            "op": "inv",
+                          },
+                          {
+                            "sym": "\\Sigma_q",
+                          },
+                        ],
+                        "op": "mul",
+                      },
+                    ],
+                    "call": "tr",
                   },
                 ],
                 "op": "sub",

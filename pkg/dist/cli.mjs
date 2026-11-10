@@ -3293,12 +3293,14 @@ function evalOp(f, op, args, _env) {
         return scalar(op === "add" ? f.add(sa, sb) : f.sub(sa, sb));
       }
       if (sa !== null && isMatrixVal(b)) {
-        const scaled = matScale(f, sa, b.m);
-        return { k: "m", m: op === "add" ? matAdd(f, scaled, b.m) : matSub(f, scaled, b.m) };
+        const d = b.m.d.slice();
+        for (let i = 0; i < d.length; i++) d[i] = op === "add" ? f.add(sa, d[i]) : f.sub(sa, d[i]);
+        return { k: "m", m: { r: b.m.r, c: b.m.c, d } };
       }
       if (sb !== null && isMatrixVal(a)) {
-        const scaled = matScale(f, sb, a.m);
-        return { k: "m", m: op === "add" ? matAdd(f, a.m, scaled) : matSub(f, a.m, scaled) };
+        const d = a.m.d.slice();
+        for (let i = 0; i < d.length; i++) d[i] = op === "add" ? f.add(d[i], sb) : f.sub(d[i], sb);
+        return { k: "m", m: { r: a.m.r, c: a.m.c, d } };
       }
       const ma = requireMatrix(a, "a sum");
       const mb = requireMatrix(b, "a sum");

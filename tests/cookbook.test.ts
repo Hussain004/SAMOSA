@@ -21,13 +21,10 @@ const CATCHES = ['wrong', 'shape'];
 const CANNOT_CHECK = new Set([
   'spectral-norm-of-transpose',
   'stationary-point',
-  'kalman-covariance',
-  'kalman-gain',
   'riccati',
   'least-squares',
   'ridge-gradient',
   'softmax',
-  'kl-of-gaussians',
 ]);
 
 describe('the cookbook', () => {
