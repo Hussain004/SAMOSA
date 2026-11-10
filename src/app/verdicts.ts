@@ -63,3 +63,67 @@ export const SNACK_ICON: Record<Verdict, string> = {
   unchecked: '?',
   defined: '≡',
 };
+
+/** A bound like 1.2e-47, in a way a person can read. */
+export function formatBound(bound: number): string {
+  if (bound === 0) return '0';
+  if (bound < 1e-100) return `10^${Math.round(Math.log10(bound))}`;
+  return bound.toExponential(1);
+}
+
+/** How a person reads the size of a counterexample, like "3×3". */
+function counterexampleShape(dims: Record<string, number> | undefined): string | null {
+  if (!dims) return null;
+  const values = Object.values(dims);
+  if (values.length === 0) return null;
+  // the common case: one size named n or m
+  const sizes = [...new Set(values)];
+  if (sizes.length === 1) return `${sizes[0]}×${sizes[0]}`;
+  return values.join(' by ');
+}
+
+/**
+ * One plain sentence for the card, so a person sees what happened
+ * before the numbers. Rule 2, in words.
+ */
+export function guaranteeSentence(step: import('../core/index.ts').StepResult): string {
+  const card = step.card;
+  const trials = card.trialsPerSize;
+  const sizes = card.sizes.length;
+  const counterexample = counterexampleShape(step.counterexample?.dims);
+  if (step.verdict === 'ok') {
+    if (step.mode === 'numeric') {
+      return `Holds in ${trials} instances at 50 digits, over ${sizes} size${sizes === 1 ? '' : 's'}. No probability bound comes with a digit-based check.`;
+    }
+    const bound = card.bound;
+    const boundText = bound !== undefined && bound > 0 ? ` A wrong step would slip through with probability ≤ ${formatBound(bound)}.` : '';
+    if (step.mode === 'quadrature') {
+      return `Holds in ${trials} quadrature trials over ${sizes} size${sizes === 1 ? '' : 's'}.${boundText}`;
+    }
+    const primes = card.primes ? ', in two primes' : '';
+    return `Holds at ${sizes} size${sizes === 1 ? '' : 's'}, ${trials} trials each${primes}.${boundText}`;
+  }
+  if (step.verdict === 'wrong') {
+    return counterexample
+      ? `This step is wrong. Here is a ${counterexample} counterexample.`
+      : 'This step is wrong. The card shows what the engine found.';
+  }
+  if (step.verdict === 'shape') return 'The shapes do not fit: these two sides cannot be compared.';
+  if (step.verdict === 'inconclusive') return 'SAMOSA could not decide this step, and says so.';
+  if (step.verdict === 'unchecked') return 'SAMOSA did not check this step, and says so.';
+  return 'This row defines a symbol.';
+}
+
+/** The exact section of the docs that this card's mode is about. */
+export function whyTrustHref(mode: 'exact' | 'numeric' | 'quadrature' | undefined): string {
+  switch (mode) {
+    case 'exact':
+      return '/docs/how-it-works#exact-mode-finite-fields-and-schwartz-zippel';
+    case 'quadrature':
+      return '/docs/how-it-works#expectations-rational-quadrature';
+    case 'numeric':
+      return '/docs/how-it-works#numeric-mode';
+    default:
+      return '/docs/how-it-works#the-short-version';
+  }
+}

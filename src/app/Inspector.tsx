@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Report, StepResult } from '../core/index.ts';
 import { matrixLatex } from './matrix.ts';
-import { VERDICT_ICON, VERDICT_LABEL, VERDICT_TITLE, seedText } from './verdicts.ts';
+import { VERDICT_ICON, VERDICT_LABEL, VERDICT_TITLE, seedText, guaranteeSentence, whyTrustHref, formatBound } from './verdicts.ts';
 import { Tex } from './tex.tsx';
 
 export interface InspectorProps {
@@ -23,8 +23,14 @@ export interface InspectorProps {
 export function Inspector({ step, report, explanation, onApplyFix, onCopy, onClose }: InspectorProps) {
   if (!step) {
     return (
-      <div className="flex h-full items-center justify-center p-6 text-center text-xs text-[var(--color-faint)]">
-        Pick a row to see its card.
+      <div className="flex h-full items-center justify-between gap-4 border-b border-[var(--color-line)] p-3">
+        <h2 className="pane-title">inspector</h2>
+        <button
+          onClick={onClose}
+          className="rounded border border-[var(--color-line)] px-2 py-1 text-[0.625rem] text-[var(--color-muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-text)]"
+        >
+          close
+        </button>
       </div>
     );
   }
@@ -43,6 +49,9 @@ export function Inspector({ step, report, explanation, onApplyFix, onCopy, onClo
             <span className="text-[var(--color-faint)]">· row {step.row}</span>
           </h2>
           <p className="mt-1 text-xs text-[var(--color-muted)]">{step.message}</p>
+          <p className="mt-2 text-sm text-[var(--color-text)]" data-testid="guarantee-sentence">
+            {guaranteeSentence(step)}
+          </p>
         </div>
         <button
           onClick={onClose}
@@ -58,26 +67,48 @@ export function Inspector({ step, report, explanation, onApplyFix, onCopy, onClo
         </p>
       )}
 
-      <div className="mt-4 grid gap-2 text-xs sm:grid-cols-2">
-        <Field label="mode" value={step.mode ?? VERDICT_LABEL[step.verdict]} />
-        <Field label="seed" value={seedText(card.seed)} />
-        <Field label="trials per size" value={String(card.trialsPerSize)} />
-        {/* A step that is wrong has no guarantee to show, so the fields of
-            the guarantee are only there when the step holds. */}
-        {step.verdict === 'ok' && (
-          <>
-            <Field label="sizes tested" value={card.sizes.map((s) => Object.entries(s).map(([k, v]) => `${k}=${v}`).join(' ')).join(' · ')} />
-            {card.primes && <Field label="primes" value={card.primes.map((p) => p.toString()).join(', ')} />}
-            {card.degree !== undefined && <Field label="degree bound" value={String(card.degree)} />}
-            {card.bound !== undefined && (
-              <Field label="false checkmark" value={`≤ ${formatBound(card.bound)}`} />
-            )}
-            {card.maxDelta !== undefined && (
-              <Field label="max difference" value={card.maxDelta.toExponential(2)} />
-            )}
-          </>
-        )}
-      </div>
+      <a
+        href={whyTrustHref(step.mode)}
+        className="mt-3 inline-flex items-center gap-1 text-[0.6875rem] text-[var(--color-faint)] underline decoration-dotted underline-offset-2 hover:text-[var(--color-text)]"
+      >
+        why trust this?
+      </a>
+
+      <details className="mt-4" open>
+        <summary className="cursor-pointer text-[0.6875rem] text-[var(--color-muted)]">the guarantee</summary>
+        <div className="mt-2 grid gap-2 text-xs sm:grid-cols-2">
+          <Field label="mode" value={step.mode ?? VERDICT_LABEL[step.verdict]} />
+          <Field label="seed" value={seedText(card.seed)} />
+          <Field label="trials per size" value={String(card.trialsPerSize)} />
+          {/* A step that is wrong has no guarantee to show, so the fields of
+              the guarantee are only there when the step holds. */}
+          {step.verdict === 'ok' && (
+            <>
+              <div className="rounded border border-[var(--color-line)] bg-[var(--color-panel-2)] px-2 py-1.5 sm:col-span-2">
+                <div className="pane-title">sizes tested</div>
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  {card.sizes.map((size, i) => (
+                    <span
+                      key={i}
+                      className="rounded border border-[var(--color-line)] px-1.5 py-0.5 font-mono text-[0.625rem] text-[var(--color-muted)]"
+                    >
+                      {Object.entries(size).map(([k, v]) => `${k}=${v}`).join(' ')}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              {card.primes && <Field label="primes" value={card.primes.map((p) => p.toString()).join(', ')} />}
+              {card.degree !== undefined && <Field label="degree bound" value={String(card.degree)} />}
+              {card.bound !== undefined && (
+                <Field label="false checkmark" value={`≤ ${formatBound(card.bound)}`} />
+              )}
+              {card.maxDelta !== undefined && (
+                <Field label="max difference" value={card.maxDelta.toExponential(2)} />
+              )}
+            </>
+          )}
+        </div>
+      </details>
 
       {card.assumptions.length > 0 && (
         <div className="mt-4" data-testid="assumptions">
@@ -246,7 +277,7 @@ function Field({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded border border-[var(--color-line)] bg-[var(--color-panel-2)] px-2 py-1.5">
       <div className="pane-title">{label}</div>
-      <div className="mt-0.5 truncate text-xs">{value}</div>
+      <div className="mt-0.5 break-words text-xs">{value}</div>
     </div>
   );
 }
@@ -265,9 +296,4 @@ function textColor(verdict: StepResult['verdict']): string {
   }
 }
 
-/** A bound like 1.2e-47, in a way a person can read. */
-export function formatBound(bound: number): string {
-  if (bound === 0) return '0';
-  if (bound < 1e-100) return `10^${Math.round(Math.log10(bound))}`;
-  return bound.toExponential(1);
-}
+
