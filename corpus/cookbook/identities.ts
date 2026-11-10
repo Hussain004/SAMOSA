@@ -236,7 +236,7 @@ A \otimes (B + C) &= A \otimes B + A \otimes C
     name: 'the Hadamard product of a sum',
     decls: N,
     source: String.raw`\begin{align*}
-A \circ (B + C) &= A \circ B + A \circ C
+A \odot (B + C) &= A \odot B + A \odot C
 \end{align*}`,
   },
 
@@ -427,6 +427,369 @@ J &:= -\sum_i p_i \log \frac{e^{z_i}}{\sum_j e^{z_j}} \\
     source: String.raw`\begin{align*}
 D &:= \frac{1}{2}\left(\operatorname{tr}\left(\Sigma^{-1}\left(T + (\mu - \nu)(\mu - \nu)^\top\right)\right) - \operatorname{tr}(\Sigma^{-1}\Sigma) + \log\frac{\det\Sigma}{\det T}\right) \\
 D - \frac{1}{2}(\mu - \nu)^\top \Sigma^{-1}(\mu - \nu) &= \frac{1}{2}\left(\operatorname{tr}(\Sigma^{-1}T) - \operatorname{tr}(\Sigma^{-1}\Sigma) + \log\frac{\det\Sigma}{\det T}\right)
+\end{align*}`,
+  },
+  // ---------------------------------------------------------- the Kronecker
+  {
+    id: 'kron-mixed-product',
+    name: 'the mixed product of Kronecker products',
+    decls: 'A: m×n; B: p×q; C: n×k; D: q×l',
+    source: String.raw`\begin{align*}
+(A \otimes B)(C \otimes D) &= (A C) \otimes (B D)
+\end{align*}`,
+  },
+  {
+    id: 'kron-transpose',
+    name: 'the transpose of a Kronecker product',
+    decls: 'A: m×n; B: p×q',
+    source: String.raw`\begin{align*}
+(A \otimes B)^\top &= A^\top \otimes B^\top
+\end{align*}`,
+  },
+  {
+    id: 'kron-trace',
+    name: 'the trace of a Kronecker product',
+    decls: 'A: m×m; B: n×n',
+    source: String.raw`\begin{align*}
+\operatorname{tr}(A \otimes B) &= \operatorname{tr}(A) \operatorname{tr}(B)
+\end{align*}`,
+  },
+  {
+    id: 'kron-inverse',
+    name: 'the inverse of a Kronecker product',
+    decls: 'A: m×m; B: n×n',
+    source: String.raw`\begin{align*}
+(A \otimes B)^{-1} &= A^{-1} \otimes B^{-1}
+\end{align*}`,
+  },
+  {
+    id: 'kron-conjugate-inverse',
+    name: 'the inverse of a conjugated Kronecker product',
+    decls: 'A: m×m',
+    source: String.raw`\begin{align*}
+(I \otimes A)^{-1} &= I \otimes A^{-1}
+\end{align*}`,
+  },
+  // -------------------------------------------------------- the determinant
+  {
+    id: 'det-of-product-of-transpose',
+    name: 'the determinant of a Gram matrix',
+    decls: 'A: n×n',
+    source: String.raw`\begin{align*}
+\det(A A^\top) &= \det(A)^2
+\end{align*}`,
+  },
+  {
+    id: 'det-of-householder',
+    name: 'the determinant of a Householder reflection',
+    decls: 'v: n',
+    source: String.raw`\begin{align*}
+P &:= I - 2 \frac{v v^\top}{v^\top v} \\
+\det P &= -1
+\end{align*}`,
+  },
+  {
+    id: 'schur-complement-determinant',
+    name: 'the Schur complement determinant lemma',
+    decls: 'A: spd n; B: n×m; C: m×n; D: spd m',
+    source: String.raw`\begin{align*}
+M &:= \begin{bmatrix} A & B \\ C & D \end{bmatrix} \\
+\det M &= \det(A) \det(D - C A^{-1} B)
+\end{align*}`,
+  },
+  {
+    id: 'schur-complement-determinant-of-d',
+    name: 'the Schur complement determinant lemma, the other way round',
+    decls: 'A: spd n; B: n×m; C: m×n; D: spd m',
+    source: String.raw`\begin{align*}
+M &:= \begin{bmatrix} A & B \\ C & D \end{bmatrix} \\
+\det M &= \det(D) \det(A - B D^{-1} C)
+\end{align*}`,
+  },
+  {
+    id: 'block-triangular-determinant',
+    name: 'the determinant of a block triangular matrix',
+    decls: 'A: spd n; B: n×n; D: spd n; Z: zero n',
+    source: String.raw`\begin{align*}
+M &:= \begin{bmatrix} A & B \\ Z & D \end{bmatrix} \\
+\det M &= \det A \det D
+\end{align*}`,
+  },
+  {
+    id: 'logdet-of-inverse',
+    name: 'the log determinant of an inverse',
+    decls: '\\Sigma: spd n',
+    source: String.raw`\begin{align*}
+\log\det \Sigma^{-1} &= -\log\det \Sigma
+\end{align*}`,
+  },
+  {
+    id: 'logdet-of-product',
+    name: 'the log determinant of a product',
+    decls: 'A: spd n; B: spd n',
+    source: String.raw`\begin{align*}
+\log\det(A B) &= \log\det A + \log\det B
+\end{align*}`,
+  },
+  // ------------------------------------------------------------ the calculus
+  {
+    id: 'logdet-gradient',
+    name: 'the gradient of the log determinant',
+    decls: '\\Sigma: spd n',
+    source: String.raw`\begin{align*}
+L &:= \log\det \Sigma \\
+\frac{\partial L}{\partial \Sigma} &= \Sigma^{-1}
+\end{align*}`,
+  },
+  {
+    id: 'det-gradient',
+    name: 'the gradient of the determinant',
+    decls: '\\Sigma: spd n',
+    source: String.raw`\begin{align*}
+M &:= \det \Sigma \\
+\frac{\partial M}{\partial \Sigma} &= M \Sigma^{-1}
+\end{align*}`,
+  },
+  {
+    id: 'frobenius-gradient',
+    name: 'the gradient of the squared Frobenius norm',
+    decls: 'A: m×n',
+    source: String.raw`\begin{align*}
+F &:= \|A\|_F^2 \\
+\frac{\partial F}{\partial A} &= 2 A
+\end{align*}`,
+  },
+  {
+    id: 'quadratic-symmetric-gradient',
+    name: 'the gradient of a quadratic form',
+    decls: 'A: n×n; x: n',
+    source: String.raw`\begin{align*}
+Q &:= x^\top A x \\
+\frac{\partial Q}{\partial x} &= (A + A^\top) x
+\end{align*}`,
+  },
+  {
+    id: 'quadratic-norm-gradient',
+    name: 'the gradient of a squared norm',
+    decls: 'x: n',
+    source: String.raw`\begin{align*}
+N &:= x^\top x \\
+\frac{\partial N}{\partial x} &= 2 x
+\end{align*}`,
+  },
+  {
+    id: 'trace-gradient',
+    name: 'the gradient of a trace',
+    decls: 'A: m×n; B: n×m',
+    source: String.raw`\begin{align*}
+T &:= \operatorname{tr}(A B) \\
+\frac{\partial T}{\partial A} &= B^\top
+\end{align*}`,
+  },
+  {
+    id: 'trace-inverse-gradient',
+    name: 'the gradient of the trace of an inverse',
+    decls: 'A: spd n; B: spd n',
+    source: String.raw`\begin{align*}
+L &:= \operatorname{tr}(A^{-1} B) \\
+\frac{\partial L}{\partial A} &= -A^{-1} B^\top A^{-1}
+\end{align*}`,
+  },
+  {
+    id: 'inverse-trace-gradient',
+    name: 'the gradient of the trace of an inverse, the simple one',
+    decls: 'A: spd n',
+    source: String.raw`\begin{align*}
+T &:= \operatorname{tr}(A^{-1}) \\
+\frac{\partial T}{\partial A} &= -A^{-1} A^{-1}
+\end{align*}`,
+  },
+  {
+    id: 'bilinear-gradient',
+    name: 'the gradient of a bilinear form',
+    decls: 'A: m×n; x: n; y: m',
+    source: String.raw`\begin{align*}
+B &:= x^\top A^\top y \\
+\frac{\partial B}{\partial x} &= A^\top y
+\end{align*}`,
+  },
+  // ------------------------------------------------------------- the blocks
+  {
+    id: 'block-trace',
+    name: 'the trace of a block matrix',
+    decls: 'A: m×m; B: m×n; C: n×m; D: n×n',
+    source: String.raw`\begin{align*}
+M &:= \begin{bmatrix} A & B \\ C & D \end{bmatrix} \\
+\operatorname{tr} M &= \operatorname{tr} A + \operatorname{tr} D
+\end{align*}`,
+  },
+  {
+    id: 'block-transpose',
+    name: 'the transpose of a block matrix',
+    decls: 'A: m×m; B: m×n; C: n×m; D: n×n',
+    source: String.raw`\begin{align*}
+M &:= \begin{bmatrix} A & B \\ C & D \end{bmatrix} \\
+M^\top &= \begin{bmatrix} A^\top & C^\top \\ B^\top & D^\top \end{bmatrix}
+\end{align*}`,
+  },
+  {
+    id: 'block-sum',
+    name: 'a block matrix is the sum of its blocks',
+    decls: 'A: m×m; B: m×n; C: n×m; D: n×n; U: zero m; V: zero n; X: zero n×m; Y: zero m×n',
+    source: String.raw`\begin{align*}
+M &:= \begin{bmatrix} A & B \\ C & D \end{bmatrix} \\
+M &= \begin{bmatrix} A & Y \\ X & D \end{bmatrix} + \begin{bmatrix} U & B \\ C & V \end{bmatrix}
+\end{align*}`,
+  },
+  {
+    id: 'block-triangular-inverse',
+    name: 'the inverse of a block triangular matrix',
+    decls: 'A: spd n; B: n×m; D: spd m; Z: zero m×n',
+    source: String.raw`\begin{align*}
+M &:= \begin{bmatrix} A & B \\ Z & D \end{bmatrix} \\
+M^{-1} &= \begin{bmatrix} A^{-1} & -A^{-1} B D^{-1} \\ Z & D^{-1} \end{bmatrix}
+\end{align*}`,
+  },
+  // ------------------------------------------------------------- the geometry
+  {
+    id: 'skew-symmetric',
+    name: 'a difference with its transpose is skew symmetric',
+    decls: 'A: n×n',
+    source: String.raw`\begin{align*}
+S &:= A - A^\top \\
+S^\top &= -S
+\end{align*}`,
+  },
+  {
+    id: 'symmetrized-sum',
+    name: 'a sum with its transpose is symmetric',
+    decls: 'A: n×n',
+    source: String.raw`\begin{align*}
+S &:= A + A^\top \\
+S^\top &= S
+\end{align*}`,
+  },
+  {
+    id: 'householder-symmetric',
+    name: 'a Householder matrix is symmetric',
+    decls: 'v: n',
+    source: String.raw`\begin{align*}
+P &:= I - 2 \frac{v v^\top}{v^\top v} \\
+P^\top &= P
+\end{align*}`,
+  },
+  {
+    id: 'householder-orthogonal',
+    name: 'a Householder matrix is orthogonal',
+    decls: 'v: n',
+    source: String.raw`\begin{align*}
+P &:= I - 2 \frac{v v^\top}{v^\top v} \\
+P^\top P &= I
+\end{align*}`,
+  },
+  {
+    id: 'householder-annihilates-vector',
+    name: 'a Householder matrix flips its own vector',
+    decls: 'v: n',
+    source: String.raw`\begin{align*}
+P &:= I - 2 \frac{v v^\top}{v^\top v} \\
+P v &= -v
+\end{align*}`,
+  },
+  {
+    id: 'projection-idempotent',
+    name: 'an orthogonal projection is idempotent',
+    decls: 'A: n×p',
+    source: String.raw`\begin{align*}
+P &:= A (A^\top A)^{-1} A^\top \\
+P^2 &= P
+\end{align*}`,
+  },
+  {
+    id: 'projection-symmetric',
+    name: 'an orthogonal projection is symmetric',
+    decls: 'A: n×p',
+    source: String.raw`\begin{align*}
+P &:= A (A^\top A)^{-1} A^\top \\
+P^\top &= P
+\end{align*}`,
+  },
+  {
+    id: 'projection-annihilates',
+    name: 'an orthogonal projection leaves its own range alone',
+    decls: 'A: n×p',
+    source: String.raw`\begin{align*}
+P &:= A (A^\top A)^{-1} A^\top \\
+P A &= A
+\end{align*}`,
+  },
+  {
+    id: 'residual-projection',
+    name: 'the residual of a projection is zero',
+    decls: 'A: n×p',
+    source: String.raw`\begin{align*}
+P &:= A (A^\top A)^{-1} A^\top \\
+(I - P) A &= 0
+\end{align*}`,
+  },
+  {
+    id: 'projection-complement',
+    name: 'the complement of a projection is a projection',
+    decls: 'A: n×p',
+    source: String.raw`\begin{align*}
+P &:= A (A^\top A)^{-1} A^\top \\
+(I - P)^2 &= I - P
+\end{align*}`,
+  },
+  {
+    id: 'orthogonal-transpose-inverse',
+    name: 'an orthogonal matrix is its transpose inverse',
+    decls: 'Q: orth n',
+    source: String.raw`\begin{align*}
+Q^\top Q &= I
+\end{align*}`,
+  },
+  {
+    id: 'hadamard-transpose',
+    name: 'the transpose of a Hadamard product',
+    decls: N,
+    source: String.raw`\begin{align*}
+(A \odot B)^\top &= A^\top \odot B^\top
+\end{align*}`,
+  },
+  {
+    id: 'outer-product-square',
+    name: 'an outer product squared is a multiple of itself',
+    decls: 'v: n',
+    source: String.raw`\begin{align*}
+X &:= v v^\top \\
+X X &= (v^\top v) X
+\end{align*}`,
+  },
+  {
+    id: 'outer-product-trace',
+    name: 'the trace of an outer product',
+    decls: 'v: n',
+    source: String.raw`\begin{align*}
+X &:= v v^\top \\
+\operatorname{tr} X &= v^\top v
+\end{align*}`,
+  },
+  // ------------------------------------------------------------ the stochastics
+  {
+    id: 'expectation-quadratic-of-normal',
+    name: 'the second moment of a normal vector',
+    decls: 'x ~ N(0, \\Sigma); \\Sigma: spd n',
+    source: String.raw`\begin{align*}
+\mathbb{E}[x^\top x] &= \operatorname{tr}(\Sigma)
+\end{align*}`,
+  },
+  {
+    id: 'expectation-of-normal-vector',
+    name: 'the mean of a normal vector',
+    decls: 'x ~ N(\\mu, \\Sigma); \\mu: n; \\Sigma: spd n',
+    source: String.raw`\begin{align*}
+\mathbb{E}[x] &= \mu
 \end{align*}`,
   },
 ];

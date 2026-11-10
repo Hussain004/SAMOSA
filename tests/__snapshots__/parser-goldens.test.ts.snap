@@ -51,6 +51,560 @@ exports[`the parser, on every row of the Menu and the Cookbook > cookbook/assoc 
 }
 `;
 
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/bilinear-gradient row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "sym": "B",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": ":=",
+      "rhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "args": [
+                  {
+                    "sym": "x",
+                  },
+                ],
+                "op": "T",
+              },
+              {
+                "args": [
+                  {
+                    "sym": "A",
+                  },
+                ],
+                "op": "T",
+              },
+            ],
+            "op": "mul",
+          },
+          {
+            "sym": "y",
+          },
+        ],
+        "op": "mul",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/bilinear-gradient row 2 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "deriv": {
+          "sym": "B",
+        },
+        "form": "grad",
+        "order": 1,
+        "wrt": [
+          {
+            "sym": "x",
+          },
+        ],
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "sym": "A",
+              },
+            ],
+            "op": "T",
+          },
+          {
+            "sym": "y",
+          },
+        ],
+        "op": "mul",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/block-sum row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "sym": "M",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": ":=",
+      "rhs": {
+        "block": [
+          [
+            {
+              "sym": "A",
+            },
+            {
+              "sym": "B",
+            },
+          ],
+          [
+            {
+              "sym": "C",
+            },
+            {
+              "sym": "D",
+            },
+          ],
+        ],
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/block-sum row 2 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "sym": "M",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "args": [
+          {
+            "block": [
+              [
+                {
+                  "sym": "A",
+                },
+                {
+                  "sym": "Y",
+                },
+              ],
+              [
+                {
+                  "sym": "X",
+                },
+                {
+                  "sym": "D",
+                },
+              ],
+            ],
+          },
+          {
+            "block": [
+              [
+                {
+                  "sym": "U",
+                },
+                {
+                  "sym": "B",
+                },
+              ],
+              [
+                {
+                  "sym": "C",
+                },
+                {
+                  "sym": "V",
+                },
+              ],
+            ],
+          },
+        ],
+        "op": "add",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/block-trace row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "sym": "M",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": ":=",
+      "rhs": {
+        "block": [
+          [
+            {
+              "sym": "A",
+            },
+            {
+              "sym": "B",
+            },
+          ],
+          [
+            {
+              "sym": "C",
+            },
+            {
+              "sym": "D",
+            },
+          ],
+        ],
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/block-trace row 2 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "args": [
+          {
+            "sym": "M",
+          },
+        ],
+        "call": "tr",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "sym": "A",
+              },
+            ],
+            "call": "tr",
+          },
+          {
+            "args": [
+              {
+                "sym": "D",
+              },
+            ],
+            "call": "tr",
+          },
+        ],
+        "op": "add",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/block-transpose row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "sym": "M",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": ":=",
+      "rhs": {
+        "block": [
+          [
+            {
+              "sym": "A",
+            },
+            {
+              "sym": "B",
+            },
+          ],
+          [
+            {
+              "sym": "C",
+            },
+            {
+              "sym": "D",
+            },
+          ],
+        ],
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/block-transpose row 2 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "args": [
+          {
+            "sym": "M",
+          },
+        ],
+        "op": "T",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "block": [
+          [
+            {
+              "args": [
+                {
+                  "sym": "A",
+                },
+              ],
+              "op": "T",
+            },
+            {
+              "args": [
+                {
+                  "sym": "C",
+                },
+              ],
+              "op": "T",
+            },
+          ],
+          [
+            {
+              "args": [
+                {
+                  "sym": "B",
+                },
+              ],
+              "op": "T",
+            },
+            {
+              "args": [
+                {
+                  "sym": "D",
+                },
+              ],
+              "op": "T",
+            },
+          ],
+        ],
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/block-triangular-determinant row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "sym": "M",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": ":=",
+      "rhs": {
+        "block": [
+          [
+            {
+              "sym": "A",
+            },
+            {
+              "sym": "B",
+            },
+          ],
+          [
+            {
+              "sym": "Z",
+            },
+            {
+              "sym": "D",
+            },
+          ],
+        ],
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/block-triangular-determinant row 2 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "args": [
+          {
+            "sym": "M",
+          },
+        ],
+        "call": "det",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "sym": "A",
+              },
+            ],
+            "call": "det",
+          },
+          {
+            "args": [
+              {
+                "sym": "D",
+              },
+            ],
+            "call": "det",
+          },
+        ],
+        "op": "mul",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/block-triangular-inverse row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "sym": "M",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": ":=",
+      "rhs": {
+        "block": [
+          [
+            {
+              "sym": "A",
+            },
+            {
+              "sym": "B",
+            },
+          ],
+          [
+            {
+              "sym": "Z",
+            },
+            {
+              "sym": "D",
+            },
+          ],
+        ],
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/block-triangular-inverse row 2 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "args": [
+          {
+            "sym": "M",
+          },
+        ],
+        "op": "inv",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "block": [
+          [
+            {
+              "args": [
+                {
+                  "sym": "A",
+                },
+              ],
+              "op": "inv",
+            },
+            {
+              "args": [
+                {
+                  "args": [
+                    {
+                      "args": [
+                        {
+                          "args": [
+                            {
+                              "sym": "A",
+                            },
+                          ],
+                          "op": "inv",
+                        },
+                      ],
+                      "op": "neg",
+                    },
+                    {
+                      "sym": "B",
+                    },
+                  ],
+                  "op": "mul",
+                },
+                {
+                  "args": [
+                    {
+                      "sym": "D",
+                    },
+                  ],
+                  "op": "inv",
+                },
+              ],
+              "op": "mul",
+            },
+          ],
+          [
+            {
+              "sym": "Z",
+            },
+            {
+              "args": [
+                {
+                  "sym": "D",
+                },
+              ],
+              "op": "inv",
+            },
+          ],
+        ],
+      },
+    },
+  ],
+}
+`;
+
 exports[`the parser, on every row of the Menu and the Cookbook > cookbook/covariance-of-scaled row 1 1`] = `
 {
   "parts": [
@@ -100,6 +654,71 @@ exports[`the parser, on every row of the Menu and the Cookbook > cookbook/covari
               },
             ],
             "op": "T",
+          },
+        ],
+        "op": "mul",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/det-gradient row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "sym": "M",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": ":=",
+      "rhs": {
+        "args": [
+          {
+            "sym": "\\Sigma",
+          },
+        ],
+        "call": "det",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/det-gradient row 2 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "deriv": {
+          "sym": "M",
+        },
+        "form": "grad",
+        "order": 1,
+        "wrt": [
+          {
+            "sym": "\\Sigma",
+          },
+        ],
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "args": [
+          {
+            "sym": "M",
+          },
+          {
+            "args": [
+              {
+                "sym": "\\Sigma",
+              },
+            ],
+            "op": "inv",
           },
         ],
         "op": "mul",
@@ -217,6 +836,104 @@ exports[`the parser, on every row of the Menu and the Cookbook > cookbook/det-le
 }
 `;
 
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/det-of-householder row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "sym": "P",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": ":=",
+      "rhs": {
+        "args": [
+          {
+            "sym": "I",
+          },
+          {
+            "args": [
+              {
+                "num": "2/1",
+              },
+              {
+                "args": [
+                  {
+                    "args": [
+                      {
+                        "sym": "v",
+                      },
+                      {
+                        "args": [
+                          {
+                            "sym": "v",
+                          },
+                        ],
+                        "op": "T",
+                      },
+                    ],
+                    "op": "mul",
+                  },
+                  {
+                    "args": [
+                      {
+                        "args": [
+                          {
+                            "sym": "v",
+                          },
+                        ],
+                        "op": "T",
+                      },
+                      {
+                        "sym": "v",
+                      },
+                    ],
+                    "op": "mul",
+                  },
+                ],
+                "op": "div",
+              },
+            ],
+            "op": "mul",
+          },
+        ],
+        "op": "sub",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/det-of-householder row 2 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "args": [
+          {
+            "sym": "P",
+          },
+        ],
+        "call": "det",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "args": [
+          {
+            "num": "1/1",
+          },
+        ],
+        "op": "neg",
+      },
+    },
+  ],
+}
+`;
+
 exports[`the parser, on every row of the Menu and the Cookbook > cookbook/det-of-inverse row 1 1`] = `
 {
   "parts": [
@@ -309,6 +1026,56 @@ exports[`the parser, on every row of the Menu and the Cookbook > cookbook/det-of
 }
 `;
 
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/det-of-product-of-transpose row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "sym": "A",
+              },
+              {
+                "args": [
+                  {
+                    "sym": "A",
+                  },
+                ],
+                "op": "T",
+              },
+            ],
+            "op": "mul",
+          },
+        ],
+        "call": "det",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "sym": "A",
+              },
+            ],
+            "call": "det",
+          },
+          {
+            "num": "2/1",
+          },
+        ],
+        "op": "pow",
+      },
+    },
+  ],
+}
+`;
+
 exports[`the parser, on every row of the Menu and the Cookbook > cookbook/det-of-transpose row 1 1`] = `
 {
   "parts": [
@@ -343,6 +1110,74 @@ exports[`the parser, on every row of the Menu and the Cookbook > cookbook/det-of
 }
 `;
 
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/expectation-of-normal-vector row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "args": [
+          {
+            "sym": "x",
+          },
+        ],
+        "expect": "E",
+        "over": [],
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "sym": "\\mu",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/expectation-quadratic-of-normal row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "args": [
+                  {
+                    "sym": "x",
+                  },
+                ],
+                "op": "T",
+              },
+              {
+                "sym": "x",
+              },
+            ],
+            "op": "mul",
+          },
+        ],
+        "expect": "E",
+        "over": [],
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "args": [
+          {
+            "sym": "\\Sigma",
+          },
+        ],
+        "call": "tr",
+      },
+    },
+  ],
+}
+`;
+
 exports[`the parser, on every row of the Menu and the Cookbook > cookbook/frob-norm-of-transpose row 1 1`] = `
 {
   "parts": [
@@ -371,6 +1206,66 @@ exports[`the parser, on every row of the Menu and the Cookbook > cookbook/frob-n
           },
         ],
         "op": "frob",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/frobenius-gradient row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "sym": "F",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": ":=",
+      "rhs": {
+        "args": [
+          {
+            "sym": "A",
+          },
+        ],
+        "op": "frob",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/frobenius-gradient row 2 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "deriv": {
+          "sym": "F",
+        },
+        "form": "grad",
+        "order": 1,
+        "wrt": [
+          {
+            "sym": "A",
+          },
+        ],
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "args": [
+          {
+            "num": "2/1",
+          },
+          {
+            "sym": "A",
+          },
+        ],
+        "op": "mul",
       },
     },
   ],
@@ -938,7 +1833,7 @@ exports[`the parser, on every row of the Menu and the Cookbook > cookbook/hadama
             "op": "add",
           },
         ],
-        "op": "mul",
+        "op": "had",
       },
       "premise": null,
       "proportionalTo": null,
@@ -954,7 +1849,7 @@ exports[`the parser, on every row of the Menu and the Cookbook > cookbook/hadama
                 "sym": "B",
               },
             ],
-            "op": "mul",
+            "op": "had",
           },
           {
             "args": [
@@ -965,10 +1860,60 @@ exports[`the parser, on every row of the Menu and the Cookbook > cookbook/hadama
                 "sym": "C",
               },
             ],
-            "op": "mul",
+            "op": "had",
           },
         ],
         "op": "add",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/hadamard-transpose row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "sym": "A",
+              },
+              {
+                "sym": "B",
+              },
+            ],
+            "op": "had",
+          },
+        ],
+        "op": "T",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "sym": "A",
+              },
+            ],
+            "op": "T",
+          },
+          {
+            "args": [
+              {
+                "sym": "B",
+              },
+            ],
+            "op": "T",
+          },
+        ],
+        "op": "had",
       },
     },
   ],
@@ -1053,6 +1998,301 @@ exports[`the parser, on every row of the Menu and the Cookbook > cookbook/hessia
       "relation": "=",
       "rhs": {
         "sym": "A",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/householder-annihilates-vector row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "sym": "P",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": ":=",
+      "rhs": {
+        "args": [
+          {
+            "sym": "I",
+          },
+          {
+            "args": [
+              {
+                "num": "2/1",
+              },
+              {
+                "args": [
+                  {
+                    "args": [
+                      {
+                        "sym": "v",
+                      },
+                      {
+                        "args": [
+                          {
+                            "sym": "v",
+                          },
+                        ],
+                        "op": "T",
+                      },
+                    ],
+                    "op": "mul",
+                  },
+                  {
+                    "args": [
+                      {
+                        "args": [
+                          {
+                            "sym": "v",
+                          },
+                        ],
+                        "op": "T",
+                      },
+                      {
+                        "sym": "v",
+                      },
+                    ],
+                    "op": "mul",
+                  },
+                ],
+                "op": "div",
+              },
+            ],
+            "op": "mul",
+          },
+        ],
+        "op": "sub",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/householder-annihilates-vector row 2 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "args": [
+          {
+            "sym": "P",
+          },
+          {
+            "sym": "v",
+          },
+        ],
+        "op": "mul",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "args": [
+          {
+            "sym": "v",
+          },
+        ],
+        "op": "neg",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/householder-orthogonal row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "sym": "P",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": ":=",
+      "rhs": {
+        "args": [
+          {
+            "sym": "I",
+          },
+          {
+            "args": [
+              {
+                "num": "2/1",
+              },
+              {
+                "args": [
+                  {
+                    "args": [
+                      {
+                        "sym": "v",
+                      },
+                      {
+                        "args": [
+                          {
+                            "sym": "v",
+                          },
+                        ],
+                        "op": "T",
+                      },
+                    ],
+                    "op": "mul",
+                  },
+                  {
+                    "args": [
+                      {
+                        "args": [
+                          {
+                            "sym": "v",
+                          },
+                        ],
+                        "op": "T",
+                      },
+                      {
+                        "sym": "v",
+                      },
+                    ],
+                    "op": "mul",
+                  },
+                ],
+                "op": "div",
+              },
+            ],
+            "op": "mul",
+          },
+        ],
+        "op": "sub",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/householder-orthogonal row 2 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "sym": "P",
+              },
+            ],
+            "op": "T",
+          },
+          {
+            "sym": "P",
+          },
+        ],
+        "op": "mul",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "sym": "I",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/householder-symmetric row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "sym": "P",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": ":=",
+      "rhs": {
+        "args": [
+          {
+            "sym": "I",
+          },
+          {
+            "args": [
+              {
+                "num": "2/1",
+              },
+              {
+                "args": [
+                  {
+                    "args": [
+                      {
+                        "sym": "v",
+                      },
+                      {
+                        "args": [
+                          {
+                            "sym": "v",
+                          },
+                        ],
+                        "op": "T",
+                      },
+                    ],
+                    "op": "mul",
+                  },
+                  {
+                    "args": [
+                      {
+                        "args": [
+                          {
+                            "sym": "v",
+                          },
+                        ],
+                        "op": "T",
+                      },
+                      {
+                        "sym": "v",
+                      },
+                    ],
+                    "op": "mul",
+                  },
+                ],
+                "op": "div",
+              },
+            ],
+            "op": "mul",
+          },
+        ],
+        "op": "sub",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/householder-symmetric row 2 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "args": [
+          {
+            "sym": "P",
+          },
+        ],
+        "op": "T",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "sym": "P",
       },
     },
   ],
@@ -1340,6 +2580,86 @@ exports[`the parser, on every row of the Menu and the Cookbook > cookbook/invers
           },
         ],
         "op": "T",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/inverse-trace-gradient row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "sym": "T",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": ":=",
+      "rhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "sym": "A",
+              },
+            ],
+            "op": "inv",
+          },
+        ],
+        "call": "tr",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/inverse-trace-gradient row 2 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "deriv": {
+          "sym": "T",
+        },
+        "form": "grad",
+        "order": 1,
+        "wrt": [
+          {
+            "sym": "A",
+          },
+        ],
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "args": [
+                  {
+                    "sym": "A",
+                  },
+                ],
+                "op": "inv",
+              },
+            ],
+            "op": "neg",
+          },
+          {
+            "args": [
+              {
+                "sym": "A",
+              },
+            ],
+            "op": "inv",
+          },
+        ],
+        "op": "mul",
       },
     },
   ],
@@ -2186,6 +3506,168 @@ exports[`the parser, on every row of the Menu and the Cookbook > cookbook/kl-of-
 }
 `;
 
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/kron-conjugate-inverse row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "sym": "I",
+              },
+              {
+                "sym": "A",
+              },
+            ],
+            "op": "kron",
+          },
+        ],
+        "op": "inv",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "args": [
+          {
+            "sym": "I",
+          },
+          {
+            "args": [
+              {
+                "sym": "A",
+              },
+            ],
+            "op": "inv",
+          },
+        ],
+        "op": "kron",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/kron-inverse row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "sym": "A",
+              },
+              {
+                "sym": "B",
+              },
+            ],
+            "op": "kron",
+          },
+        ],
+        "op": "inv",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "sym": "A",
+              },
+            ],
+            "op": "inv",
+          },
+          {
+            "args": [
+              {
+                "sym": "B",
+              },
+            ],
+            "op": "inv",
+          },
+        ],
+        "op": "kron",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/kron-mixed-product row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "sym": "A",
+              },
+              {
+                "sym": "B",
+              },
+            ],
+            "op": "kron",
+          },
+          {
+            "args": [
+              {
+                "sym": "C",
+              },
+              {
+                "sym": "D",
+              },
+            ],
+            "op": "kron",
+          },
+        ],
+        "op": "mul",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "sym": "A",
+              },
+              {
+                "sym": "C",
+              },
+            ],
+            "op": "mul",
+          },
+          {
+            "args": [
+              {
+                "sym": "B",
+              },
+              {
+                "sym": "D",
+              },
+            ],
+            "op": "mul",
+          },
+        ],
+        "op": "kron",
+      },
+    },
+  ],
+}
+`;
+
 exports[`the parser, on every row of the Menu and the Cookbook > cookbook/kron-of-sum row 1 1`] = `
 {
   "parts": [
@@ -2239,6 +3721,106 @@ exports[`the parser, on every row of the Menu and the Cookbook > cookbook/kron-o
           },
         ],
         "op": "add",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/kron-trace row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "sym": "A",
+              },
+              {
+                "sym": "B",
+              },
+            ],
+            "op": "kron",
+          },
+        ],
+        "call": "tr",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "sym": "A",
+              },
+            ],
+            "call": "tr",
+          },
+          {
+            "args": [
+              {
+                "sym": "B",
+              },
+            ],
+            "call": "tr",
+          },
+        ],
+        "op": "mul",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/kron-transpose row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "sym": "A",
+              },
+              {
+                "sym": "B",
+              },
+            ],
+            "op": "kron",
+          },
+        ],
+        "op": "T",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "sym": "A",
+              },
+            ],
+            "op": "T",
+          },
+          {
+            "args": [
+              {
+                "sym": "B",
+              },
+            ],
+            "op": "T",
+          },
+        ],
+        "op": "kron",
       },
     },
   ],
@@ -2390,6 +3972,363 @@ exports[`the parser, on every row of the Menu and the Cookbook > cookbook/left-i
 }
 `;
 
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/logdet-gradient row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "sym": "L",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": ":=",
+      "rhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "sym": "\\Sigma",
+              },
+            ],
+            "call": "det",
+          },
+        ],
+        "call": "log",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/logdet-gradient row 2 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "deriv": {
+          "sym": "L",
+        },
+        "form": "grad",
+        "order": 1,
+        "wrt": [
+          {
+            "sym": "\\Sigma",
+          },
+        ],
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "args": [
+          {
+            "sym": "\\Sigma",
+          },
+        ],
+        "op": "inv",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/logdet-of-inverse row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "args": [
+                  {
+                    "sym": "\\Sigma",
+                  },
+                ],
+                "op": "inv",
+              },
+            ],
+            "call": "det",
+          },
+        ],
+        "call": "log",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "args": [
+                  {
+                    "sym": "\\Sigma",
+                  },
+                ],
+                "call": "det",
+              },
+            ],
+            "call": "log",
+          },
+        ],
+        "op": "neg",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/logdet-of-product row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "args": [
+                  {
+                    "sym": "A",
+                  },
+                  {
+                    "sym": "B",
+                  },
+                ],
+                "op": "mul",
+              },
+            ],
+            "call": "det",
+          },
+        ],
+        "call": "log",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "args": [
+                  {
+                    "sym": "A",
+                  },
+                ],
+                "call": "det",
+              },
+            ],
+            "call": "log",
+          },
+          {
+            "args": [
+              {
+                "args": [
+                  {
+                    "sym": "B",
+                  },
+                ],
+                "call": "det",
+              },
+            ],
+            "call": "log",
+          },
+        ],
+        "op": "add",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/orthogonal-transpose-inverse row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "sym": "Q",
+              },
+            ],
+            "op": "T",
+          },
+          {
+            "sym": "Q",
+          },
+        ],
+        "op": "mul",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "sym": "I",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/outer-product-square row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "sym": "X",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": ":=",
+      "rhs": {
+        "args": [
+          {
+            "sym": "v",
+          },
+          {
+            "args": [
+              {
+                "sym": "v",
+              },
+            ],
+            "op": "T",
+          },
+        ],
+        "op": "mul",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/outer-product-square row 2 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "args": [
+          {
+            "sym": "X",
+          },
+          {
+            "sym": "X",
+          },
+        ],
+        "op": "mul",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "args": [
+                  {
+                    "sym": "v",
+                  },
+                ],
+                "op": "T",
+              },
+              {
+                "sym": "v",
+              },
+            ],
+            "op": "mul",
+          },
+          {
+            "sym": "X",
+          },
+        ],
+        "op": "mul",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/outer-product-trace row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "sym": "X",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": ":=",
+      "rhs": {
+        "args": [
+          {
+            "sym": "v",
+          },
+          {
+            "args": [
+              {
+                "sym": "v",
+              },
+            ],
+            "op": "T",
+          },
+        ],
+        "op": "mul",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/outer-product-trace row 2 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "args": [
+          {
+            "sym": "X",
+          },
+        ],
+        "call": "tr",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "sym": "v",
+              },
+            ],
+            "op": "T",
+          },
+          {
+            "sym": "v",
+          },
+        ],
+        "op": "mul",
+      },
+    },
+  ],
+}
+`;
+
 exports[`the parser, on every row of the Menu and the Cookbook > cookbook/product-of-sums row 1 1`] = `
 {
   "parts": [
@@ -2483,6 +4422,347 @@ exports[`the parser, on every row of the Menu and the Cookbook > cookbook/produc
           },
         ],
         "op": "add",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/projection-annihilates row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "sym": "P",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": ":=",
+      "rhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "args": [
+                  {
+                    "args": [
+                      {
+                        "args": [
+                          {
+                            "sym": "A",
+                          },
+                        ],
+                        "op": "T",
+                      },
+                      {
+                        "sym": "A",
+                      },
+                    ],
+                    "op": "mul",
+                  },
+                ],
+                "call": "A",
+              },
+            ],
+            "op": "inv",
+          },
+          {
+            "args": [
+              {
+                "sym": "A",
+              },
+            ],
+            "op": "T",
+          },
+        ],
+        "op": "mul",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/projection-annihilates row 2 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "args": [
+          {
+            "sym": "P",
+          },
+          {
+            "sym": "A",
+          },
+        ],
+        "op": "mul",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "sym": "A",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/projection-complement row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "sym": "P",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": ":=",
+      "rhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "args": [
+                  {
+                    "args": [
+                      {
+                        "args": [
+                          {
+                            "sym": "A",
+                          },
+                        ],
+                        "op": "T",
+                      },
+                      {
+                        "sym": "A",
+                      },
+                    ],
+                    "op": "mul",
+                  },
+                ],
+                "call": "A",
+              },
+            ],
+            "op": "inv",
+          },
+          {
+            "args": [
+              {
+                "sym": "A",
+              },
+            ],
+            "op": "T",
+          },
+        ],
+        "op": "mul",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/projection-complement row 2 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "sym": "I",
+              },
+              {
+                "sym": "P",
+              },
+            ],
+            "op": "sub",
+          },
+          {
+            "num": "2/1",
+          },
+        ],
+        "op": "pow",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "args": [
+          {
+            "sym": "I",
+          },
+          {
+            "sym": "P",
+          },
+        ],
+        "op": "sub",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/projection-idempotent row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "sym": "P",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": ":=",
+      "rhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "args": [
+                  {
+                    "args": [
+                      {
+                        "args": [
+                          {
+                            "sym": "A",
+                          },
+                        ],
+                        "op": "T",
+                      },
+                      {
+                        "sym": "A",
+                      },
+                    ],
+                    "op": "mul",
+                  },
+                ],
+                "call": "A",
+              },
+            ],
+            "op": "inv",
+          },
+          {
+            "args": [
+              {
+                "sym": "A",
+              },
+            ],
+            "op": "T",
+          },
+        ],
+        "op": "mul",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/projection-idempotent row 2 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "args": [
+          {
+            "sym": "P",
+          },
+          {
+            "num": "2/1",
+          },
+        ],
+        "op": "pow",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "sym": "P",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/projection-symmetric row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "sym": "P",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": ":=",
+      "rhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "args": [
+                  {
+                    "args": [
+                      {
+                        "args": [
+                          {
+                            "sym": "A",
+                          },
+                        ],
+                        "op": "T",
+                      },
+                      {
+                        "sym": "A",
+                      },
+                    ],
+                    "op": "mul",
+                  },
+                ],
+                "call": "A",
+              },
+            ],
+            "op": "inv",
+          },
+          {
+            "args": [
+              {
+                "sym": "A",
+              },
+            ],
+            "op": "T",
+          },
+        ],
+        "op": "mul",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/projection-symmetric row 2 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "args": [
+          {
+            "sym": "P",
+          },
+        ],
+        "op": "T",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "sym": "P",
       },
     },
   ],
@@ -2675,6 +4955,253 @@ exports[`the parser, on every row of the Menu and the Cookbook > cookbook/quadra
           },
         ],
         "op": "mul",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/quadratic-norm-gradient row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "sym": "N",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": ":=",
+      "rhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "sym": "x",
+              },
+            ],
+            "op": "T",
+          },
+          {
+            "sym": "x",
+          },
+        ],
+        "op": "mul",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/quadratic-norm-gradient row 2 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "deriv": {
+          "sym": "N",
+        },
+        "form": "grad",
+        "order": 1,
+        "wrt": [
+          {
+            "sym": "x",
+          },
+        ],
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "args": [
+          {
+            "num": "2/1",
+          },
+          {
+            "sym": "x",
+          },
+        ],
+        "op": "mul",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/quadratic-symmetric-gradient row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "sym": "Q",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": ":=",
+      "rhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "args": [
+                  {
+                    "sym": "x",
+                  },
+                ],
+                "op": "T",
+              },
+              {
+                "sym": "A",
+              },
+            ],
+            "op": "mul",
+          },
+          {
+            "sym": "x",
+          },
+        ],
+        "op": "mul",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/quadratic-symmetric-gradient row 2 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "deriv": {
+          "sym": "Q",
+        },
+        "form": "grad",
+        "order": 1,
+        "wrt": [
+          {
+            "sym": "x",
+          },
+        ],
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "sym": "A",
+              },
+              {
+                "args": [
+                  {
+                    "sym": "A",
+                  },
+                ],
+                "op": "T",
+              },
+            ],
+            "op": "add",
+          },
+          {
+            "sym": "x",
+          },
+        ],
+        "op": "mul",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/residual-projection row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "sym": "P",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": ":=",
+      "rhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "args": [
+                  {
+                    "args": [
+                      {
+                        "args": [
+                          {
+                            "sym": "A",
+                          },
+                        ],
+                        "op": "T",
+                      },
+                      {
+                        "sym": "A",
+                      },
+                    ],
+                    "op": "mul",
+                  },
+                ],
+                "call": "A",
+              },
+            ],
+            "op": "inv",
+          },
+          {
+            "args": [
+              {
+                "sym": "A",
+              },
+            ],
+            "op": "T",
+          },
+        ],
+        "op": "mul",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/residual-projection row 2 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "sym": "I",
+              },
+              {
+                "sym": "P",
+              },
+            ],
+            "op": "sub",
+          },
+          {
+            "sym": "A",
+          },
+        ],
+        "op": "mul",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "num": "0/1",
       },
     },
   ],
@@ -3043,6 +5570,220 @@ exports[`the parser, on every row of the Menu and the Cookbook > cookbook/right-
 }
 `;
 
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/schur-complement-determinant row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "sym": "M",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": ":=",
+      "rhs": {
+        "block": [
+          [
+            {
+              "sym": "A",
+            },
+            {
+              "sym": "B",
+            },
+          ],
+          [
+            {
+              "sym": "C",
+            },
+            {
+              "sym": "D",
+            },
+          ],
+        ],
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/schur-complement-determinant row 2 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "args": [
+          {
+            "sym": "M",
+          },
+        ],
+        "call": "det",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "sym": "A",
+              },
+            ],
+            "call": "det",
+          },
+          {
+            "args": [
+              {
+                "args": [
+                  {
+                    "sym": "D",
+                  },
+                  {
+                    "args": [
+                      {
+                        "args": [
+                          {
+                            "sym": "C",
+                          },
+                          {
+                            "args": [
+                              {
+                                "sym": "A",
+                              },
+                            ],
+                            "op": "inv",
+                          },
+                        ],
+                        "op": "mul",
+                      },
+                      {
+                        "sym": "B",
+                      },
+                    ],
+                    "op": "mul",
+                  },
+                ],
+                "op": "sub",
+              },
+            ],
+            "call": "det",
+          },
+        ],
+        "op": "mul",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/schur-complement-determinant-of-d row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "sym": "M",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": ":=",
+      "rhs": {
+        "block": [
+          [
+            {
+              "sym": "A",
+            },
+            {
+              "sym": "B",
+            },
+          ],
+          [
+            {
+              "sym": "C",
+            },
+            {
+              "sym": "D",
+            },
+          ],
+        ],
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/schur-complement-determinant-of-d row 2 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "args": [
+          {
+            "sym": "M",
+          },
+        ],
+        "call": "det",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "sym": "D",
+              },
+            ],
+            "call": "det",
+          },
+          {
+            "args": [
+              {
+                "args": [
+                  {
+                    "sym": "A",
+                  },
+                  {
+                    "args": [
+                      {
+                        "args": [
+                          {
+                            "sym": "B",
+                          },
+                          {
+                            "args": [
+                              {
+                                "sym": "D",
+                              },
+                            ],
+                            "op": "inv",
+                          },
+                        ],
+                        "op": "mul",
+                      },
+                      {
+                        "sym": "C",
+                      },
+                    ],
+                    "op": "mul",
+                  },
+                ],
+                "op": "sub",
+              },
+            ],
+            "call": "det",
+          },
+        ],
+        "op": "mul",
+      },
+    },
+  ],
+}
+`;
+
 exports[`the parser, on every row of the Menu and the Cookbook > cookbook/sherman-morrison row 1 1`] = `
 {
   "parts": [
@@ -3200,6 +5941,67 @@ exports[`the parser, on every row of the Menu and the Cookbook > cookbook/sherma
           },
         ],
         "op": "sub",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/skew-symmetric row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "sym": "S",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": ":=",
+      "rhs": {
+        "args": [
+          {
+            "sym": "A",
+          },
+          {
+            "args": [
+              {
+                "sym": "A",
+              },
+            ],
+            "op": "T",
+          },
+        ],
+        "op": "sub",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/skew-symmetric row 2 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "args": [
+          {
+            "sym": "S",
+          },
+        ],
+        "op": "T",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "args": [
+          {
+            "sym": "S",
+          },
+        ],
+        "op": "neg",
       },
     },
   ],
@@ -3448,6 +6250,62 @@ exports[`the parser, on every row of the Menu and the Cookbook > cookbook/statio
 }
 `;
 
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/symmetrized-sum row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "sym": "S",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": ":=",
+      "rhs": {
+        "args": [
+          {
+            "sym": "A",
+          },
+          {
+            "args": [
+              {
+                "sym": "A",
+              },
+            ],
+            "op": "T",
+          },
+        ],
+        "op": "add",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/symmetrized-sum row 2 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "args": [
+          {
+            "sym": "S",
+          },
+        ],
+        "op": "T",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "sym": "S",
+      },
+    },
+  ],
+}
+`;
+
 exports[`the parser, on every row of the Menu and the Cookbook > cookbook/trace-cyclic row 1 1`] = `
 {
   "parts": [
@@ -3503,6 +6361,172 @@ exports[`the parser, on every row of the Menu and the Cookbook > cookbook/trace-
           },
         ],
         "call": "tr",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/trace-gradient row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "sym": "T",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": ":=",
+      "rhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "sym": "A",
+              },
+              {
+                "sym": "B",
+              },
+            ],
+            "op": "mul",
+          },
+        ],
+        "call": "tr",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/trace-gradient row 2 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "deriv": {
+          "sym": "T",
+        },
+        "form": "grad",
+        "order": 1,
+        "wrt": [
+          {
+            "sym": "A",
+          },
+        ],
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "args": [
+          {
+            "sym": "B",
+          },
+        ],
+        "op": "T",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/trace-inverse-gradient row 1 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "sym": "L",
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": ":=",
+      "rhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "args": [
+                  {
+                    "sym": "A",
+                  },
+                ],
+                "op": "inv",
+              },
+              {
+                "sym": "B",
+              },
+            ],
+            "op": "mul",
+          },
+        ],
+        "call": "tr",
+      },
+    },
+  ],
+}
+`;
+
+exports[`the parser, on every row of the Menu and the Cookbook > cookbook/trace-inverse-gradient row 2 1`] = `
+{
+  "parts": [
+    {
+      "conclusion": null,
+      "lhs": {
+        "deriv": {
+          "sym": "L",
+        },
+        "form": "grad",
+        "order": 1,
+        "wrt": [
+          {
+            "sym": "A",
+          },
+        ],
+      },
+      "premise": null,
+      "proportionalTo": null,
+      "relation": "=",
+      "rhs": {
+        "args": [
+          {
+            "args": [
+              {
+                "args": [
+                  {
+                    "args": [
+                      {
+                        "sym": "A",
+                      },
+                    ],
+                    "op": "inv",
+                  },
+                ],
+                "op": "neg",
+              },
+              {
+                "args": [
+                  {
+                    "sym": "B",
+                  },
+                ],
+                "op": "T",
+              },
+            ],
+            "op": "mul",
+          },
+          {
+            "args": [
+              {
+                "sym": "A",
+              },
+            ],
+            "op": "inv",
+          },
+        ],
+        "op": "mul",
       },
     },
   ],

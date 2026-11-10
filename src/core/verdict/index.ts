@@ -517,4 +517,4 @@ function unsupportedRelation(relation: Relation | 'defined'): string {
 export { compareSides } from './sides.ts';
 export { sizeSettings } from './plan.ts';
 export { sampledNames, freeVariables } from './shared.ts';
-export { numericDelta } from './numeric.ts';
+export { numericDelta, numericAbsDelta } from './numeric.ts';

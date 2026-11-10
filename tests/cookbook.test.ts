@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { check, analyzeSource, numericDelta, inferType } from '../src/core/index.ts';
+import { check, analyzeSource, numericAbsDelta, inferType } from '../src/core/index.ts';
 import { F64Field } from '../src/core/fields/f64.ts';
 import { IDENTITIES } from '../corpus/cookbook/identities.ts';
 import { allMutants } from '../corpus/cookbook/mutants.ts';
@@ -138,7 +138,7 @@ describe('the cookbook', () => {
       }
       const step = parsed.steps.find((s) => s.row === mutant.row);
       if (!step) continue;
-      const run = numericDelta(
+      const run = numericAbsDelta(
         parsed.ctx,
         parsed.defs,
         step,
@@ -149,7 +149,7 @@ describe('the cookbook', () => {
       );
       if (run === null || run === 'domain') continue;
       expect(run.shapeMessage, `${mutant.id} row ${mutant.row}`).toBeUndefined();
-      expect(run.delta, `${mutant.id} row ${mutant.row}`).toBeLessThanOrEqual(1e-9);
+      expect(run.diff, `${mutant.id} row ${mutant.row}`).toBeLessThanOrEqual(1e-9);
       verified++;
     }
     // and the audit is real: a silent oracle here used to pass this test

@@ -212,6 +212,56 @@ export function checkNumeric(
 export type NumericRun = { delta: number; shapeMessage?: string; unreadable?: string } | 'domain' | null;
 
 
+export interface AbsDeltaRun {
+  /** the largest entry of lhs minus rhs, in absolute value */
+  diff: number;
+}
+
+/**
+ * The absolute distance between the two sides of a step.
+ *
+ * This is for the audit of the Cookbook: the same sampling as numericDelta,
+ * but the answer is max|lhs - rhs|, not a relative delta, so a claim whose
+ * sides are both zero to machine precision is not called a lie. Used to
+ * confirm that a mutant the engine called harmless really changes nothing.
+ */
+export function numericAbsDelta<T>(
+  ctx: TypeContext,
+  defs: Map<string, Node>,
+  step: Step,
+  setting: Map<string, number>,
+  rng: Rng,
+  trial: number,
+  field: Field<T>,
+): AbsDeltaRun | null | 'domain' | { shapeMessage: string } | { unreadable: string } {
+  const sampler = new Sampler(field, rng);
+  const env = makeEnv(field, rng);
+  env.defs = defs;
+  const free = freeVariables(step);
+  const sampled = sampleFor(ctx, step, defs, setting, sampler, free, trial);
+  if (sampled === 'unknown') return null;
+  for (const [name, value] of sampled.values.entries()) env.values.set(name, value);
+  for (const [name, quadVar] of sampled.quad.entries()) env.quad.set(name, quadVar);
+
+  const sides = evaluateSides(field, step.lhs!, step.rhs!, env, sampler);
+  if (sides.kind === 'unknown') {
+    if (sides.shape) return { shapeMessage: sides.message };
+    if (!sides.domain && /not read/.test(sides.message)) return { unreadable: sides.message };
+    return 'domain';
+  }
+  if (sides.kind === 'equal') return { diff: 0 };
+  const flat = (v: Val<T>): number[] =>
+    v.k === 's' ? [field.toNumber(v.v)] : v.m.d.map((x) => field.toNumber(x));
+  const fa = flat(sides.lhs);
+  const fb = flat(sides.rhs);
+  if (fa.length !== fb.length) return { shapeMessage: 'the two sides have different numbers of entries' };
+  let diff = 0;
+  for (let i = 0; i < fa.length; i++) {
+    diff = Math.max(diff, Math.abs(fa[i] - fb[i]));
+  }
+  return { diff };
+}
+
 export function numericDelta<T>(
   ctx: TypeContext,
   defs: Map<string, Node>,

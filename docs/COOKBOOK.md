@@ -8,9 +8,12 @@ row.
 
 ## What is in it
 
-`corpus/cookbook/identities.ts` holds 48 identities in matrix algebra, matrix
-calculus and stochastics. Each one has the declarations it needs and the
-derivation in LaTeX, the way a person would write it.
+`corpus/cookbook/identities.ts` holds 89 identities in matrix algebra, matrix
+calculus and stochastics, grown from the 48 the Cookbook started with: the
+Kronecker identities, the derivatives of the determinant and of the inverse,
+the block matrices and the Schur complements, the Householder and projection
+geometry, and the normal moment identities. Each one has the declarations it
+needs and the derivation in LaTeX, the way a person would write it.
 
 `corpus/cookbook/mutants.ts` makes the mistakes. A mutant is a derivation with
 one thing wrong in it, taken from the mistake catalog: the same list the
@@ -24,13 +27,13 @@ Measured by `pnpm check:corpus`:
 <!-- gen:cookbook -->
 | | |
 | --- | --- |
-| the identities | 48 |
-| the mutants | 294 |
+| the identities | 89 |
+| the mutants | 434 |
 | **the false checkmarks** | **0** |
 | the identities SAMOSA cannot check | 3 |
-| the mutation score | 242 of 244 (**99.2%**) |
-| the harmless mutants the float64 oracle confirmed | 50 |
-| the raw rate | 242 of 294 (**82.3%**) |
+| the mutation score | 329 of 331 (**99.4%**) |
+| the harmless mutants the float64 oracle confirmed | 103 |
+| the raw rate | 329 of 434 (**75.8%**) |
 <!-- /gen:cookbook -->
 
 The plan's gate G2 asks for 95% of the planted bugs caught with the expected
@@ -72,14 +75,25 @@ The corpus is not only a measurement. It found real bugs, and they are fixed:
 - the group of a parenthesis did not include the parenthesis in its span, so
   an edit over it left the parenthesis behind
 - a shape mismatch was reported as "not checked" instead of a shape error
+- the row splitter counted the closing brace of an environment's name as a
+  group, so a derivation with a block matrix that carried braces in the row
+  after it never split into rows
+- the "Hadamard product of a sum" identity was written with
+  `\circ`, which this engine reads as ordinary multiplication, so the
+  identity checked the distributive law and not Hadamard's; it now uses
+  `\odot`, the element wise product
+- the derivative denominator silently dropped a Greek symbol, so
+  `\frac{\partial J}{\partial \beta}` differentiated with respect to an
+  empty name; a bare `\partial` numerator is now read as an operator whose
+  operand is the expression that follows
 
 ## The gates, honestly
 
 <!-- gen:cookbook-gates -->
 | gate | what the plan asks | what we measure |
 | --- | --- | --- |
-| G1: no false checkmark | the golden suite and the Cookbook | 0 false checkmarks in 48 identities, and 0 in the 16 Menu derivations |
-| G2: the bugs caught | 95%, with the repair in the top three | the mutation score is 99.2% (242 of 244, the 50 harmless mutants excluded and confirmed by the float64 oracle); the raw rate is 82.3% (242 of 294); the four planted bugs of the golden suite all get their expected repair in the top three |
+| G1: no false checkmark | the golden suite and the Cookbook | 0 false checkmarks in 89 identities, and 0 in the 16 Menu derivations |
+| G2: the bugs caught | 95%, with the repair in the top three | the mutation score is 99.4% (329 of 331, the 103 harmless mutants excluded and confirmed by the float64 oracle); the raw rate is 75.8% (329 of 434); the four planted bugs of the golden suite all get their expected repair in the top three |
 | G3: the parse coverage | 70% | 56.3%, measured in [COVERAGE.md](COVERAGE.md); the gate is not met |
 <!-- /gen:cookbook-gates -->
 

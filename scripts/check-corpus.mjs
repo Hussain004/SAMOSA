@@ -12,11 +12,16 @@
  *   node scripts/check-corpus.mjs
  */
 
-import { check, explain, analyzeSource, numericDelta, inferType } from '../src/core/index.ts';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { check, explain, analyzeSource, numericAbsDelta, inferType } from '../src/core/index.ts';
 import { F64Field } from '../src/core/fields/f64.ts';
 import { rngFor } from '../src/core/prng.ts';
 import { IDENTITIES } from '../corpus/cookbook/identities.ts';
 import { allMutants } from '../corpus/cookbook/mutants.ts';
+
+/** the launch floor: a change that lowers these is a regression, not progress */
+const FLOOR = JSON.parse(readFileSync(resolve(import.meta.dirname, '../corpus/floor.json'), 'utf8'));
 
 /** The verdicts that count as a catch. */
 const CATCHES = ['wrong', 'shape'];
@@ -104,7 +109,7 @@ for (const mutant of harmlessMutants) {
   }
   const step = parsed.steps.find((s) => s.row === mutant.row);
   if (!step) continue;
-  const run = numericDelta(
+  const run = numericAbsDelta(
     parsed.ctx,
     parsed.defs,
     step,
@@ -124,11 +129,12 @@ for (const mutant of harmlessMutants) {
     missedMutants.push({ ...mutant, verdict: 'ok', message: `the oracle saw the shape: ${run.shapeMessage}` });
     continue;
   }
-  if (run.delta <= 1e-9) {
+  if (run.diff <= 1e-9) {
     verifiedHarmlessMutants.push(mutant);
     continue;
   }
   console.error(`the false checkmark: ${mutant.id} row ${mutant.row} (${mutant.rule}) had the wrong green light`);
+  console.error('the mutant source:', mutant.source);
   process.exit(1);
 }
 
@@ -175,6 +181,28 @@ for (const item of missedMutants) {
 if (falseCheckmarks.length) {
   // a false checkmark is the one thing the corpus cannot forgive
   console.error('the cookbook found a false checkmark');
+  process.exit(1);
+}
+
+// the floor: the numbers of corpus/floor.json, enforced on every run
+const floorScore = (caught / (mutants - verifiedHarmlessMutants.length)) * 100;
+const floorRaw = mutants ? (caught / mutants) * 100 : 100;
+const floorFails = [];
+if (falseCheckmarks.length > FLOOR.falseCheckmarks) {
+  floorFails.push(`the false checkmarks ${falseCheckmarks.length} exceed the floor ${FLOOR.falseCheckmarks}`);
+}
+if (floorScore + 0.05 < FLOOR.mutationScore) {
+  floorFails.push(`the mutation score ${floorScore.toFixed(1)}% is below the floor ${FLOOR.mutationScore}%`);
+}
+if (floorRaw + 0.05 < FLOOR.rawRate) {
+  floorFails.push(`the raw rate ${floorRaw.toFixed(1)}% is below the floor ${FLOOR.rawRate}%`);
+}
+if (IDENTITIES.length < FLOOR.identities) {
+  floorFails.push(`the Cookbook has ${IDENTITIES.length} identities, below the floor of ${FLOOR.identities}`);
+}
+if (floorFails.length) {
+  console.error('the cookbook regressed below the floor:');
+  for (const failure of floorFails) console.error(`  ${failure}`);
   process.exit(1);
 }
 if (missedMutants.length) {

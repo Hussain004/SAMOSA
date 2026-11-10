@@ -4,6 +4,7 @@ import { Sampler } from './sample.ts';
 import { rngFor } from './prng.ts';
 import { renderNode } from './render.ts';
 import { compareSides, sizeSettings } from './verdict/index.ts';
+import { mat, matSolve } from './linalg.ts';
 import { dimSizeOf, type TypeContext } from './types.ts';
 import type { Node, Span } from './ir.ts';
 import type { Fix } from './verdict/index.ts';
@@ -644,16 +645,40 @@ function residualRepairs(sh: RepairCtx): Fix[] {
 
   const terms = candidateTerms(sh);
 
+  // the difference and every candidate on the same instances, evaluated once
+  const flat: number[] = [];
+  for (const s of samples) flat.push(...s.diff);
+  const usable: Array<{ text: string; node: Node; entries: number[] }> = [];
   for (const [text, term] of terms) {
+    const entries: number[] = [];
+    let ok = true;
+    for (const { env, diff } of samples) {
+      try {
+        const t = evalNode(field, term, env);
+        if (t.k !== 'm' || t.m.d.length !== diff.length) {
+          ok = false;
+          break;
+        }
+        entries.push(...t.m.d);
+      } catch {
+        ok = false;
+        break;
+      }
+    }
+    if (!ok) continue;
+    usable.push({ text, node: term, entries });
+  }
+
+  for (const { text, node, entries } of usable) {
     sh.spent.n++;
-    const scale = matchesScale(field, term, samples);
+    const scale = matchesScaleValues(field, entries, samples);
     if (scale === null || scale === 0) continue;
     // the patched row is checked like any other candidate, so the fix that is
     // offered is one that has been seen to hold
     const patched: Node = {
       k: 'op',
       op: 'add',
-      args: [sh.rhs, term],
+      args: [sh.rhs, node],
       span: sh.rhs.span,
     };
     // an edit that does not change the row is no fix at all
@@ -667,9 +692,152 @@ function residualRepairs(sh: RepairCtx): Fix[] {
       detail: text,
       side: 'rhs',
     });
-    if (out.length >= 3) break;
+    if (out.length >= 3) return out;
+  }
+
+  // the residual can be two or three terms deep, so the fit runs over small
+  // subsets, solved with the Gaussian elimination of linalg over GF(p) and
+  // accepted only when the coefficients are small rationals
+  if (usable.length >= 2) {
+    for (let i = 0; i < usable.length && out.length < 3; i++) {
+      for (let j = i + 1; j < usable.length && out.length < 3; j++) {
+        const coefs = solveSmall(field, usable, [i, j], flat);
+        if (coefs) pushResidualFix(sh, out, [
+          { c: coefs[0], text: usable[i].text, node: usable[i].node },
+          { c: coefs[1], text: usable[j].text, node: usable[j].node },
+        ]);
+      }
+    }
+  }
+  if (usable.length <= 48) {
+    for (let i = 0; i < usable.length && out.length < 3; i++) {
+      for (let j = i + 1; j < usable.length && out.length < 3; j++) {
+        for (let k = j + 1; k < usable.length && out.length < 3; k++) {
+          const coefs = solveSmall(field, usable, [i, j, k], flat);
+          if (coefs) pushResidualFix(sh, out, [
+            { c: coefs[0], text: usable[i].text, node: usable[i].node },
+            { c: coefs[1], text: usable[j].text, node: usable[j].node },
+            { c: coefs[2], text: usable[k].text, node: usable[k].node },
+          ]);
+        }
+      }
+    }
   }
   return out;
+}
+
+/** The small rationals a multi-term fit accepts, and their text. */
+const SMALL_NICE_SCALES = [-2, -1, -0.5, 0.5, 1, 2];
+
+/** The text of one signed coefficient, like the single-term repair prints it. */
+function coefText(c: number): string {
+  const mag = Math.abs(c);
+  const sign = c >= 0 ? '+' : '-';
+  const coeff = mag === 1 ? '' : mag === 0.5 ? '\\frac{1}{2}' : `${mag}`;
+  return `${sign}${coeff ? ` ${coeff}` : ''}`;
+}
+
+/** A num node for the magnitude of a small rational. */
+function smallNum(c: number): Node {
+  if (Math.abs(c) === 0.5) return { k: 'num', value: { n: 1, d: 2 }, span: { from: 0, to: 0 } };
+  return { k: 'num', value: { n: Math.abs(c), d: 1 }, span: { from: 0, to: 0 } };
+}
+
+/** The patched row: rhs plus the terms with their coefficients. */
+function patchWith(sh: RepairCtx, terms: Array<{ c: number; text: string; node: Node }>): Node {
+  let acc: Node = sh.rhs;
+  for (const { c, node } of terms) {
+    const mag = Math.abs(c);
+    const scaled: Node = mag === 1 ? node : { k: 'op', op: 'mul', args: [smallNum(c), node], span: node.span };
+    acc = {
+      k: 'op',
+      op: c >= 0 ? 'add' : 'sub',
+      args: [acc, scaled],
+      span: sh.rhs.span,
+    };
+  }
+  return acc;
+}
+
+/** A multi-term residual fix, once the fit has been seen to hold. */
+function pushResidualFix(
+  sh: RepairCtx,
+  out: Fix[],
+  terms: Array<{ c: number; text: string; node: Node }>,
+): void {
+  const text = terms.map(({ c, text: t }) => `${coefText(c)} ${pretty(t)}`).join(' ');
+  const patched = patchWith(sh, terms);
+  if (renderNode(patched) === renderNode(sh.rhs)) return;
+  const insert = `${renderNode(sh.rhs)} ${text}`;
+  const verified = holdsWith(sh, 'rhs', patched);
+  out.push({
+    kind: 'residual',
+    title: `this step is off by exactly ${text}`,
+    edit: { span: sh.rhs.span, insert },
+    verified,
+    detail: terms.map(({ text: t }) => t).join(' + '),
+    side: 'rhs',
+  });
+}
+
+/** The equations a fit solves on, the first few, tried in order. */
+function equationSubsets(n: number, k: number): number[][] {
+  const out: number[][] = [];
+  if (k === 2) {
+    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) out.push([i, j]);
+    return out;
+  }
+  for (let i = 0; i < n; i++)
+    for (let j = i + 1; j < n; j++)
+      for (let k2 = j + 1; k2 < n; k2++) out.push([i, j, k2]);
+  return out;
+}
+
+/**
+ * The coefficients of a small subset of candidate terms, over GF(p).
+ *
+ * The system is solved on a few equations and then verified on all of
+ * them, so a solution is accepted only when it is exact everywhere, and
+ * only when every coefficient is a small rational.
+ */
+function solveSmall(
+  field: GFpField,
+  terms: Array<{ entries: number[] }>,
+  idxs: number[],
+  flat: number[],
+): number[] | null {
+  const k = idxs.length;
+  const nEq = Math.min(8, flat.length);
+  for (const subset of equationSubsets(nEq, k)) {
+    try {
+      const A = mat(k, k, (r, c) => terms[idxs[c]].entries[subset[r]]);
+      const b = mat(k, 1, (r) => flat[subset[r]]);
+      const x = matSolve(field, A, b);
+      const coefs = idxs.map((_, c) => x.d[c]);
+      const accepted = coefs.map((c) => {
+        for (const s of SMALL_NICE_SCALES) {
+          const den = Math.abs(s % 1) > 0 ? 2 : 1;
+          const num = Math.abs(s % 1) > 0 ? (s < 0 ? -1 : 1) : s;
+          if (field.fromRational(num, den) === c) return s;
+        }
+        return null;
+      });
+      if (accepted.some((c) => c === null)) continue;
+      // exact on every equation, or it is nothing
+      let ok = true;
+      for (let e = 0; e < flat.length && ok; e++) {
+        let acc = 0;
+        for (let c = 0; c < k; c++) {
+          acc = field.add(acc, field.mul(x.d[c], terms[idxs[c]].entries[e]));
+        }
+        if (acc !== flat[e]) ok = false;
+      }
+      if (ok) return accepted as number[];
+    } catch {
+      continue;
+    }
+  }
+  return null;
 }
 
 /**
@@ -732,35 +900,38 @@ function candidateTerms(sh: RepairCtx): Map<string, Node> {
   return terms;
 }
 
-function matchesScale(
+/**
+ * The scale of a residual that is a multiple of one candidate term, read off
+ * one entry and checked against all of them, so the search is over the
+ * small rationals and not over the entries.
+ */
+function matchesScaleValues(
   field: GFpField,
-  term: Node,
+  termValues: number[],
   samples: Array<{ env: ReturnType<typeof makeEnv<number>>; diff: number[] }>,
 ): number | null {
-  // The term is evaluated on the same instances as the difference, or the
-  // two would never agree.
-  const termValues: number[][] = [];
-  for (const { env, diff } of samples) {
-    let value: number[];
-    try {
-      const t = evalNode(field, term, env);
-      if (t.k !== 'm') return null;
-      value = t.m.d;
-    } catch {
-      return null;
-    }
-    if (value.length !== diff.length) return null;
-    termValues.push(value);
+  const termValuesPerSample: number[][] = [];
+  let at = 0;
+  for (const { diff } of samples) {
+    termValuesPerSample.push(termValues.slice(at, at + diff.length));
+    at += diff.length;
   }
 
-  // The scale is read off one entry and then checked against all of them, so
-  // the search is over the small rationals and not over the entries.
-  const scale = niceScale(field, field.div(samples[0].diff[0], termValues[0][0]));
+  // The scale is read off an entry where the term is nonzero, then checked
+  // against every entry, so the search stays over the small rationals
+  let scale: { n: number; d: number } | null = null;
+  for (let s = 0; s < termValuesPerSample.length && scale === null; s++) {
+    for (let i = 0; i < termValuesPerSample[s].length; i++) {
+      if (termValuesPerSample[s][i] === 0) continue;
+      scale = niceScale(field, field.div(samples[s].diff[i], termValuesPerSample[s][i]));
+      if (scale) break;
+    }
+  }
   if (scale === null) return null;
 
   for (let s = 0; s < samples.length; s++) {
     for (let i = 0; i < samples[s].diff.length; i++) {
-      if (field.mul(field.fromRational(scale.n, scale.d), termValues[s][i]) !== samples[s].diff[i]) {
+      if (field.mul(field.fromRational(scale.n, scale.d), termValuesPerSample[s][i]) !== samples[s].diff[i]) {
         return null;
       }
     }

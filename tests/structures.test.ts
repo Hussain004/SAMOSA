@@ -437,6 +437,10 @@ function oracleFailures(src: string, decls: string | undefined, where: string): 
     collectNodeSymbols(step.lhs, names);
     collectNodeSymbols(step.rhs, names);
     for (const def of parsed.defs.values()) collectNodeSymbols(def, names);
+    // a defined symbol is not sampled: its definition is evaluated per
+    // instance, or the oracle would compare a random matrix against the
+    // claim and call every derivation with a definition wrong
+    for (const defName of parsed.defs.keys()) names.delete(defName);
     // the types: the symbols register themselves during inference, and the
     // oracle samples the same context the verdict saw
     inferType(parsed.ctx, step.lhs);
