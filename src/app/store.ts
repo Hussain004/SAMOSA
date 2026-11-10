@@ -263,7 +263,7 @@ export const useApp = create<AppState>((set, get) => ({
     if (explanations[id]) return;
     const step = report.steps.find((s) => s.id === id);
     if (!step) return;
-    if (step.verdict !== 'wrong' && step.verdict !== 'shape') return;
+    if (step.verdict !== 'wrong' && step.verdict !== 'shape' && step.verdict !== 'ok') return;
     runExplain(source, id, settings);
   },
 
@@ -294,7 +294,7 @@ export const useApp = create<AppState>((set, get) => ({
     if (explanations[id]) return;
     const step = report.steps.find((s) => s.id === id);
     if (!step) return;
-    if (step.verdict !== 'wrong' && step.verdict !== 'shape') return;
+    if (step.verdict !== 'wrong' && step.verdict !== 'shape' && step.verdict !== 'ok') return;
     runExplain(source, id, settings);
   },
 

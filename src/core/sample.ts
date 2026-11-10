@@ -1,5 +1,5 @@
 import type { Field } from './fields/types.ts';
-import { GFpField } from './fields/gfp.ts';
+import { isGFpField } from './fields/gfp.ts';
 import { identity, matAdd, matInv, matMul, matScale, matSub, transpose, zeros, type Mat } from './linalg.ts';
 import type { Prop } from './decl.ts';
 import type { Rng } from './prng.ts';
@@ -68,7 +68,7 @@ export class Sampler<T> {
     if (has('triu')) return { k: 'm', m: this.sampleTriangular(r, c, true) };
     if (has('tril')) return { k: 'm', m: this.sampleTriangular(r, c, false) };
     if (has('skew')) return { k: 'm', m: this.sampleSkew(r, c) };
-    if (has('spd') && !(this.field instanceof GFpField)) {
+    if (has('spd') && !(isGFpField(this.field))) {
       // over the reals a positive definite matrix is sampled as B B' + r I, so
       // that the densities and the square roots are well defined
       const f = this.field;
@@ -91,7 +91,7 @@ export class Sampler<T> {
   /** One random element of the field. */
   private element(): T {
     const f = this.field;
-    if (f instanceof GFpField) return randField(this.rng, f.p) as T;
+    if (isGFpField(f)) return randField(this.rng, f.p) as T;
     return f.normal(this.rng);
   }
 
@@ -145,7 +145,7 @@ export class Sampler<T> {
    */
   sampleOrthogonal(n: number, reflect = false): Mat<T> {
     const f = this.field;
-    if (f instanceof GFpField) {
+    if (isGFpField(f)) {
       const g = f as unknown as Field<T>;
       const s = this.sampleSkew(n, n);
       const eye = identity<T>(n, g.one, g.zero);
@@ -214,7 +214,7 @@ export class Sampler<T> {
   /** A unit vector: a normalized Gaussian, or a stereographic point. */
   sampleUnit(r: number, c: number): Mat<T> {
     const f = this.field;
-    if (f instanceof GFpField) {
+    if (isGFpField(f)) {
       // stereographic: (2t, ||t||^2 - 1) / (||t||^2 + 1) on the unit sphere
       // (review 4.1). A column vector is stereographed down the rows: t has
       // length r - 1 and the last entry takes the pole. Every column of a
@@ -268,7 +268,7 @@ export class Sampler<T> {
    */
   sampleScalar(variety = 0, index = 0): T {
     const f = this.field;
-    if (f instanceof GFpField) return randField(this.rng, f.p) as T;
+    if (isGFpField(f)) return randField(this.rng, f.p) as T;
     const z = this.norm();
     const sign = ((variety >> index) & 1) === 1 ? -1 : 1;
     const cls = (variety + index) % 3;
@@ -284,7 +284,7 @@ export class Sampler<T> {
   /** A strictly positive scalar over the reals; the pos property is a real order, so GF(p) cannot have it. */
   samplePositiveScalar(): T {
     const f = this.field;
-    if (f instanceof GFpField) return randField(this.rng, f.p) as T;
+    if (isGFpField(f)) return randField(this.rng, f.p) as T;
     return f.add(f.abs(this.norm()), f.fromRational(5, 100));
   }
 }

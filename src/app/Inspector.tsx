@@ -8,7 +8,7 @@ import { Tex } from './tex.tsx';
 export interface InspectorProps {
   step: StepResult | null;
   report: Report | null;
-  explanation?: { fixes: import('../core/index.ts').Fix[]; counterexample?: import('../core/index.ts').ShrunkInstance };
+  explanation?: import('../core/index.ts').Explanation;
   onApplyFix: (fix: import('../core/index.ts').Fix) => void;
   onCopy: (text: string) => void;
   onClose: () => void;
@@ -53,6 +53,15 @@ export function Inspector({ step, report, explanation, onApplyFix, onCopy, onClo
           <p className="mt-2 text-sm text-[var(--color-text)]" data-testid="guarantee-sentence">
             {guaranteeSentence(step)}
           </p>
+          {explanation?.ruleName && (
+            <a
+              href="/docs/COOKBOOK"
+              className="mt-1 inline-block text-[0.75rem] text-[var(--color-muted)] underline decoration-dotted underline-offset-2 hover:text-[var(--color-text)]"
+              title="the Cookbook names this identity"
+            >
+              ≡ {explanation.ruleName}
+            </a>
+          )}
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
           <button

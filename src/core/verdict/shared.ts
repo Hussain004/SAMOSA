@@ -21,7 +21,7 @@ import {
 import type { Step, Counterexample } from './types.ts';
 import { collectDimVarsFor } from '../dims.ts';
 import { GAUSS7, type QuadVar } from '../quadrature.ts';
-import { GFpField } from '../fields/gfp.ts';
+import { isGFpField } from '../fields/gfp.ts';
 import type { Prop } from '../decl.ts';
 import { isMatrixVal, isScalarVal, scalar, type Val } from '../value.ts';
 import { DEFAULT_FUNCTIONS } from '../parse.ts';
@@ -192,7 +192,7 @@ export function hasExpectation(step: Step): boolean {
 /** The variables a derivative is taken with respect to: they stay free. */
 
 export function fieldClose<T>(field: Field<T>, a: T, b: T): boolean {
-  if (field instanceof GFpField) return field.eq(a, b);
+  if (isGFpField(field)) return field.eq(a, b);
   const x = field.toNumber(a);
   const y = field.toNumber(b);
   const scale = Math.max(1, Math.abs(x), Math.abs(y));

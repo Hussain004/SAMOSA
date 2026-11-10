@@ -36,6 +36,7 @@ export { shrinkCounterexample } from './shrink.ts';
 export type { ShrunkInstance } from './shrink.ts';
 
 import { analyzeSource, check, type CheckOptions, type Fix, type Report, type Source, type Step, type StepResult } from './verdict/index.ts';
+import { identifyRule } from './name-rule.ts';
 import { parseRow } from './parse.ts';
 import { splitRows } from './steps.ts';
 import { inferType } from './types.ts';
@@ -76,6 +77,8 @@ export interface Explanation {
   counterexample?: ShrunkInstance;
   /** the guarantee card of the step, again */
   card?: StepResult['card'];
+  /** the name of the identity, when the step is one the Cookbook knows */
+  ruleName?: string;
 }
 
 /**
@@ -95,7 +98,11 @@ export function explain(
   if (!step || !step.lhs || !step.rhs) return { fixes: [] };
   // A row that holds has nothing to repair, so no fixes are offered for it.
   const verdict = report?.steps.find((s) => s.id === stepId)?.verdict;
-  if (verdict && verdict !== 'wrong' && verdict !== 'shape') return { fixes: [] };
+  if (verdict && verdict !== 'wrong' && verdict !== 'shape') {
+    // a row that holds gets the name of the identity, when the Cookbook knows it
+    const ruleName = identifyRule(parsed, step, { n: 0 }) ?? undefined;
+    return { fixes: [], ruleName };
+  }
   return explainStep(parsed, step, opts);
 }
 
@@ -180,5 +187,7 @@ function explainStep(source: Source, step: Step, opts: CheckOptions, spent: { n:
     if (spent.n >= CEX_ATTEMPTS) break;
   }
 
-  return { fixes, counterexample };
+  // a row that holds gets the name of the identity, when the Cookbook knows it
+  const ruleName = identifyRule(source, step, spent) ?? undefined;
+  return { fixes, counterexample, ruleName };
 }

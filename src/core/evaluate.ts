@@ -1,5 +1,5 @@
 import type { Field } from './fields/types.ts';
-import { GFpField } from './fields/gfp.ts';
+import { isGFpField } from './fields/gfp.ts';
 import { DualField, type DualValue } from './fields/dual.ts';
 import { HyperDualField, type HyperDualValue } from './fields/hyperdual.ts';
 import {
@@ -237,7 +237,7 @@ export function evalNode<T>(f: Field<T>, node: Node, env: EvalEnv<T>): Val<T> {
     case 'piecewise': {
       // a piecewise expression needs an order on the conditions, which a
       // finite field has not: it is checked over the reals only
-      if (f instanceof GFpField) {
+      if (isGFpField(f)) {
         throw new EvalError('a piecewise expression is checked over the reals only');
       }
       for (const branch of node.cases) {

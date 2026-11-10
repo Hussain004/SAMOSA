@@ -27,6 +27,9 @@ export class GFpField implements Field<number> {
 
   readonly p: number;
 
+  /** structural discriminator, so a field is recognized even across a duplicate instance of this class */
+  readonly isGFp = true;
+
   constructor(p: number) {
     this.p = p;
     this.pi = this.mul(314159265, this.inv(100000000));
@@ -143,3 +146,8 @@ export class GFpField implements Field<number> {
 /** The two primes used for exact checking. Both were verified prime. */
 export const P1 = 2147483647; // 2^31 - 1
 export const P2 = 2147483629;
+
+/** True for GF(p), structurally, so a duplicate instance of the class does not hide it. */
+export function isGFpField(f: unknown): f is GFpField {
+  return typeof (f as GFpField | undefined)?.isGFp === 'boolean' && (f as GFpField).isGFp === true;
+}
