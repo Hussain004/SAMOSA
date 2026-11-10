@@ -21,6 +21,8 @@ export interface RenderedProps {
   /** the row the user guessed, and the row that is really wrong */
   guess: string | null;
   revealed: string | null;
+  /** the span the top fix replaces, per step, when the fix loaded */
+  fixSpans?: Record<string, { from: number; to: number } | undefined>;
 }
 
 /**
@@ -42,6 +44,7 @@ export function RenderedRows({
   guess,
   revealed,
   stepOrder,
+  fixSpans,
 }: RenderedProps) {
   if (!report || report.steps.length === 0) {
     // on the first paint there is nothing to say yet, so the page does not
@@ -87,6 +90,7 @@ export function RenderedRows({
           guess={guess}
           revealed={revealed}
           stepOrder={stepOrder}
+          fixSpan={fixSpans?.[step.id]}
           onSelect={onSelectStep}
           onHover={(on) => onHoverStep(on ? step.id : null)}
         />
@@ -104,6 +108,7 @@ function Row({
   guess,
   revealed,
   stepOrder,
+  fixSpan,
   onSelect,
   onHover,
 }: {
@@ -115,13 +120,14 @@ function Row({
   guess: string | null;
   revealed: string | null;
   stepOrder: StepResult[];
+  fixSpan?: { from: number; to: number };
   onSelect: (id: string) => void;
   onHover: (on: boolean) => void;
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
   const html = useMemo(
-    () => renderStep(step, source, spotTheBug && !revealed),
-    [step, source, spotTheBug, revealed],
+    () => renderStep(step, source, spotTheBug && !revealed, fixSpan),
+    [step, source, spotTheBug, revealed, fixSpan],
   );
 
   useEffect(() => {
@@ -265,8 +271,8 @@ function badgeClass(step: StepResult): string {
 }
 
 /** Renders a step with KaTeX, highlighting the part that is wrong. */
-export function renderStep(step: StepResult, source = '', plain = false): string {
-  const latex = stepLaTeX(step, source, plain);
+export function renderStep(step: StepResult, source = '', plain = false, fixSpan?: { from: number; to: number }): string {
+  const latex = stepLaTeX(step, source, plain, fixSpan);
   if (!latex) return '';
   try {
     return katex.renderToString(latex, {
@@ -288,10 +294,17 @@ export function renderStep(step: StepResult, source = '', plain = false): string
  * The spans of a step are offsets into its own row, so the row text is what
  * gets sliced.
  */
-function stepLaTeX(step: StepResult, _source: string, plain = false): string {
+function stepLaTeX(step: StepResult, _source: string, plain = false, fixSpan?: { from: number; to: number }): string {
   const text = step.text ?? '';
   if (!text) return '';
   if (!plain && step.verdict === 'wrong' && step.lhsSpan && step.rhsSpan) {
+    // when the top fix names the exact term it would edit, only that term is highlighted
+    if (fixSpan && fixSpan.from >= 0 && fixSpan.to <= text.length && fixSpan.from < fixSpan.to) {
+      const before = tex(text.slice(0, fixSpan.from));
+      const wrong = tex(text.slice(fixSpan.from, fixSpan.to));
+      const after = tex(text.slice(fixSpan.to));
+      return `${before}\\htmlClass{samosa-hl}{${wrong}}${after}`;
+    }
     const lhs = text.slice(step.lhsSpan.from, step.lhsSpan.to);
     const relation = text.slice(step.lhsSpan.to, step.rhsSpan.from).replace(/&/g, '');
     const rhs = text.slice(step.rhsSpan.from);

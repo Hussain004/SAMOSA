@@ -230,6 +230,15 @@ export function App() {
   );
 
   const step = report?.steps.find((s) => s.id === selectedStep) ?? null;
+  // the top fix of each wrong row, extracted once the explanation lands
+  const fixSpans = useMemo(() => {
+    const out: Record<string, { from: number; to: number } | undefined> = {};
+    for (const [id, explanation] of Object.entries(explanations)) {
+      const edit = explanation.fixes[0]?.edit;
+      if (edit) out[id] = edit.span;
+    }
+    return out;
+  }, [explanations]);
   const counts = useMemo(() => {
     const out = { ok: 0, wrong: 0, shape: 0, unchecked: 0, defined: 0, inconclusive: 0 };
     for (const s of report?.steps ?? []) out[s.verdict] += 1;
@@ -482,6 +491,7 @@ export function App() {
               hoverStep={hoverStep}
               onHoverStep={setHoverStep}
               stepOrder={report?.steps ?? []}
+              fixSpans={fixSpans}
               onSelectStep={(id) => {
                 select(id);
                 // on a phone the card is a bottom sheet, so a tap opens it
