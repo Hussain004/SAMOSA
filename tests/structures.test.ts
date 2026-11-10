@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { analyzeSource, check, type Report, type StepResult } from '../src/core/verdict.ts';
+import { analyzeSource, check, type Report, type StepResult } from '../src/core/verdict/index.ts';
 import { evalNode, makeEnv } from '../src/core/evaluate.ts';
 import { Sampler } from '../src/core/sample.ts';
 import { GFpField, P1, P2 } from '../src/core/fields/gfp.ts';

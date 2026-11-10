@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { check, explain } from '../src/core/index.ts';
-import { analyzeSource } from '../src/core/verdict.ts';
+import { analyzeSource } from '../src/core/verdict/index.ts';
 import { shrinkCounterexample } from '../src/core/shrink.ts';
 import { collectDimVarsFor } from '../src/core/dims.ts';
 import { inferType } from '../src/core/types.ts';

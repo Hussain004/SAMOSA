@@ -5,7 +5,7 @@
  * three of them always give the same verdict for the same input.
  */
 
-export { check, sizeSettings, ENGINE_VERSION, DEFAULT_SEED, analyzeSource, numericDelta } from './verdict.ts';
+export { check, sizeSettings, ENGINE_VERSION, DEFAULT_SEED, analyzeSource, numericDelta } from './verdict/index.ts';
 export type {
   CheckOptions,
   Counterexample,
@@ -16,8 +16,8 @@ export type {
   Report,
   StepResult,
   Verdict,
-} from './verdict.ts';
-export type { Source, Step } from './verdict.ts';
+} from './verdict/index.ts';
+export type { Source, Step } from './verdict/index.ts';
 
 export { parseRow, Parser, classifySuperscript, findRelations } from './parse.ts';
 export { tokenize, renderTokens } from './lex.ts';
@@ -35,7 +35,7 @@ export { renderNode } from './render.ts';
 export { shrinkCounterexample } from './shrink.ts';
 export type { ShrunkInstance } from './shrink.ts';
 
-import { analyzeSource, check, type CheckOptions, type Fix, type Report, type Source, type Step, type StepResult } from './verdict.ts';
+import { analyzeSource, check, type CheckOptions, type Fix, type Report, type Source, type Step, type StepResult } from './verdict/index.ts';
 import { parseRow } from './parse.ts';
 import { splitRows } from './steps.ts';
 import { inferType } from './types.ts';

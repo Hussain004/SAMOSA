@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
-import { check } from '../src/core/verdict.ts';
+import { check } from '../src/core/verdict/index.ts';
 import { parseRow } from '../src/core/parse.ts';
 import { parseDeclarations } from '../src/core/decl.ts';
 

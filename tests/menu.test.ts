@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { check } from '../src/core/verdict.ts';
+import { check } from '../src/core/verdict/index.ts';
 import { MENU } from '../corpus/menu.ts';
 
 /**

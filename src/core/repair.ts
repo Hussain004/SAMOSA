@@ -3,10 +3,10 @@ import { evalNode, makeEnv } from './evaluate.ts';
 import { Sampler } from './sample.ts';
 import { rngFor } from './prng.ts';
 import { renderNode } from './render.ts';
-import { compareSides, sizeSettings } from './verdict.ts';
+import { compareSides, sizeSettings } from './verdict/index.ts';
 import { dimSizeOf, type TypeContext } from './types.ts';
 import type { Node, Span } from './ir.ts';
-import type { Fix } from './verdict.ts';
+import type { Fix } from './verdict/index.ts';
 import { canonicalizeSymbol } from './notation.ts';
 import type { Prop } from './decl.ts';
 
