@@ -15,7 +15,7 @@ import { formatGithub, formatPretty, formatSarif } from './format.ts';
 
 /** The build replaced the version it read from the package manifest. */
 declare const SAMOSA_VERSION: string | undefined;
-const VERSION = typeof SAMOSA_VERSION === 'string' ? SAMOSA_VERSION : '1.1.0';
+const VERSION = typeof SAMOSA_VERSION === 'string' ? SAMOSA_VERSION : '0.0.0-dev';
 
 /**
  * The flags that stand alone, before a command.

@@ -42,7 +42,7 @@ import type { Dim, Prop } from './decl.ts';
 
 /** The build replaced the version it read from the package manifest. */
 declare const SAMOSA_ENGINE_VERSION: string | undefined;
-export const ENGINE_VERSION = typeof SAMOSA_ENGINE_VERSION === 'string' ? SAMOSA_ENGINE_VERSION : '1.1.0';
+export const ENGINE_VERSION = typeof SAMOSA_ENGINE_VERSION === 'string' ? SAMOSA_ENGINE_VERSION : '0.0.0-dev';
 export const DEFAULT_SEED = 0x5a305a;
 
 export type Verdict = 'ok' | 'wrong' | 'shape' | 'inconclusive' | 'unchecked' | 'defined';
