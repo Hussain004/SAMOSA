@@ -263,6 +263,24 @@ test('the spot the bug game gives feedback and keeps a streak', async ({ page })
   await expect(page.getByText('streak 1')).toBeVisible();
 });
 
+test('the course packs are playable from the banner', async ({ page }) => {
+  await page.getByRole('button', { name: 'Menu', exact: true }).click();
+  await page.getByTestId('spot-joseph').click();
+  await expect(page.getByText('one row is wrong. click it.')).toBeVisible();
+
+  // the pack picker is in the banner, with all four packs
+  const backprop = page.getByRole('button', { name: 'Backprop through an MLP' });
+  await expect(backprop).toBeVisible();
+  await expect(page.getByRole('button', { name: 'EKF and the Riccati recursion' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'The inversion lemmas' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'TA solution keys' })).toBeVisible();
+
+  // pick a pack: the button becomes active and the game continues inside it
+  await backprop.click();
+  await expect(backprop).toHaveClass(/border-\[var\(--color-saffron\)\]/);
+  await expect(page.getByText('one row is wrong. click it.')).toBeVisible();
+});
+
 test('the phone has one pane at a time', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/app/');

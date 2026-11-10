@@ -5,6 +5,7 @@ import type { WorkerRequest, WorkerResponse } from '../worker.ts';
 import { PRESETS } from '../core/index.ts';
 import { splitRows } from '../core/steps.ts';
 import { MENU } from '../../corpus/menu.ts';
+import { packById, packCandidates } from '../../corpus/packs.ts';
 
 /**
  * The state of the checker.
@@ -36,6 +37,8 @@ export interface AppState {
   revealed: string | null;
   /** the Menu item the game came from, so the next bug is a different one */
   spotItem: string | null;
+  /** the course pack the game draws from, or null for the whole menu */
+  spotPack: string | null;
   /** how many rows were tried in this game */
   tries: number;
   /** how many games in a row were found */
@@ -53,6 +56,8 @@ export interface AppState {
   startSpotTheBug: (source: string, decls: string, itemId?: string) => void;
   makeGuess: (id: string) => void;
   nextBug: () => void;
+  /** start the game from a course pack, drawing the next bug from it */
+  startPack: (packId: string) => void;
   stopSpotTheBug: () => void;
   reroll: () => void;
   loadShare: () => void;
@@ -214,6 +219,7 @@ export const useApp = create<AppState>((set, get) => ({
   guess: null,
   revealed: null,
   spotItem: null,
+  spotPack: null,
   tries: 0,
   streak: 0,
   explanations: {},
@@ -276,6 +282,16 @@ export const useApp = create<AppState>((set, get) => ({
   nextBug: () => {
     // A one row derivation has nothing to find, so the next bug is a
     // derivation with more than one row, and not the one already on screen.
+    const pack = packById(get().spotPack);
+    if (pack) {
+      const pool = packCandidates(pack, MENU, get().spotItem ?? undefined);
+      // when the pack's turn is over, the pack starts again
+      const cycle = pool.length ? pool : packCandidates(pack, MENU);
+      const item = cycle[Math.floor(Math.random() * cycle.length)];
+      if (!item?.bugSource) return;
+      get().startSpotTheBug(item.bugSource, item.decls, item.id);
+      return;
+    }
     const candidates = MENU.filter(
       (item) => item.bugSource && item.id !== get().spotItem && splitRows(item.bugSource).length > 1,
     );
@@ -285,8 +301,18 @@ export const useApp = create<AppState>((set, get) => ({
     get().startSpotTheBug(item.bugSource, item.decls, item.id);
   },
 
+  startPack: (packId) => {
+    const pack = packById(packId);
+    if (!pack) return;
+    set({ spotPack: packId });
+    const pool = packCandidates(pack, MENU);
+    if (!pool.length) return;
+    const item = pool[Math.floor(Math.random() * pool.length)];
+    get().startSpotTheBug(item.bugSource!, item.decls, item.id);
+  },
+
   stopSpotTheBug: () => {
-    set({ spotTheBug: false, guess: null, revealed: null, tries: 0 });
+    set({ spotTheBug: false, spotPack: null, guess: null, revealed: null, tries: 0 });
   },
 
   select: (id) => {

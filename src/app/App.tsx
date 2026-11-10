@@ -10,6 +10,7 @@ import { getPreset } from '../core/index.ts';
 import { canonicalizeSymbol } from '../core/index.ts';
 import { exportJson, exportMarkdown, exportLatex } from './export.ts';
 import { MENU } from '../../corpus/menu.ts';
+import { PACKS } from '../../corpus/packs.ts';
 import { VERDICT_LABEL, seedText, parseSeed } from './verdicts.ts';
 import { FontSizeControl, applyFontScale, readFontScale, stepFontScale } from '../font-size.tsx';
 
@@ -54,6 +55,8 @@ export function App() {
     streak,
     nextBug,
     stopSpotTheBug,
+    spotPack,
+    startPack,
     setSource,
     setSettings,
     select,
@@ -422,6 +425,22 @@ export function App() {
               {copied.startsWith('I found the bug') ? '✓ copied' : 'share the result'}
             </button>
           )}
+          <span className="flex flex-wrap items-center gap-1" aria-label="the course packs">
+            {PACKS.map((pack) => (
+              <button
+                key={pack.id}
+                onClick={() => startPack(pack.id)}
+                title={pack.blurb}
+                className={`rounded border px-1.5 py-0.5 text-[0.625rem] ${
+                  spotPack === pack.id
+                    ? 'border-[var(--color-saffron)] text-[var(--color-saffron)]'
+                    : 'border-[var(--color-line)] text-[var(--color-faint)] hover:text-[var(--color-text)]'
+                }`}
+              >
+                {pack.title}
+              </button>
+            ))}
+          </span>
           <span className="text-[var(--color-faint)]">streak {streak}</span>
           <button
             onClick={stopSpotTheBug}
