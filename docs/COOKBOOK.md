@@ -30,7 +30,7 @@ Measured by `pnpm check:corpus`:
 | the identities | 94 |
 | the mutants | 451 |
 | **the false checkmarks** | **0** |
-| the identities SAMOSA cannot check | 1 |
+| the identities SAMOSA cannot check | 0 |
 | the mutation score | 343 of 343 (**100.0%**) |
 | the harmless mutants the float64 oracle confirmed | 108 |
 | the raw rate | 343 of 451 (**76.1%**) |
@@ -48,7 +48,7 @@ These are not lies, they are gaps:
 <!-- gen:cookbook-gaps -->
 | the identity | why |
 | --- | --- |
-| a stationary point | no value for x |
+
 <!-- /gen:cookbook-gaps -->
 
 ### The misses

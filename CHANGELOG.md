@@ -4,6 +4,105 @@ All notable changes to SAMOSA. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 follows [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-11-11
+
+The implication row checks, the distribution row checks, the counterexample
+speaks three languages, and the editor is an extension.
+
+### Fixed
+
+- The sampler read a literal covariance as a generic symbol and drew a
+  random root, so every `x ~ N(0, 1)` was wrong. The identity covariance is
+  its own square root now, a nonzero literal mean for a vector is refused
+  rather than sampled at random, and a Gaussian takes the shape of its law
+  (the shape of the mean, or of the covariance, or a fresh dimension
+  nobody pins).
+- A Gaussian was always a scalar, so `x ~ N(\mu, \Sigma)` used as a vector
+  sampled as a scalar. A random variable now has the shape of its law.
+- An implication row carried no registry of its own, so a row with no
+  earlier rows always came back unevaluated. The row populates it now, and
+  the dimensions of the polymorphic symbols unify with the shapes they
+  meet in: `Q Q^\top = I ==> Q = I` checks.
+- A scalar pivot is a one by one matrix everywhere in the implication
+  machinery, so scalar implications check too.
+- A matrix zero compared with a zero scalar was decided before the zero
+  matrix broadcast, and a true implication came back wrong. The broadcast
+  decides now.
+- The identity of a stationary point in the Cookbook was uncheckable: the
+  identity (an unstructured quadratic's unique stationary point is the
+  origin) is true only with an invertible structure, so it declares `spd`,
+  and it checks. The implication was previously `?` everywhere because the
+  row never evaluated.
+- A row with a relation in `<= < >= >` was `?` with the reason missing.
+  Inequalities are searched for counterexamples now: wrong with a
+  counterexample when a violation is found, inconclusive never (see
+  below), never a checkmark.
+- `E[sin x]` went through the polynomial quadrature and came back with the
+  wrong message instead of a verdict. Non-polynomial expectations go
+  through a seeded Monte Carlo estimate now: wrong outside six standard
+  errors, inconclusive otherwise, never a checkmark.
+- `Ax + b ~ N(A mu + b, A Sigma A^T)` was unchecked. A distribution claim
+  is checked by its two moments now, exactly, and a non-affine left side
+  is refused rather than certified.
+
+### Added
+
+- Inequalities are checked by counterexample search: `|a+b| >= |a|+|b|`
+  is wrong, Cauchy-Schwarz stays a question mark, and `A >= 0` broadcasts
+  a zero scalar to the zero matrix.
+- A distribution claim `f ~ \mathcal{N}(m, S)` is checked by its two
+  moments: `E[f] = m` and `Var(f) = S`, exactly, by the rational
+  quadrature in the primes. The card says the first two moments match and
+  lists the assumption that the left side is Gaussian; an affine function
+  of a Gaussian is, and SAMOSA checks that.
+- The non-affine implication (a premise the polynomial solver cannot
+  read) is solved by Newton's method at the reals: wrong at the root
+  found, inconclusive otherwise, never a checkmark. Scalar pivots,
+  vector pivots and matrix pivots (square systems up to 6 by 6) all
+  work.
+- The row badge and the card name the identity the step is: `the Kalman
+  gain`, `the Joseph form`, `the push-through identity`. A row that does
+  not hold is never named.
+- Inequalities never get a checkmark; the mode invariant is tested.
+- The VS Code extension: red squiggles for wrong rows, hover with the
+  guarantee and the counterexample as a NumPy snippet, quick fixes from
+  the repair search, and two commands (open in the app, copy the
+  counterexample). The engine runs in a worker inside the language
+  server; nothing leaves the editor. The `.vsix` packages; the
+  Marketplace and Open VSX wait on the publisher account.
+- The counterexample, in three languages: NumPy (Python, exact rationals
+  via Fraction), Julia, and MATLAB. The card shows the language you ask
+  for, and copies that snippet.
+- The MCP server grew the tools agents use: suggest_declarations for the
+  undeclared derivation (two calls to an all-checkmark one), explain_step
+  for one row, spans on every step, two bundled resources (notation,
+  Cookbook), and the check-my-derivation prompt.
+- A whole paper opens in the app: drop a `.tex` on the source pane, and
+  the outline rail lists every math block with its rows and verdicts.
+  Click one to jump to it.
+- The app is an installable offline PWA, and the report figures as a
+  scannable PNG from the card.
+- A `?` card invites a report of the exact row as a prefilled GitHub
+  issue; the privacy page says what that link is, and that it is the only
+  path for text to leave the app.
+- The false friends corpus is in the open: the 40 plausible but false
+  identities SAMOSA will never ratify, the dated list of the false
+  checkmarks found and fixed, the issue form for the next one, and the
+  ledger page that renders both. Accepted traps are credited by handle.
+- The embed widget: a read-only derivation at `/embed`, checked once on
+  mount, with `frame-ancestors *` and `connect-src 'none'`; the app stays
+  frame-sealed. The overflow menu copies an iframe snippet.
+- Four course packs (Backprop, EKF and the Riccati recursion, the
+  inversion lemmas, TA solution keys), playable in spot the bug with the
+  streak you keep.
+- The landing page opens with a live mini-checker, the soundness ledger
+  and the coverage curve; the landing is `sections/`, one file per
+  section.
+- Nightly CI runs the Menu, the Cookbook and the false friends at thirty
+  seeds; the parser is fuzzed; Lighthouse gates accessibility at 0.95 on
+  `/` and `/app/`; the release refuses a changelog with no section for
+  the tag.
+
 ## [1.2.0] - 2026-11-04
 
 The stochastic identities are checked, papers are read inside their

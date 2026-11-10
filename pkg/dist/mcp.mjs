@@ -11609,7 +11609,7 @@ function guessProportionalityVariable(step, ctx) {
 }
 
 // src/core/verdict/types.ts
-var ENGINE_VERSION = true ? "1.2.0" : "0.0.0-dev";
+var ENGINE_VERSION = true ? "1.3.0" : "0.0.0-dev";
 var DEFAULT_SEED = 5910618;
 
 // src/core/verdict/index.ts
@@ -14703,7 +14703,7 @@ function handleExplainStep(args) {
 }
 
 // mcp/server.ts
-var VERSION = true ? "1.2.0" : "0.0.0-dev";
+var VERSION = true ? "1.3.0" : "0.0.0-dev";
 var server = new McpServer({ name: "samosa", version: VERSION });
 var stepSchema = z.object({
   row: z.number(),

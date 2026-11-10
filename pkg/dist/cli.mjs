@@ -11608,7 +11608,7 @@ function guessProportionalityVariable(step, ctx) {
 }
 
 // src/core/verdict/types.ts
-var ENGINE_VERSION = true ? "1.2.0" : "0.0.0-dev";
+var ENGINE_VERSION = true ? "1.3.0" : "0.0.0-dev";
 var DEFAULT_SEED = 5910618;
 
 // src/core/verdict/index.ts
@@ -14177,7 +14177,7 @@ function formatGithub(reports) {
 }
 
 // cli/bin.ts
-var VERSION = true ? "1.2.0" : "0.0.0-dev";
+var VERSION = true ? "1.3.0" : "0.0.0-dev";
 function topLevel(argv) {
   switch (argv[0]) {
     case "--version":

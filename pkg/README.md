@@ -183,7 +183,7 @@ with the mistakes the catalog can make of them.
 | | |
 | --- | --- |
 | the false checkmarks | **0** |
-| the identities SAMOSA cannot check | **1** |
+| the identities SAMOSA cannot check | **0** |
 | the mutation score | **343 of 343 (100.0%)** |
 | the harmless mutants, where the mistake changes nothing | **108** |
 | the raw rate | **343 of 451 (76.1%)** |

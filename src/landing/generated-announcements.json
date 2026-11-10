@@ -1,5 +1,10 @@
 [
   {
+    "date": "2026-11-11",
+    "version": "1.3.0",
+    "body": "The implication row checks, the distribution row checks, the counterexample speaks three languages, and the editor is an extension."
+  },
+  {
     "date": "2026-11-04",
     "version": "1.2.0",
     "body": "The stochastic identities are checked, papers are read inside their document body, and the docs are pages of the site."
