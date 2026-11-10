@@ -25,12 +25,12 @@ Measured by `pnpm check:corpus`:
 | | |
 | --- | --- |
 | the identities | 48 |
-| the mutants | 287 |
+| the mutants | 294 |
 | **the false checkmarks** | **0** |
-| the identities SAMOSA cannot check | 5 |
-| the mutation score | 235 of 240 (**97.9%**) |
-| the harmless mutants the float64 oracle confirmed | 47 |
-| the raw rate | 235 of 287 (**81.9%**) |
+| the identities SAMOSA cannot check | 3 |
+| the mutation score | 242 of 244 (**99.2%**) |
+| the harmless mutants the float64 oracle confirmed | 50 |
+| the raw rate | 242 of 294 (**82.3%**) |
 <!-- /gen:cookbook -->
 
 The plan's gate G2 asks for 95% of the planted bugs caught with the expected
@@ -47,8 +47,6 @@ These are not lies, they are gaps:
 | --- | --- |
 | the spectral norm of a transpose | the unsquared norm \|2\| |
 | a stationary point | no value for x |
-| the normal equations | unexpected end of input |
-| the gradient of a ridge regression | the two sides of this derivative claim do not have comparable shapes |
 | the gradient of the softmax cross entropy | an indexed symbol z_j |
 <!-- /gen:cookbook-gaps -->
 
@@ -81,7 +79,7 @@ The corpus is not only a measurement. It found real bugs, and they are fixed:
 | gate | what the plan asks | what we measure |
 | --- | --- | --- |
 | G1: no false checkmark | the golden suite and the Cookbook | 0 false checkmarks in 48 identities, and 0 in the 16 Menu derivations |
-| G2: the bugs caught | 95%, with the repair in the top three | the mutation score is 97.9% (235 of 240, the 47 harmless mutants excluded and confirmed by the float64 oracle); the raw rate is 81.9% (235 of 287); the four planted bugs of the golden suite all get their expected repair in the top three |
+| G2: the bugs caught | 95%, with the repair in the top three | the mutation score is 99.2% (242 of 244, the 50 harmless mutants excluded and confirmed by the float64 oracle); the raw rate is 82.3% (242 of 294); the four planted bugs of the golden suite all get their expected repair in the top three |
 | G3: the parse coverage | 70% | 56.3%, measured in [COVERAGE.md](COVERAGE.md); the gate is not met |
 <!-- /gen:cookbook-gates -->
 

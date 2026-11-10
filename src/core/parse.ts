@@ -359,6 +359,16 @@ export class Parser {
   /** stop a product at a bar, so a call can read a condition */
   private stopAtBar = false;
 
+  /** The tokens of a \partial numerator after the operator, so a caller can tell a bare operator from one with an operand. */
+  static tokensAfterPartial(numTokens: Token[]): Token[] {
+    let start = 0;
+    if (numTokens[0]?.value === 'partial') {
+      start = 1;
+      if (numTokens[start]?.type === 'sup') start += 2;
+    }
+    return numTokens.slice(start).filter((t) => t.type !== 'eof');
+  }
+
   private readonly tokens: Token[];
   private readonly opts: ParseOptions;
 
@@ -1172,7 +1182,18 @@ export class Parser {
       case 'tfrac': {
         this.pos++;
         const parts = this.readFractionParts();
-        return this.parseFraction(parts.num, parts.den, { from: t.from, to: parts.den.span.to });
+        const numTokens = tokenize(parts.num.text);
+        const denTokens = tokenize(parts.den.text);
+        const numIsPartial = numTokens[0]?.type === 'cmd' && numTokens[0].value === 'partial';
+        const denIsPartial = denTokens[0]?.type === 'cmd' && denTokens[0].value === 'partial';
+        // \frac{\partial}{\partial \beta} is an operator whose operand is
+        // the expression that follows, like \nabla: read it, do not crash
+        // on the empty numerator (it used to die with "unexpected end of
+        // input")
+        if (numIsPartial && denIsPartial && Parser.tokensAfterPartial(numTokens).length === 0) {
+          return this.parseDerivativeOperator(t, numTokens, denTokens);
+        }
+        return this.parseFraction(parts.num, parts.den, { from: t.from, to: parts.den.span.to }, numTokens, denTokens);
       }
       case 'sqrt': {
         this.pos++;
@@ -1493,9 +1514,11 @@ export class Parser {
     num: { text: string; span: Span },
     den: { text: string; span: Span },
     span: Span,
+    numTokens?: Token[],
+    denTokens?: Token[],
   ): Node {
-    const numTokens = tokenize(num.text);
-    const denTokens = tokenize(den.text);
+    numTokens ??= tokenize(num.text);
+    denTokens ??= tokenize(den.text);
     const numIsPartial = numTokens[0]?.type === 'cmd' && numTokens[0].value === 'partial';
     const denIsPartial = denTokens[0]?.type === 'cmd' && denTokens[0].value === 'partial';
 
@@ -1530,9 +1553,49 @@ export class Parser {
     const numParser = new Parser(numTokens.slice(numStart), '', this.opts);
     const f = numParser.parseExpression();
 
-    // denominator: one or more \partial <symbol> groups
+    const { wrt, denOrder } = this.readWrt(denTokens);
+
+    if (order === 1 && denOrder === 2) order = 2;
+
+    const form: 'grad' | 'jac' | 'hess' | 'diff' = order === 2 ? 'hess' : 'grad';
+    return { k: 'deriv', f, wrt, order, form, span };
+  }
+
+  /**
+   * The derivative operator written as a fraction, `\frac{\partial}{\partial
+   * \beta}`: its operand is the expression that follows, the way `\nabla`
+   * works.
+   */
+  private parseDerivativeOperator(
+    t: Token,
+    numTokens: Token[],
+    denTokens: Token[],
+  ): Node {
+    let order: 1 | 2 = 1;
+    if (numTokens[0]?.value === 'partial' && numTokens[1]?.type === 'sup') {
+      const text = numTokens[2]?.value ?? '';
+      if (text === '2') order = 2;
+    }
+    const { wrt, denOrder } = this.readWrt(denTokens);
+    if (order === 1 && denOrder === 2) order = 2;
+    // the operand is the rest of this side of the row, the way physics
+    // papers write it: \frac{\partial}{\partial \beta} J + y is d/dbeta of
+    // J + y. The row parser never feeds it the \&= and beyond.
+    const f = this.parseExpression();
+    return {
+      k: 'deriv',
+      f,
+      wrt,
+      order,
+      form: order === 2 ? 'hess' : 'grad',
+      span: { from: t.from, to: f.span.to },
+    };
+  }
+
+  /** The symbols a derivative is taken with respect to, from `\partial \beta \Sigma`. */
+  private readWrt(denTokens: Token[]): { wrt: Node[]; denOrder: 1 | 2 } {
     const wrt: Node[] = [];
-    let denOrder = 1;
+    let denOrder: 1 | 2 = 1;
     let i = 0;
     while (i < denTokens.length) {
       const t = denTokens[i];
@@ -1543,6 +1606,15 @@ export class Parser {
         let text = '';
         if (denTokens[i]?.type === 'ident') {
           text = denTokens[i].value;
+          nameEnd = i + 1;
+        } else if (
+          denTokens[i]?.type === 'cmd' &&
+          (GREEK.has(denTokens[i].value) || SYMBOL_COMMANDS.has(denTokens[i].value))
+        ) {
+          // the way the row parser names it: the command with its backslash,
+          // so a Greek symbol in the denominator is the same symbol the row
+          // carries, and the engine can find a value for it
+          text = `\\${denTokens[i].value}`;
           nameEnd = i + 1;
         } else if (denTokens[i]?.type === 'lbrace') {
           let depth = 1;
@@ -1602,10 +1674,7 @@ export class Parser {
     }
 
     if (wrt.length >= 2) denOrder = 2;
-    if (order === 1 && denOrder === 2) order = 2;
-
-    const form: 'grad' | 'jac' | 'hess' | 'diff' = order === 2 ? 'hess' : 'grad';
-    return { k: 'deriv', f, wrt, order, form, span };
+    return { wrt, denOrder };
   }
 
   private parseDerivativeAfterNabla(t: Token): Node {

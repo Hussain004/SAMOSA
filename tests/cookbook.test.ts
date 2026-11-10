@@ -22,8 +22,6 @@ const CANNOT_CHECK = new Set([
   'spectral-norm-of-transpose',
   'stationary-point',
   'riccati',
-  'least-squares',
-  'ridge-gradient',
   'softmax',
 ]);
 

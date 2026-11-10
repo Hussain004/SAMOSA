@@ -183,14 +183,14 @@ with the mistakes the catalog can make of them.
 | | |
 | --- | --- |
 | the false checkmarks | **0** |
-| the identities SAMOSA cannot check | **5** |
-| the mutation score | **235 of 240 (97.9%)** |
-| the harmless mutants, where the mistake changes nothing | **47** |
-| the raw rate | **235 of 287 (81.9%)** |
+| the identities SAMOSA cannot check | **3** |
+| the mutation score | **242 of 244 (99.2%)** |
+| the harmless mutants, where the mistake changes nothing | **50** |
+| the raw rate | **242 of 294 (82.3%)** |
 
-The plan's gate asks for 95% of the bugs caught; the mutation score is 97.9%,
+The plan's gate asks for 95% of the bugs caught; the mutation score is 99.2%,
 and every mutant the engine calls right is confirmed harmless by the float64
-oracle. The method, the misses and the 5 gaps the corpus found are
+oracle. The method, the misses and the 2 gaps the corpus found are
 in [docs/COOKBOOK.md](docs/COOKBOOK.md).
 <!-- /gen:cookbook -->
 

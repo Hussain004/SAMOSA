@@ -398,7 +398,8 @@ K_t &:= \Sigma_t C_t^\top Q_t^{-1} \\
     name: 'the normal equations',
     decls: 'X: n×p; y: n; \\beta: p',
     source: String.raw`\begin{align*}
-\frac{\partial}{\partial \beta} \frac{1}{2}\|y - X\beta\|^2 &= X^\top(X\beta - y)
+J &:= \frac{1}{2}\|y - X\beta\|^2 \\
+\frac{\partial J}{\partial \beta} &= X^\top(X\beta - y)
 \end{align*}`,
   },
   {
