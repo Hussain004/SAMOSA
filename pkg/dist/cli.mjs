@@ -9780,677 +9780,6 @@ function secondDirectional(field, residual, x, dir) {
   return { r: plus.r, c: plus.c, d };
 }
 
-// src/core/verdict/proportionality.ts
-function checkProportionality(step, ctx, defs, opts, card) {
-  const dimVars = collectDimVars(ctx, step, defs);
-  const settings = sizeSettings(dimVars);
-  const assumptions = collectAssumptions(ctx, step);
-  const sizes = [];
-  const variable = step.proportionalTo;
-  for (const setting of settings) {
-    sizes.push(Object.fromEntries(setting));
-    const rng = rngFor(opts.seed, step.id, settingKey(setting), "propto");
-    const field = new F64Field();
-    const sampler = new Sampler(field, rng);
-    const env = makeEnv(field, rng);
-    env.defs = defs;
-    env.sizes = new Map(setting);
-    const sampled = sampleFor(ctx, step, defs, setting, sampler);
-    if (sampled === "unknown") {
-      const message = "could not sample an instance";
-      return {
-        id: step.id,
-        row: step.row,
-        span: step.span,
-        relation: step.relation,
-        verdict: "unchecked",
-        card: { ...card, sizes, assumptions },
-        message,
-        reason: message,
-        annotation: step.annotation
-      };
-    }
-    for (const [name2, value] of sampled.values.entries()) env.values.set(name2, value);
-    const name = variable ?? guessProportionalityVariable(step, ctx);
-    if (!name) {
-      const message = "SAMOSA does not know which variable this proportionality is taken in. Write \\propto_x.";
-      return {
-        id: step.id,
-        row: step.row,
-        span: step.span,
-        relation: step.relation,
-        verdict: "unchecked",
-        card: { ...card, sizes, assumptions },
-        message,
-        reason: message,
-        annotation: step.annotation
-      };
-    }
-    const info = ctx.symbols.get(name);
-    if (!info) {
-      const message = `SAMOSA does not know the shape of ${name}`;
-      return {
-        id: step.id,
-        row: step.row,
-        span: step.span,
-        relation: step.relation,
-        verdict: "unchecked",
-        card: { ...card, sizes, assumptions },
-        message,
-        reason: message,
-        annotation: step.annotation
-      };
-    }
-    const differences = [];
-    for (let point = 0; point < 3; point++) {
-      const trialEnv = { ...env, values: new Map(env.values), memo: /* @__PURE__ */ new Map() };
-      if (info.ty.t === "mat") {
-        const r = dimSizeOf(ctx, info.ty.r, setting);
-        const c = dimSizeOf(ctx, info.ty.c, setting);
-        trialEnv.values.set(name, { k: "m", m: sampler.sampleGeneral(r, c) });
-      } else {
-        trialEnv.values.set(name, scalar(sampler.sampleScalar()));
-      }
-      let left;
-      let right;
-      try {
-        const l = evalNode(field, step.lhs, trialEnv);
-        const r = evalNode(field, step.rhs, trialEnv);
-        left = asNumber(l);
-        right = asNumber(r);
-      } catch {
-        const message = "SAMOSA could not evaluate this proportionality over the reals";
-        return {
-          id: step.id,
-          row: step.row,
-          span: step.span,
-          relation: step.relation,
-          verdict: "unchecked",
-          card: { ...card, sizes, assumptions },
-          message,
-          reason: message,
-          annotation: step.annotation
-        };
-      }
-      if (!Number.isFinite(left) || !Number.isFinite(right)) {
-        const message = "this proportionality was not defined at one of the points";
-        return {
-          id: step.id,
-          row: step.row,
-          span: step.span,
-          relation: step.relation,
-          verdict: "unchecked",
-          card: { ...card, sizes, assumptions },
-          message,
-          reason: message,
-          annotation: step.annotation
-        };
-      }
-      differences.push(Math.log(Math.abs(left)) - Math.log(Math.abs(right)));
-    }
-    const spread = Math.max(...differences) - Math.min(...differences);
-    const scale = Math.max(1, ...differences.map((d) => Math.abs(d)));
-    if (spread > 1e-8 * scale) {
-      return {
-        id: step.id,
-        row: step.row,
-        span: step.span,
-        relation: step.relation,
-        verdict: "wrong",
-        mode: "numeric",
-        card: { ...card, sizes, assumptions },
-        message: `the ratio of the two sides depends on ${name}, so they are not proportional`,
-        reason: `the ratio of the two sides depends on ${name}, so they are not proportional`,
-        annotation: step.annotation
-      };
-    }
-  }
-  return {
-    id: step.id,
-    row: step.row,
-    span: step.span,
-    relation: step.relation,
-    verdict: "ok",
-    mode: "numeric",
-    card: { ...card, sizes, assumptions },
-    message: "the ratio of the two sides does not depend on the variable",
-    annotation: step.annotation
-  };
-}
-function asNumber(val) {
-  if (isScalarVal(val)) return Number(val.v);
-  return Number(val.m.d[0]);
-}
-function guessProportionalityVariable(step, ctx) {
-  const names = /* @__PURE__ */ new Set();
-  collectSymbols(step.lhs, names);
-  for (const name of names) {
-    const info = ctx.symbols.get(name);
-    if (info && info.ty.t === "mat") return name;
-  }
-  return void 0;
-}
-
-// src/core/verdict/types.ts
-var ENGINE_VERSION = true ? "1.2.0" : "0.0.0-dev";
-var DEFAULT_SEED = 5910618;
-
-// src/core/verdict/index.ts
-function analyzeSource(src, opts) {
-  const rows = splitRows(src);
-  const harvested = harvestDeclsDetailed(src);
-  const proseChips = harvested.fromProse.map((h) => ({
-    id: "harvested",
-    symbol: h.name,
-    span: { from: 0, to: 0 },
-    message: `${h.decl}, read from line ${h.line}`
-  }));
-  const declared = parseDeclarations([opts.decls ?? "", ...harvested.decls].filter(Boolean).join("; "));
-  const preset = presetDecls(opts.preset);
-  const decls = mergeDecls(preset, declared.decls);
-  const ctx = createContext(decls, opts.layout ?? "denominator", declared.pinned);
-  const defs = /* @__PURE__ */ new Map();
-  const definedNames = /* @__PURE__ */ new Set();
-  const knownFns = new Set(decls.filter((d) => d.kind === "function").map((d) => d.name));
-  const knownValues = new Set(decls.filter((d) => d.kind !== "function").map((d) => d.name));
-  const macros = harvestMacros(src);
-  const steps = [];
-  let previousRhs;
-  let rowIndex = 0;
-  for (const row of rows) {
-    const parsed = parseRow(src, row.text, row.from, rowIndex, knownFns, macros, knownValues);
-    rowIndex++;
-    if (parsed.error) {
-      steps.push({
-        id: `s${steps.length}`,
-        row: rowIndex,
-        span: parsed.error.span,
-        text: row.text,
-        relation: "other",
-        annotation: parsed.annotation,
-        isDefinition: false,
-        unreadable: parsed.error.message,
-        symbols: /* @__PURE__ */ new Set()
-      });
-      continue;
-    }
-    if (parsed.prose || !parsed.parts.length) continue;
-    for (const part of parsed.parts) {
-      if (part.relation === "=>" || part.relation === "<=>") {
-        const symbols2 = /* @__PURE__ */ new Set();
-        collectSymbols(part.premise?.lhs, symbols2);
-        collectSymbols(part.premise?.rhs, symbols2);
-        collectSymbols(part.conclusion?.lhs, symbols2);
-        collectSymbols(part.conclusion?.rhs, symbols2);
-        steps.push({
-          id: `s${steps.length}`,
-          row: rowIndex,
-          span: part.span,
-          text: row.text,
-          relation: part.relation,
-          premise: part.premise,
-          conclusion: part.conclusion,
-          annotation: parsed.annotation,
-          isDefinition: false,
-          symbols: symbols2
-        });
-        previousRhs = part.conclusion?.rhs;
-        continue;
-      }
-      let lhs = part.lhs ?? null ?? void 0;
-      const rhs = part.rhs ?? null ?? void 0;
-      if (!lhs && previousRhs) lhs = previousRhs;
-      const symbols = /* @__PURE__ */ new Set();
-      collectSymbols(lhs, symbols);
-      collectSymbols(rhs, symbols);
-      const bareLhs = defNameOf(lhs, ctx);
-      const rightSymbols = /* @__PURE__ */ new Set();
-      collectSymbols(rhs, rightSymbols);
-      const isDefinition = part.relation === ":=" || bareLhs !== void 0 && !definedNames.has(bareLhs) && !isFunctionName(ctx, bareLhs) && !ctx.decls.has(bareLhs) && !rightSymbols.has(bareLhs);
-      steps.push({
-        id: `s${steps.length}`,
-        row: rowIndex,
-        span: part.span,
-        text: row.text,
-        lhs,
-        rhs,
-        proportionalTo: part.proportionalTo,
-        relation: part.relation === ":=" ? "defined" : part.relation,
-        annotation: parsed.annotation,
-        isDefinition,
-        defName: isDefinition ? bareLhs : void 0,
-        symbols
-      });
-      previousRhs = rhs;
-      if (bareLhs && isDefinition) {
-        definedNames.add(bareLhs);
-        knownValues.add(bareLhs);
-        if (lhs?.k === "call") knownFns.add(bareLhs);
-      }
-      if (isDefinition && bareLhs && rhs) {
-        defs.set(bareLhs, rhs);
-        ctx.defs.set(bareLhs, rhs);
-        if (lhs?.k === "call") {
-          const params = lhs.args.filter((a) => a.k === "sym").map((a) => a.name);
-          defs.params ??= /* @__PURE__ */ new Map();
-          defs.params.set(bareLhs, params);
-        }
-      }
-    }
-  }
-  return { ctx, defs, steps, declErrors: declared.errors, harvested: proseChips };
-}
-function check(src, opts = {}) {
-  const started = now();
-  const seed = opts.seed ?? DEFAULT_SEED;
-  const trials = opts.trials ?? 3;
-  const source = analyzeSource(src, opts);
-  const { ctx, defs, steps } = source;
-  const decls = [...ctx.decls.values()];
-  const chips = [];
-  const diagnostics = [];
-  const results = [];
-  const used = /* @__PURE__ */ new Set();
-  for (const step of steps) {
-    for (const name of step.symbols) used.add(name);
-    if (step.lhs?.k === "sym") used.add(step.lhs.name);
-    if (step.rhs?.k === "sym") used.add(step.rhs.name);
-  }
-  for (const decl of decls) {
-    if (!decl.dist || !used.has(decl.name)) continue;
-    for (const param of Object.values(decl.dist)) {
-      if (param !== decl.dist.kind) used.add(param);
-    }
-  }
-  for (const decl of decls) {
-    if (used.has(decl.name)) continue;
-    if (decl.source === "preset") continue;
-    chips.push({
-      id: "unused-declaration",
-      symbol: decl.name,
-      message: `${decl.name} is declared but no row uses it, so the declaration does nothing`,
-      span: { from: 0, to: 0 }
-    });
-  }
-  for (const step of steps) {
-    const result = checkStep(step, ctx, defs, { seed, trials }, diagnostics);
-    result.text ??= step.text;
-    results.push(result);
-  }
-  for (const message of source.declErrors) {
-    diagnostics.push({ severity: "warning", message, span: { from: 0, to: 0 } });
-  }
-  chips.push(...ctx.chips);
-  chips.push(...source.harvested);
-  return {
-    version: ENGINE_VERSION,
-    seed,
-    steps: results,
-    symbols: [...ctx.symbols.values()],
-    chips,
-    diagnostics,
-    ms: Math.round(now() - started)
-  };
-}
-function mergeDecls(preset, declared) {
-  const out = [...preset];
-  const index = new Map(out.map((d, i) => [d.name, i]));
-  for (const d of declared) {
-    const at = index.get(d.name);
-    if (at === void 0) {
-      index.set(d.name, out.length);
-      out.push(d);
-    } else {
-      out[at] = d;
-    }
-  }
-  return out;
-}
-function now() {
-  return Date.now();
-}
-function checkStep(step, ctx, defs, opts, diagnostics) {
-  const base2 = {
-    trialsPerSize: opts.trials,
-    sizes: [],
-    assumptions: [],
-    seed: opts.seed
-  };
-  if (step.unreadable) {
-    return {
-      id: step.id,
-      row: step.row,
-      span: step.span,
-      text: step.text,
-      relation: "other",
-      verdict: "unchecked",
-      card: base2,
-      message: step.unreadable,
-      reason: step.unreadable,
-      annotation: step.annotation
-    };
-  }
-  if (step.isDefinition) {
-    return {
-      id: step.id,
-      row: step.row,
-      span: step.span,
-      text: step.text,
-      lhsSpan: step.lhs?.span,
-      rhsSpan: step.rhs?.span,
-      relation: "defined",
-      verdict: "defined",
-      card: base2,
-      message: step.defName ? `defined: ${step.defName}` : "defined",
-      isDefinition: true,
-      annotation: step.annotation
-    };
-  }
-  if (step.relation === "=>" || step.relation === "<=>") {
-    return checkImplication(step, ctx, defs, opts, base2);
-  }
-  if (step.relation !== "=" && step.relation !== "propto") {
-    const message = unsupportedRelation(step.relation);
-    return {
-      id: step.id,
-      row: step.row,
-      span: step.span,
-      text: step.text,
-      relation: step.relation,
-      verdict: "unchecked",
-      card: base2,
-      message,
-      reason: message,
-      annotation: step.annotation
-    };
-  }
-  if (!step.lhs || !step.rhs) {
-    const message = "this row has no relation to check";
-    return {
-      id: step.id,
-      row: step.row,
-      span: step.span,
-      text: step.text,
-      relation: step.relation,
-      verdict: "unchecked",
-      card: base2,
-      message,
-      reason: message,
-      annotation: step.annotation
-    };
-  }
-  const lhsTy = inferType(ctx, step.lhs);
-  const rhsTy = inferType(ctx, step.rhs);
-  let transposed = false;
-  if (step.lhs?.k === "deriv" && rhsTy.t === "mat" && lhsTy.t === "mat") {
-    const key = (d) => typeof d === "number" ? String(d) : ctx.dims.find(d.v);
-    transposed = key(rhsTy.r) === key(lhsTy.c) && key(rhsTy.c) === key(lhsTy.r) && key(rhsTy.r) !== key(rhsTy.c);
-  }
-  if (lhsTy.t === "mat" && rhsTy.t === "mat") {
-    unifyShapes(ctx, lhsTy, rhsTy, step.span);
-  }
-  const allErrors = ctx.errors.splice(0, ctx.errors.length);
-  const shapeConflicts = ctx.shapeConflicts.splice(0, ctx.shapeConflicts.length);
-  const shapeErrors = allErrors.filter((e) => e.kind !== "unknown-function");
-  const unknownFn = allErrors.find((e) => e.kind === "unknown-function");
-  if (shapeErrors.length && transposed) {
-    shapeErrors[0].message = "this is the numerator layout: SAMOSA uses the denominator layout, where the gradient has the shape of the variable it is taken with respect to";
-  }
-  if (shapeErrors.length) {
-    for (const error of shapeErrors) {
-      diagnostics.push({ severity: "error", message: error.message, span: error.span, stepId: step.id });
-    }
-    const dimVars = collectDimVars(ctx, step, defs);
-    const settings = sizeSettings(dimVars);
-    const witness = settings.filter(
-      (s) => shapeConflicts.every(({ a, b }) => s.get(a) !== s.get(b))
-    );
-    const shown = (witness.length ? witness : settings).slice(0, 3);
-    const sizes = shown.map((s) => Object.fromEntries(s));
-    return {
-      id: step.id,
-      row: step.row,
-      span: step.span,
-      lhsSpan: step.lhs.span,
-      rhsSpan: step.rhs.span,
-      relation: step.relation,
-      verdict: "shape",
-      card: { ...base2, sizes, assumptions: collectAssumptions(ctx, step) },
-      message: shapeErrors[0].message,
-      reason: shapeErrors.map((e) => e.message).join("; "),
-      annotation: step.annotation
-    };
-  }
-  if (unknownFn) {
-    diagnostics.push({ severity: "error", message: unknownFn.message, span: unknownFn.span, stepId: step.id });
-    return {
-      id: step.id,
-      row: step.row,
-      span: step.span,
-      lhsSpan: step.lhs.span,
-      rhsSpan: step.rhs.span,
-      relation: step.relation,
-      verdict: "unchecked",
-      card: base2,
-      message: `${unknownFn.message}, so SAMOSA cannot read this step`,
-      reason: unknownFn.message,
-      annotation: step.annotation
-    };
-  }
-  const unreadable = rawReason(step.lhs) ?? rawReason(step.rhs);
-  if (unreadable) {
-    return {
-      id: step.id,
-      row: step.row,
-      span: step.span,
-      lhsSpan: step.lhs?.span,
-      rhsSpan: step.rhs?.span,
-      relation: step.relation,
-      verdict: "unchecked",
-      card: base2,
-      message: unreadable,
-      reason: unreadable,
-      annotation: step.annotation
-    };
-  }
-  if (step.relation === "propto") {
-    return checkProportionality(step, ctx, defs, opts, base2);
-  }
-  const mode = planMode(step, ctx, defs);
-  if (mode === "unchecked") {
-    const message = "SAMOSA cannot check this step";
-    return {
-      id: step.id,
-      row: step.row,
-      span: step.span,
-      lhsSpan: step.lhs.span,
-      rhsSpan: step.rhs.span,
-      relation: step.relation,
-      verdict: "unchecked",
-      card: base2,
-      message,
-      reason: message,
-      annotation: step.annotation
-    };
-  }
-  if (mode === "exact") return checkExact(step, ctx, defs, opts, base2);
-  return checkNumeric(step, ctx, defs, opts, base2);
-}
-function unifyShapes(ctx, a, b, span) {
-  const r = unifyDim(ctx, a.r, b.r, "in this equality", span);
-  const c = unifyDim(ctx, a.c, b.c, "in this equality", span);
-  void r;
-  void c;
-}
-function unsupportedRelation(relation) {
-  switch (relation) {
-    case "le":
-    case "ge":
-    case "lt":
-    case "gt":
-      return `inequalities (${relation}) are not checked in v1`;
-    case "approx":
-      return "approximations are not checked in v1";
-    case "propto":
-      return "proportionality is checked over the reals only";
-    default:
-      return "this relation is not checked in v1";
-  }
-}
-
-// src/core/render.ts
-function renderNode(node) {
-  switch (node.k) {
-    case "num": {
-      const v = node.value;
-      if (v.d === 1) return String(v.n);
-      if (v.d < 0) return `-${-v.n}/${-v.d}`;
-      return `\\frac{${v.n}}{${v.d}}`;
-    }
-    case "sym":
-      return renderSymbol(node.name);
-    case "op":
-      return renderOp(node);
-    case "call":
-      return `${node.fn}\\left(${node.args.map(renderNode).join(", ")}\\right)`;
-    case "deriv": {
-      const wrt = node.wrt.map((w) => `\\partial ${renderNode(w)}`).join(" ");
-      return `\\frac{\\partial${node.order === 2 ? "^2" : ""} ${renderNode(node.f)}}{${wrt}}`;
-    }
-    case "expect": {
-      const op = node.op === "E" ? "\\mathbb{E}" : node.op === "Var" ? "\\operatorname{Var}" : "\\operatorname{Cov}";
-      return `${op}\\left[${node.args.map(renderNode).join(", ")}\\right]`;
-    }
-    case "bigop": {
-      const op = node.kind === "sum" ? "\\sum" : "\\prod";
-      const lo = node.lo ? renderNode(node.lo) : "";
-      const hi = node.hi ? renderNode(node.hi) : "";
-      return `${op}_{${node.idx}=${lo}}^{${hi}} ${renderNode(node.body)}`;
-    }
-    case "block": {
-      const rows = node.rows.map((row) => row.map(renderNode).join(" & ")).join(" \\\\ ");
-      return `\\begin{bmatrix} ${rows} \\end{bmatrix}`;
-    }
-    case "piecewise": {
-      const rows = node.cases.map(
-        ({ condition, value }) => condition ? `${renderNode(value)} & ${renderNodeCond(condition)}` : `${renderNode(value)} & otherwise`
-      ).join(" \\\\ ");
-      return `\\begin{cases} ${rows} \\end{cases}`;
-    }
-    case "raw":
-      return node.text;
-    default:
-      return "";
-  }
-}
-function renderNodeCond(node) {
-  if (node.k !== "cond") return renderNode(node);
-  const cond = node;
-  const REL = {
-    le: "\\le",
-    ge: "\\ge",
-    lt: "<",
-    gt: ">",
-    "=": "=",
-    approx: "\\approx"
-  };
-  return `${renderNode(cond.lhs)} ${REL[cond.relation] ?? cond.relation} ${renderNode(cond.rhs)}`;
-}
-function renderSymbol(name) {
-  const supIndex = name.indexOf("^");
-  const subIndex = name.indexOf("_");
-  let base2 = name;
-  let sub2 = "";
-  let sup = "";
-  if (subIndex >= 0 && (supIndex < 0 || subIndex < supIndex)) {
-    base2 = name.slice(0, subIndex);
-    const rest = name.slice(subIndex + 1);
-    if (supIndex > subIndex) {
-      sub2 = rest.slice(0, supIndex - subIndex - 1);
-      sup = rest.slice(supIndex - subIndex);
-    } else {
-      sub2 = rest;
-    }
-  } else if (supIndex >= 0) {
-    base2 = name.slice(0, supIndex);
-    sup = name.slice(supIndex);
-  }
-  let out = base2;
-  if (sub2) out += sub2.length === 1 ? `_${sub2}` : `_{${sub2}}`;
-  if (sup) out += sup.length === 1 ? `^${sup}` : `^{${sup}}`;
-  return out;
-}
-function renderOp(node) {
-  const a = node.args.map(renderNode);
-  switch (node.op) {
-    case "add":
-      return `${operand(node.args[0])} + ${operand(node.args[1])}`;
-    case "sub":
-      return `${operand(node.args[0])} - ${operand(node.args[1])}`;
-    case "neg":
-      return `-${operand(node.args[0])}`;
-    case "mul":
-      return `${operand(node.args[0])} ${operand(node.args[1])}`;
-    case "div":
-      return `\\frac{${a[0]}}{${a[1]}}`;
-    case "pow":
-      return `${base(node.args[0])}^{${a[1]}}`;
-    case "inv":
-      return `${base(node.args[0])}^{-1}`;
-    case "invT":
-      return `${base(node.args[0])}^{-\\top}`;
-    case "T":
-      return `${base(node.args[0])}^\\top`;
-    case "tr":
-      return `\\operatorname{tr}\\left(${a[0]}\\right)`;
-    case "det":
-      return `\\det\\left(${a[0]}\\right)`;
-    case "adj":
-      return `\\operatorname{adj}\\left(${a[0]}\\right)`;
-    case "kron":
-      return `${a[0]} \\otimes ${a[1]}`;
-    case "cross":
-      return `${operand(node.args[0])} \\times ${operand(node.args[1])}`;
-    case "had":
-      return `${a[0]} \\odot ${a[1]}`;
-    case "inner":
-      return `\\left\\langle ${a[0]}, ${a[1]} \\right\\rangle`;
-    case "norm2":
-      return `\\left\\|${a[0]}\\right\\|^{2}`;
-    case "frob":
-      return `\\left\\|${a[0]}\\right\\|_{F}^{2}`;
-    case "norm":
-      return `\\left\\|${a[0]}\\right\\|`;
-    case "normF":
-      return `\\left\\|${a[0]}\\right\\|_{F}`;
-    case "vec":
-      return `\\operatorname{vec}\\left(${a[0]}\\right)`;
-    case "diag":
-      return `\\operatorname{diag}\\left(${a[0]}\\right)`;
-    case "abs":
-      return `\\left|${a[0]}\\right|`;
-    case "sqrtm":
-      return `\\sqrt{${a[0]}}`;
-  }
-}
-function operand(node) {
-  if (!node) return "";
-  const text = renderNode(node);
-  if (node.k === "op" && (node.op === "add" || node.op === "sub" || node.op === "neg")) {
-    return `\\left(${text}\\right)`;
-  }
-  if (node.k === "op" && node.op === "mul") return `{${text}}`;
-  return text;
-}
-function base(node) {
-  if (!node) return "";
-  const text = renderNode(node);
-  if (node.k === "op" && ["add", "sub", "neg", "mul", "cross", "kron", "had"].includes(node.op)) {
-    return `\\left(${text}\\right)`;
-  }
-  return `{${text}}`;
-}
-
 // src/core/numpy.ts
 function rationalize(x) {
   if (!Number.isFinite(x)) return null;
@@ -11120,6 +10449,888 @@ function literal(lang, value, shape) {
   const out = [];
   for (let i = 0; i < rows; i++) out.push(rowAt(i).join(" "));
   return `[${out.join("; ")}]`;
+}
+
+// src/core/verdict/inequality.ts
+var TRIALS_PER_SIZE = 6;
+var VECTOR_PROBES = 8;
+var CMP = {
+  le: (cmp) => cmp > 0,
+  // lhs ≤ rhs breaks when lhs > rhs
+  lt: (cmp) => cmp >= 0,
+  // lhs < rhs breaks when lhs ≥ rhs
+  ge: (cmp) => cmp < 0,
+  // lhs ≥ rhs breaks when lhs < rhs
+  gt: (cmp) => cmp <= 0
+  // lhs > rhs breaks when lhs ≤ rhs
+};
+var isScalarZero = (node) => !!node && node.k === "num" && node.value.n === 0 && node.value.d === 1;
+var isOneByOne = (ty) => ty.t === "mat" && typeof ty.r === "number" && typeof ty.c === "number" && ty.r === 1 && ty.c === 1;
+function comparisonShape(lhsTy, rhsTy, lhs, rhs) {
+  const scalarLike = (ty) => ty.t === "scalar" || isOneByOne(ty);
+  if (scalarLike(lhsTy) && scalarLike(rhsTy)) return "scalar";
+  if (lhsTy.t === "mat" && rhsTy.t === "mat") return "matrix";
+  if (lhsTy.t === "mat" && rhsTy.t === "scalar" && isScalarZero(rhs)) return "matrix-broadcast";
+  if (rhsTy.t === "mat" && lhsTy.t === "scalar" && isScalarZero(lhs)) return "matrix-broadcast";
+  return "invalid-shape";
+}
+function sampleInstance(ctx, step, defs, setting, sampler, trial) {
+  const env = makeEnv(sampler.field, sampler.rng);
+  env.defs = defs;
+  env.sizes = new Map(setting);
+  const sampled = sampleFor(ctx, step, defs, setting, sampler, /* @__PURE__ */ new Set(), trial);
+  if (sampled === "unknown") return null;
+  for (const [name, value] of sampled.values.entries()) env.values.set(name, value);
+  for (const [name, quad] of sampled.quad.entries()) env.quad.set(name, quad);
+  return env;
+}
+function asScalar2(v) {
+  if (v.k === "s") return v.v;
+  if (v.k === "m" && v.m.r === 1 && v.m.c === 1) return v.m.d[0];
+  return null;
+}
+function checkInequality(step, ctx, defs, opts, card) {
+  const base2 = {
+    ...card,
+    sizes: [],
+    assumptions: []
+  };
+  const relation = step.relation;
+  const relText = step.relation;
+  const unsigned = (span) => ({
+    id: step.id,
+    row: step.row,
+    span,
+    text: step.text,
+    lhsSpan: step.lhs?.span,
+    rhsSpan: step.rhs?.span,
+    relation: relText,
+    verdict: "shape",
+    card: { ...base2, assumptions: ["the shapes do not fit"] },
+    message: "the two sides of this inequality have incomparable shapes",
+    reason: "the two sides of this inequality have incomparable shapes",
+    annotation: step.annotation
+  });
+  if (!step.lhs || !step.rhs) {
+    return {
+      id: step.id,
+      row: step.row,
+      span: step.span,
+      text: step.text,
+      relation: relText,
+      verdict: "unchecked",
+      card: base2,
+      message: "this row has no claim to compare",
+      reason: "this row has no claim to compare"
+    };
+  }
+  const lhsTy = inferType(ctx, step.lhs);
+  const rhsTy = inferType(ctx, step.rhs);
+  const shape = comparisonShape(lhsTy, rhsTy, step.lhs, step.rhs);
+  if (shape === "invalid-shape") return unsigned(step.span);
+  const dimVars = collectDimVarsFor(ctx, step.lhs, step.rhs, defs);
+  const settings = sizeSettings(dimVars).slice(0, 2);
+  const field = new DecField(50);
+  const spent = { n: 0 };
+  let comparisons = 0;
+  const tried = [];
+  let found = null;
+  const compareScalars = (cmp) => CMP[relation](cmp);
+  for (const setting of settings) {
+    tried.push(Object.fromEntries(setting));
+    for (let trial = 0; trial < TRIALS_PER_SIZE; trial++) {
+      const rng = rngFor(opts.seed, step.id, settingKey(setting), trial, "ineq");
+      const sampler = new Sampler(field, rng);
+      const env = sampleInstance(ctx, step, defs, setting, sampler, trial);
+      if (!env) continue;
+      try {
+        const l = evalNode(field, step.lhs, env);
+        const r = evalNode(field, step.rhs, env);
+        const ls = asScalar2(l);
+        const rs = asScalar2(r);
+        if (shape === "scalar" || ls !== null && rs !== null) {
+          if (ls === null || rs === null) continue;
+          comparisons++;
+          const d = field.sub(ls, rs);
+          if (compareScalars(field.cmp(d, field.zero))) {
+            found = { values: env.values, l, r, setting, env };
+            break;
+          }
+          continue;
+        }
+        const Smat = broadcastDifference(field, l, r);
+        if (!Smat) continue;
+        for (let probe = 0; probe < VECTOR_PROBES + Smat.r; probe++) {
+          spent.n++;
+          const v = probe < VECTOR_PROBES ? sampler.sampleGeneral(Smat.r, 1) : identity(Smat.r, field.one, field.zero);
+          const col = probe < VECTOR_PROBES ? v : { r: Smat.r, c: 1, d: Array.from({ length: Smat.r }, (_, i) => i === probe - VECTOR_PROBES ? field.one : field.zero) };
+          comparisons++;
+          const t = inner(field, col, matMul(field, Smat, col));
+          if (compareScalars(field.cmp(t, field.zero))) {
+            found = { values: env.values, l, r, setting, env };
+            break;
+          }
+        }
+        if (found) break;
+      } catch {
+        continue;
+      }
+    }
+    if (found) break;
+  }
+  if (found) {
+    let counterexample;
+    try {
+      counterexample = describe(
+        ctx,
+        found.setting,
+        found.values,
+        derivedValues(field, found.env, defs),
+        (name) => ctx.symbols.get(name)?.props ?? [],
+        step.lhs,
+        step.rhs,
+        defs,
+        found.l,
+        found.r,
+        field,
+        false
+      );
+    } catch {
+      counterexample = void 0;
+    }
+    spent.n += 1;
+    return {
+      id: step.id,
+      row: step.row,
+      span: step.span,
+      text: step.text,
+      lhsSpan: step.lhs?.span,
+      rhsSpan: step.rhs?.span,
+      relation: relText,
+      verdict: "wrong",
+      mode: "numeric",
+      card: {
+        ...base2,
+        sizes: tried,
+        assumptions: ["inequalities are never certified; a violation was found"],
+        maxDelta: 0
+      },
+      message: "this inequality does not hold",
+      reason: "this inequality does not hold",
+      counterexample,
+      annotation: step.annotation
+    };
+  }
+  const sizes = tried;
+  const sizeText = sizes.length === 0 || sizes.every((s) => Object.keys(s).length === 0) ? "scalars" : sizes.map((s) => Object.entries(s).map(([k, v]) => `${k}=${v}`).join(" ")).join("; ");
+  const instances = comparisons;
+  const message = `no violation found in ${instances} instances at sizes ${sizeText}; inequalities are never certified`;
+  return {
+    id: step.id,
+    row: step.row,
+    span: step.span,
+    text: step.text,
+    lhsSpan: step.lhs?.span,
+    rhsSpan: step.rhs?.span,
+    relation: relText,
+    verdict: "unchecked",
+    mode: "numeric",
+    card: {
+      ...base2,
+      sizes,
+      assumptions: ["inequalities are never certified"]
+    },
+    message,
+    reason: message,
+    annotation: step.annotation
+  };
+}
+function broadcastDifference(field, l, r) {
+  if (l.k === "m" && r.k === "m") {
+    if (l.m.r !== r.m.r || l.m.c !== r.m.c) return null;
+    return matSub(field, l.m, r.m);
+  }
+  if (l.k === "m" && r.k === "s") {
+    return l.m;
+  }
+  if (r.k === "m" && l.k === "s") {
+    return matSub(field, zeros(r.m.r, r.m.c, field.zero), r.m);
+  }
+  return null;
+}
+
+// src/core/verdict/proportionality.ts
+function checkProportionality(step, ctx, defs, opts, card) {
+  const dimVars = collectDimVars(ctx, step, defs);
+  const settings = sizeSettings(dimVars);
+  const assumptions = collectAssumptions(ctx, step);
+  const sizes = [];
+  const variable = step.proportionalTo;
+  for (const setting of settings) {
+    sizes.push(Object.fromEntries(setting));
+    const rng = rngFor(opts.seed, step.id, settingKey(setting), "propto");
+    const field = new F64Field();
+    const sampler = new Sampler(field, rng);
+    const env = makeEnv(field, rng);
+    env.defs = defs;
+    env.sizes = new Map(setting);
+    const sampled = sampleFor(ctx, step, defs, setting, sampler);
+    if (sampled === "unknown") {
+      const message = "could not sample an instance";
+      return {
+        id: step.id,
+        row: step.row,
+        span: step.span,
+        relation: step.relation,
+        verdict: "unchecked",
+        card: { ...card, sizes, assumptions },
+        message,
+        reason: message,
+        annotation: step.annotation
+      };
+    }
+    for (const [name2, value] of sampled.values.entries()) env.values.set(name2, value);
+    const name = variable ?? guessProportionalityVariable(step, ctx);
+    if (!name) {
+      const message = "SAMOSA does not know which variable this proportionality is taken in. Write \\propto_x.";
+      return {
+        id: step.id,
+        row: step.row,
+        span: step.span,
+        relation: step.relation,
+        verdict: "unchecked",
+        card: { ...card, sizes, assumptions },
+        message,
+        reason: message,
+        annotation: step.annotation
+      };
+    }
+    const info = ctx.symbols.get(name);
+    if (!info) {
+      const message = `SAMOSA does not know the shape of ${name}`;
+      return {
+        id: step.id,
+        row: step.row,
+        span: step.span,
+        relation: step.relation,
+        verdict: "unchecked",
+        card: { ...card, sizes, assumptions },
+        message,
+        reason: message,
+        annotation: step.annotation
+      };
+    }
+    const differences = [];
+    for (let point = 0; point < 3; point++) {
+      const trialEnv = { ...env, values: new Map(env.values), memo: /* @__PURE__ */ new Map() };
+      if (info.ty.t === "mat") {
+        const r = dimSizeOf(ctx, info.ty.r, setting);
+        const c = dimSizeOf(ctx, info.ty.c, setting);
+        trialEnv.values.set(name, { k: "m", m: sampler.sampleGeneral(r, c) });
+      } else {
+        trialEnv.values.set(name, scalar(sampler.sampleScalar()));
+      }
+      let left;
+      let right;
+      try {
+        const l = evalNode(field, step.lhs, trialEnv);
+        const r = evalNode(field, step.rhs, trialEnv);
+        left = asNumber(l);
+        right = asNumber(r);
+      } catch {
+        const message = "SAMOSA could not evaluate this proportionality over the reals";
+        return {
+          id: step.id,
+          row: step.row,
+          span: step.span,
+          relation: step.relation,
+          verdict: "unchecked",
+          card: { ...card, sizes, assumptions },
+          message,
+          reason: message,
+          annotation: step.annotation
+        };
+      }
+      if (!Number.isFinite(left) || !Number.isFinite(right)) {
+        const message = "this proportionality was not defined at one of the points";
+        return {
+          id: step.id,
+          row: step.row,
+          span: step.span,
+          relation: step.relation,
+          verdict: "unchecked",
+          card: { ...card, sizes, assumptions },
+          message,
+          reason: message,
+          annotation: step.annotation
+        };
+      }
+      differences.push(Math.log(Math.abs(left)) - Math.log(Math.abs(right)));
+    }
+    const spread = Math.max(...differences) - Math.min(...differences);
+    const scale = Math.max(1, ...differences.map((d) => Math.abs(d)));
+    if (spread > 1e-8 * scale) {
+      return {
+        id: step.id,
+        row: step.row,
+        span: step.span,
+        relation: step.relation,
+        verdict: "wrong",
+        mode: "numeric",
+        card: { ...card, sizes, assumptions },
+        message: `the ratio of the two sides depends on ${name}, so they are not proportional`,
+        reason: `the ratio of the two sides depends on ${name}, so they are not proportional`,
+        annotation: step.annotation
+      };
+    }
+  }
+  return {
+    id: step.id,
+    row: step.row,
+    span: step.span,
+    relation: step.relation,
+    verdict: "ok",
+    mode: "numeric",
+    card: { ...card, sizes, assumptions },
+    message: "the ratio of the two sides does not depend on the variable",
+    annotation: step.annotation
+  };
+}
+function asNumber(val) {
+  if (isScalarVal(val)) return Number(val.v);
+  return Number(val.m.d[0]);
+}
+function guessProportionalityVariable(step, ctx) {
+  const names = /* @__PURE__ */ new Set();
+  collectSymbols(step.lhs, names);
+  for (const name of names) {
+    const info = ctx.symbols.get(name);
+    if (info && info.ty.t === "mat") return name;
+  }
+  return void 0;
+}
+
+// src/core/verdict/types.ts
+var ENGINE_VERSION = true ? "1.2.0" : "0.0.0-dev";
+var DEFAULT_SEED = 5910618;
+
+// src/core/verdict/index.ts
+function analyzeSource(src, opts) {
+  const rows = splitRows(src);
+  const harvested = harvestDeclsDetailed(src);
+  const proseChips = harvested.fromProse.map((h) => ({
+    id: "harvested",
+    symbol: h.name,
+    span: { from: 0, to: 0 },
+    message: `${h.decl}, read from line ${h.line}`
+  }));
+  const declared = parseDeclarations([opts.decls ?? "", ...harvested.decls].filter(Boolean).join("; "));
+  const preset = presetDecls(opts.preset);
+  const decls = mergeDecls(preset, declared.decls);
+  const ctx = createContext(decls, opts.layout ?? "denominator", declared.pinned);
+  const defs = /* @__PURE__ */ new Map();
+  const definedNames = /* @__PURE__ */ new Set();
+  const knownFns = new Set(decls.filter((d) => d.kind === "function").map((d) => d.name));
+  const knownValues = new Set(decls.filter((d) => d.kind !== "function").map((d) => d.name));
+  const macros = harvestMacros(src);
+  const steps = [];
+  let previousRhs;
+  let rowIndex = 0;
+  for (const row of rows) {
+    const parsed = parseRow(src, row.text, row.from, rowIndex, knownFns, macros, knownValues);
+    rowIndex++;
+    if (parsed.error) {
+      steps.push({
+        id: `s${steps.length}`,
+        row: rowIndex,
+        span: parsed.error.span,
+        text: row.text,
+        relation: "other",
+        annotation: parsed.annotation,
+        isDefinition: false,
+        unreadable: parsed.error.message,
+        symbols: /* @__PURE__ */ new Set()
+      });
+      continue;
+    }
+    if (parsed.prose || !parsed.parts.length) continue;
+    for (const part of parsed.parts) {
+      if (part.relation === "=>" || part.relation === "<=>") {
+        const symbols2 = /* @__PURE__ */ new Set();
+        collectSymbols(part.premise?.lhs, symbols2);
+        collectSymbols(part.premise?.rhs, symbols2);
+        collectSymbols(part.conclusion?.lhs, symbols2);
+        collectSymbols(part.conclusion?.rhs, symbols2);
+        steps.push({
+          id: `s${steps.length}`,
+          row: rowIndex,
+          span: part.span,
+          text: row.text,
+          relation: part.relation,
+          premise: part.premise,
+          conclusion: part.conclusion,
+          annotation: parsed.annotation,
+          isDefinition: false,
+          symbols: symbols2
+        });
+        previousRhs = part.conclusion?.rhs;
+        continue;
+      }
+      let lhs = part.lhs ?? null ?? void 0;
+      const rhs = part.rhs ?? null ?? void 0;
+      if (!lhs && previousRhs) lhs = previousRhs;
+      const symbols = /* @__PURE__ */ new Set();
+      collectSymbols(lhs, symbols);
+      collectSymbols(rhs, symbols);
+      const bareLhs = defNameOf(lhs, ctx);
+      const rightSymbols = /* @__PURE__ */ new Set();
+      collectSymbols(rhs, rightSymbols);
+      const isDefinition = part.relation === ":=" || bareLhs !== void 0 && !definedNames.has(bareLhs) && !isFunctionName(ctx, bareLhs) && !ctx.decls.has(bareLhs) && !rightSymbols.has(bareLhs);
+      steps.push({
+        id: `s${steps.length}`,
+        row: rowIndex,
+        span: part.span,
+        text: row.text,
+        lhs,
+        rhs,
+        proportionalTo: part.proportionalTo,
+        relation: part.relation === ":=" ? "defined" : part.relation,
+        annotation: parsed.annotation,
+        isDefinition,
+        defName: isDefinition ? bareLhs : void 0,
+        symbols
+      });
+      previousRhs = rhs;
+      if (bareLhs && isDefinition) {
+        definedNames.add(bareLhs);
+        knownValues.add(bareLhs);
+        if (lhs?.k === "call") knownFns.add(bareLhs);
+      }
+      if (isDefinition && bareLhs && rhs) {
+        defs.set(bareLhs, rhs);
+        ctx.defs.set(bareLhs, rhs);
+        if (lhs?.k === "call") {
+          const params = lhs.args.filter((a) => a.k === "sym").map((a) => a.name);
+          defs.params ??= /* @__PURE__ */ new Map();
+          defs.params.set(bareLhs, params);
+        }
+      }
+    }
+  }
+  return { ctx, defs, steps, declErrors: declared.errors, harvested: proseChips };
+}
+function check(src, opts = {}) {
+  const started = now();
+  const seed = opts.seed ?? DEFAULT_SEED;
+  const trials = opts.trials ?? 3;
+  const source = analyzeSource(src, opts);
+  const { ctx, defs, steps } = source;
+  const decls = [...ctx.decls.values()];
+  const chips = [];
+  const diagnostics = [];
+  const results = [];
+  const used = /* @__PURE__ */ new Set();
+  for (const step of steps) {
+    for (const name of step.symbols) used.add(name);
+    if (step.lhs?.k === "sym") used.add(step.lhs.name);
+    if (step.rhs?.k === "sym") used.add(step.rhs.name);
+  }
+  for (const decl of decls) {
+    if (!decl.dist || !used.has(decl.name)) continue;
+    for (const param of Object.values(decl.dist)) {
+      if (param !== decl.dist.kind) used.add(param);
+    }
+  }
+  for (const decl of decls) {
+    if (used.has(decl.name)) continue;
+    if (decl.source === "preset") continue;
+    chips.push({
+      id: "unused-declaration",
+      symbol: decl.name,
+      message: `${decl.name} is declared but no row uses it, so the declaration does nothing`,
+      span: { from: 0, to: 0 }
+    });
+  }
+  for (const step of steps) {
+    const result = checkStep(step, ctx, defs, { seed, trials }, diagnostics);
+    result.text ??= step.text;
+    results.push(result);
+  }
+  for (const message of source.declErrors) {
+    diagnostics.push({ severity: "warning", message, span: { from: 0, to: 0 } });
+  }
+  chips.push(...ctx.chips);
+  chips.push(...source.harvested);
+  return {
+    version: ENGINE_VERSION,
+    seed,
+    steps: results,
+    symbols: [...ctx.symbols.values()],
+    chips,
+    diagnostics,
+    ms: Math.round(now() - started)
+  };
+}
+function mergeDecls(preset, declared) {
+  const out = [...preset];
+  const index = new Map(out.map((d, i) => [d.name, i]));
+  for (const d of declared) {
+    const at = index.get(d.name);
+    if (at === void 0) {
+      index.set(d.name, out.length);
+      out.push(d);
+    } else {
+      out[at] = d;
+    }
+  }
+  return out;
+}
+function now() {
+  return Date.now();
+}
+function checkStep(step, ctx, defs, opts, diagnostics) {
+  const base2 = {
+    trialsPerSize: opts.trials,
+    sizes: [],
+    assumptions: [],
+    seed: opts.seed
+  };
+  if (step.unreadable) {
+    return {
+      id: step.id,
+      row: step.row,
+      span: step.span,
+      text: step.text,
+      relation: "other",
+      verdict: "unchecked",
+      card: base2,
+      message: step.unreadable,
+      reason: step.unreadable,
+      annotation: step.annotation
+    };
+  }
+  if (step.isDefinition) {
+    return {
+      id: step.id,
+      row: step.row,
+      span: step.span,
+      text: step.text,
+      lhsSpan: step.lhs?.span,
+      rhsSpan: step.rhs?.span,
+      relation: "defined",
+      verdict: "defined",
+      card: base2,
+      message: step.defName ? `defined: ${step.defName}` : "defined",
+      isDefinition: true,
+      annotation: step.annotation
+    };
+  }
+  if (step.relation === "le" || step.relation === "lt" || step.relation === "ge" || step.relation === "gt") {
+    return checkInequality(step, ctx, defs, opts, base2);
+  }
+  if (step.relation === "=>" || step.relation === "<=>") {
+    return checkImplication(step, ctx, defs, opts, base2);
+  }
+  if (step.relation !== "=" && step.relation !== "propto") {
+    const message = unsupportedRelation(step.relation);
+    return {
+      id: step.id,
+      row: step.row,
+      span: step.span,
+      text: step.text,
+      relation: step.relation,
+      verdict: "unchecked",
+      card: base2,
+      message,
+      reason: message,
+      annotation: step.annotation
+    };
+  }
+  if (!step.lhs || !step.rhs) {
+    const message = "this row has no relation to check";
+    return {
+      id: step.id,
+      row: step.row,
+      span: step.span,
+      text: step.text,
+      relation: step.relation,
+      verdict: "unchecked",
+      card: base2,
+      message,
+      reason: message,
+      annotation: step.annotation
+    };
+  }
+  const lhsTy = inferType(ctx, step.lhs);
+  const rhsTy = inferType(ctx, step.rhs);
+  let transposed = false;
+  if (step.lhs?.k === "deriv" && rhsTy.t === "mat" && lhsTy.t === "mat") {
+    const key = (d) => typeof d === "number" ? String(d) : ctx.dims.find(d.v);
+    transposed = key(rhsTy.r) === key(lhsTy.c) && key(rhsTy.c) === key(lhsTy.r) && key(rhsTy.r) !== key(rhsTy.c);
+  }
+  if (lhsTy.t === "mat" && rhsTy.t === "mat") {
+    unifyShapes(ctx, lhsTy, rhsTy, step.span);
+  }
+  const allErrors = ctx.errors.splice(0, ctx.errors.length);
+  const shapeConflicts = ctx.shapeConflicts.splice(0, ctx.shapeConflicts.length);
+  const shapeErrors = allErrors.filter((e) => e.kind !== "unknown-function");
+  const unknownFn = allErrors.find((e) => e.kind === "unknown-function");
+  if (shapeErrors.length && transposed) {
+    shapeErrors[0].message = "this is the numerator layout: SAMOSA uses the denominator layout, where the gradient has the shape of the variable it is taken with respect to";
+  }
+  if (shapeErrors.length) {
+    for (const error of shapeErrors) {
+      diagnostics.push({ severity: "error", message: error.message, span: error.span, stepId: step.id });
+    }
+    const dimVars = collectDimVars(ctx, step, defs);
+    const settings = sizeSettings(dimVars);
+    const witness = settings.filter(
+      (s) => shapeConflicts.every(({ a, b }) => s.get(a) !== s.get(b))
+    );
+    const shown = (witness.length ? witness : settings).slice(0, 3);
+    const sizes = shown.map((s) => Object.fromEntries(s));
+    return {
+      id: step.id,
+      row: step.row,
+      span: step.span,
+      lhsSpan: step.lhs.span,
+      rhsSpan: step.rhs.span,
+      relation: step.relation,
+      verdict: "shape",
+      card: { ...base2, sizes, assumptions: collectAssumptions(ctx, step) },
+      message: shapeErrors[0].message,
+      reason: shapeErrors.map((e) => e.message).join("; "),
+      annotation: step.annotation
+    };
+  }
+  if (unknownFn) {
+    diagnostics.push({ severity: "error", message: unknownFn.message, span: unknownFn.span, stepId: step.id });
+    return {
+      id: step.id,
+      row: step.row,
+      span: step.span,
+      lhsSpan: step.lhs.span,
+      rhsSpan: step.rhs.span,
+      relation: step.relation,
+      verdict: "unchecked",
+      card: base2,
+      message: `${unknownFn.message}, so SAMOSA cannot read this step`,
+      reason: unknownFn.message,
+      annotation: step.annotation
+    };
+  }
+  const unreadable = rawReason(step.lhs) ?? rawReason(step.rhs);
+  if (unreadable) {
+    return {
+      id: step.id,
+      row: step.row,
+      span: step.span,
+      lhsSpan: step.lhs?.span,
+      rhsSpan: step.rhs?.span,
+      relation: step.relation,
+      verdict: "unchecked",
+      card: base2,
+      message: unreadable,
+      reason: unreadable,
+      annotation: step.annotation
+    };
+  }
+  if (step.relation === "propto") {
+    return checkProportionality(step, ctx, defs, opts, base2);
+  }
+  const mode = planMode(step, ctx, defs);
+  if (mode === "unchecked") {
+    const message = "SAMOSA cannot check this step";
+    return {
+      id: step.id,
+      row: step.row,
+      span: step.span,
+      lhsSpan: step.lhs.span,
+      rhsSpan: step.rhs.span,
+      relation: step.relation,
+      verdict: "unchecked",
+      card: base2,
+      message,
+      reason: message,
+      annotation: step.annotation
+    };
+  }
+  if (mode === "exact") return checkExact(step, ctx, defs, opts, base2);
+  return checkNumeric(step, ctx, defs, opts, base2);
+}
+function unifyShapes(ctx, a, b, span) {
+  const r = unifyDim(ctx, a.r, b.r, "in this equality", span);
+  const c = unifyDim(ctx, a.c, b.c, "in this equality", span);
+  void r;
+  void c;
+}
+function unsupportedRelation(relation) {
+  switch (relation) {
+    case "le":
+    case "ge":
+    case "lt":
+    case "gt":
+      return `inequalities (${relation}) are not checked in v1`;
+    case "approx":
+      return "approximations are not checked in v1";
+    case "propto":
+      return "proportionality is checked over the reals only";
+    default:
+      return "this relation is not checked in v1";
+  }
+}
+
+// src/core/render.ts
+function renderNode(node) {
+  switch (node.k) {
+    case "num": {
+      const v = node.value;
+      if (v.d === 1) return String(v.n);
+      if (v.d < 0) return `-${-v.n}/${-v.d}`;
+      return `\\frac{${v.n}}{${v.d}}`;
+    }
+    case "sym":
+      return renderSymbol(node.name);
+    case "op":
+      return renderOp(node);
+    case "call":
+      return `${node.fn}\\left(${node.args.map(renderNode).join(", ")}\\right)`;
+    case "deriv": {
+      const wrt = node.wrt.map((w) => `\\partial ${renderNode(w)}`).join(" ");
+      return `\\frac{\\partial${node.order === 2 ? "^2" : ""} ${renderNode(node.f)}}{${wrt}}`;
+    }
+    case "expect": {
+      const op = node.op === "E" ? "\\mathbb{E}" : node.op === "Var" ? "\\operatorname{Var}" : "\\operatorname{Cov}";
+      return `${op}\\left[${node.args.map(renderNode).join(", ")}\\right]`;
+    }
+    case "bigop": {
+      const op = node.kind === "sum" ? "\\sum" : "\\prod";
+      const lo = node.lo ? renderNode(node.lo) : "";
+      const hi = node.hi ? renderNode(node.hi) : "";
+      return `${op}_{${node.idx}=${lo}}^{${hi}} ${renderNode(node.body)}`;
+    }
+    case "block": {
+      const rows = node.rows.map((row) => row.map(renderNode).join(" & ")).join(" \\\\ ");
+      return `\\begin{bmatrix} ${rows} \\end{bmatrix}`;
+    }
+    case "piecewise": {
+      const rows = node.cases.map(
+        ({ condition, value }) => condition ? `${renderNode(value)} & ${renderNodeCond(condition)}` : `${renderNode(value)} & otherwise`
+      ).join(" \\\\ ");
+      return `\\begin{cases} ${rows} \\end{cases}`;
+    }
+    case "raw":
+      return node.text;
+    default:
+      return "";
+  }
+}
+function renderNodeCond(node) {
+  if (node.k !== "cond") return renderNode(node);
+  const cond = node;
+  const REL = {
+    le: "\\le",
+    ge: "\\ge",
+    lt: "<",
+    gt: ">",
+    "=": "=",
+    approx: "\\approx"
+  };
+  return `${renderNode(cond.lhs)} ${REL[cond.relation] ?? cond.relation} ${renderNode(cond.rhs)}`;
+}
+function renderSymbol(name) {
+  const supIndex = name.indexOf("^");
+  const subIndex = name.indexOf("_");
+  let base2 = name;
+  let sub2 = "";
+  let sup = "";
+  if (subIndex >= 0 && (supIndex < 0 || subIndex < supIndex)) {
+    base2 = name.slice(0, subIndex);
+    const rest = name.slice(subIndex + 1);
+    if (supIndex > subIndex) {
+      sub2 = rest.slice(0, supIndex - subIndex - 1);
+      sup = rest.slice(supIndex - subIndex);
+    } else {
+      sub2 = rest;
+    }
+  } else if (supIndex >= 0) {
+    base2 = name.slice(0, supIndex);
+    sup = name.slice(supIndex);
+  }
+  let out = base2;
+  if (sub2) out += sub2.length === 1 ? `_${sub2}` : `_{${sub2}}`;
+  if (sup) out += sup.length === 1 ? `^${sup}` : `^{${sup}}`;
+  return out;
+}
+function renderOp(node) {
+  const a = node.args.map(renderNode);
+  switch (node.op) {
+    case "add":
+      return `${operand(node.args[0])} + ${operand(node.args[1])}`;
+    case "sub":
+      return `${operand(node.args[0])} - ${operand(node.args[1])}`;
+    case "neg":
+      return `-${operand(node.args[0])}`;
+    case "mul":
+      return `${operand(node.args[0])} ${operand(node.args[1])}`;
+    case "div":
+      return `\\frac{${a[0]}}{${a[1]}}`;
+    case "pow":
+      return `${base(node.args[0])}^{${a[1]}}`;
+    case "inv":
+      return `${base(node.args[0])}^{-1}`;
+    case "invT":
+      return `${base(node.args[0])}^{-\\top}`;
+    case "T":
+      return `${base(node.args[0])}^\\top`;
+    case "tr":
+      return `\\operatorname{tr}\\left(${a[0]}\\right)`;
+    case "det":
+      return `\\det\\left(${a[0]}\\right)`;
+    case "adj":
+      return `\\operatorname{adj}\\left(${a[0]}\\right)`;
+    case "kron":
+      return `${a[0]} \\otimes ${a[1]}`;
+    case "cross":
+      return `${operand(node.args[0])} \\times ${operand(node.args[1])}`;
+    case "had":
+      return `${a[0]} \\odot ${a[1]}`;
+    case "inner":
+      return `\\left\\langle ${a[0]}, ${a[1]} \\right\\rangle`;
+    case "norm2":
+      return `\\left\\|${a[0]}\\right\\|^{2}`;
+    case "frob":
+      return `\\left\\|${a[0]}\\right\\|_{F}^{2}`;
+    case "norm":
+      return `\\left\\|${a[0]}\\right\\|`;
+    case "normF":
+      return `\\left\\|${a[0]}\\right\\|_{F}`;
+    case "vec":
+      return `\\operatorname{vec}\\left(${a[0]}\\right)`;
+    case "diag":
+      return `\\operatorname{diag}\\left(${a[0]}\\right)`;
+    case "abs":
+      return `\\left|${a[0]}\\right|`;
+    case "sqrtm":
+      return `\\sqrt{${a[0]}}`;
+  }
+}
+function operand(node) {
+  if (!node) return "";
+  const text = renderNode(node);
+  if (node.k === "op" && (node.op === "add" || node.op === "sub" || node.op === "neg")) {
+    return `\\left(${text}\\right)`;
+  }
+  if (node.k === "op" && node.op === "mul") return `{${text}}`;
+  return text;
+}
+function base(node) {
+  if (!node) return "";
+  const text = renderNode(node);
+  if (node.k === "op" && ["add", "sub", "neg", "mul", "cross", "kron", "had"].includes(node.op)) {
+    return `\\left(${text}\\right)`;
+  }
+  return `{${text}}`;
 }
 
 // corpus/cookbook/identities.ts

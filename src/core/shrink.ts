@@ -147,7 +147,7 @@ export function shrinkCounterexample(
  * They are computed from the definitions with the sampled inputs, so a person
  * who recomputes them gets the same numbers.
  */
-function derivedValues<T>(
+export function derivedValues<T>(
   field: Field<T>,
   env: ReturnType<typeof makeEnv<T>>,
   defs: Map<string, Node>,
@@ -342,7 +342,7 @@ function equal<T>(field: Field<T>, a: Val<T>, b: Val<T>): boolean {
 }
 
 /** Turns a set of values into something a person can read, plus NumPy. */
-function describe<T>(
+export function describe<T>(
   ctx: TypeContext,
   sizes: Map<string, number>,
   values: Map<string, Val<T>>,

@@ -35,6 +35,7 @@ import { sizeSettings, planMode } from './plan.ts';
 import { checkExact } from './exact.ts';
 import { checkNumeric } from './numeric.ts';
 import { checkImplication } from './implication.ts';
+import { checkInequality } from './inequality.ts';
 import { checkProportionality } from './proportionality.ts';
 import {
   ENGINE_VERSION,
@@ -347,6 +348,10 @@ function checkStep(
       isDefinition: true,
       annotation: step.annotation,
     };
+  }
+
+  if (step.relation === 'le' || step.relation === 'lt' || step.relation === 'ge' || step.relation === 'gt') {
+    return checkInequality(step, ctx, defs, opts, base);
   }
 
   if (step.relation === '=>' || step.relation === '<=>') {
