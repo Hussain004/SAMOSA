@@ -34,10 +34,13 @@ reproducible.
 4. For a row marked `wrong` or `shape`, call `explain_step` for that row
    and read the counterexample and the fixes. Fix every such row. Check again.
 5. Never present a derivation that still has a `wrong` or a `shape` row.
-6. If a row comes back as `unchecked`, say so, and say why: SAMOSA does not
+6. A row `f ~ \mathcal{N}(m, S)` is checked by its moments: E[f] = m and
+   Var(f) = S, exactly, and the card lists the assumption that the left
+   side is a Gaussian. A non-affine left side is never certified.
+7. If a row comes back as `unchecked`, say so, and say why: SAMOSA does not
    check inequalities, limits or non polynomial expectations. Inequalities are
    searched for counterexamples, never certified.
-7. Include the share link from the report, so the person can open every step.
+8. Include the share link from the report, so the person can open every step.
 
 ## What the verdicts mean
 

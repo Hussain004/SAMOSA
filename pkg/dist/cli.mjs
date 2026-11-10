@@ -830,7 +830,7 @@ var RELATION_COMMANDS = {
   preceq: "le",
   succeq: "ge",
   approx: "approx",
-  sim: "approx",
+  sim: "sim",
   simeq: "approx",
   equiv: "=",
   neq: "other",
@@ -3905,7 +3905,7 @@ function symbolType(ctx, name, span) {
   }
   const decl = ctx.decls.get(name);
   if (decl) {
-    const ty = declType(decl);
+    const ty = declType(decl, ctx.decls);
     ctx.symbols.set(name, {
       name,
       display: decl.display || toDisplay(name),
@@ -3945,13 +3945,13 @@ function symbolType(ctx, name, span) {
   if (guess.chip) ctx.chips.push({ ...guess.chip, span, symbol: name });
   return guess.ty;
 }
-function declType(decl) {
+function declType(decl, decls) {
   if (decl.kind === "scalar") return { t: "scalar" };
   if (decl.kind === "function") {
     return { t: "fn", dom: (decl.dom ?? []).map((d) => ({ t: "mat", r: d, c: d })), cod: { t: "scalar" } };
   }
   if (decl.kind === "random") {
-    const of = decl.rows ? { t: "mat", r: decl.rows, c: decl.cols ?? decl.rows } : { t: "scalar" };
+    const of = decl.rows ? { t: "mat", r: decl.rows, c: decl.cols ?? decl.rows } : rvShape(decl.dist, decls, decl.name);
     return { t: "rv", of, dist: decl.dist ?? { kind: "normal", mu: "0", sigma: "1" } };
   }
   const r = decl.rows ?? freshDimCtx(decl);
@@ -3960,6 +3960,25 @@ function declType(decl) {
 }
 function freshDimCtx(decl) {
   return { v: `#${decl.name}` };
+}
+function rvShape(dist, decls, name) {
+  const literal2 = (text) => /^-?[0-9]+(\/[0-9]+)?$/.test(text.trim());
+  if (dist?.kind === "normal") {
+    const muText = dist.mu.trim();
+    const sigmaText = dist.sigma.trim();
+    if (literal2(muText) && literal2(sigmaText)) return { t: "scalar" };
+    const lookup = (text) => decls?.get(text) ?? decls?.get(canonicalizeSymbol(text));
+    const mu = literal2(muText) ? void 0 : lookup(muText);
+    if (mu) {
+      if (mu.kind === "scalar") return { t: "scalar" };
+      if (mu.kind === "vector") return { t: "mat", r: mu.rows ?? freshDimCtx(mu), c: 1 };
+      if (mu.kind === "matrix") return { t: "mat", r: mu.rows ?? freshDimCtx(mu), c: mu.cols ?? 1 };
+    }
+    const sigma = sigmaText === "I" ? void 0 : lookup(sigmaText);
+    if (sigma?.rows) return { t: "mat", r: sigma.rows, c: 1 };
+    return { t: "mat", r: { v: `#${name}` }, c: 1 };
+  }
+  return { t: "scalar" };
 }
 function baseLetter(name) {
   const stripped = name.replace(/^(\\[A-Za-z]+)+/, "");
@@ -3979,7 +3998,7 @@ function inferIndexBound(ctx, body, idx, span) {
       if (pos < 0) return;
       const decl = ctx.decls.get(base2);
       const info = ctx.symbols.get(base2);
-      const ty = info?.ty ?? (decl ? declType(decl) : void 0);
+      const ty = info?.ty ?? (decl ? declType(decl, ctx.decls) : void 0);
       if (ty?.t !== "mat") return;
       const dim = pos === 0 ? ty.r : ty.c;
       const hi = dimNode(dim, span);
@@ -4025,7 +4044,7 @@ function componentOf(ctx, name) {
   const [, base2, subText] = m;
   const decl = ctx.decls.get(base2);
   const info = ctx.symbols.get(base2);
-  const ty = info?.ty ?? (decl ? declType(decl) : void 0);
+  const ty = info?.ty ?? (decl ? declType(decl, ctx.decls) : void 0);
   if (!ty || ty.t !== "mat") return null;
   const letters = subText.split("");
   if (letters.length === 1 && ty.c === 1) {
@@ -5362,26 +5381,44 @@ function sampleFor(ctx, step, defs, setting, sampler, free = /* @__PURE__ */ new
     const peg = pegs.get(name) ?? 0;
     if (info.ty.t === "rv") {
       const dist = info.ty.dist;
+      const f = sampler.field;
+      const literalNumber = (text) => {
+        const match = text.trim().match(/^(-?\d+)(?:\/(\d+))?$/);
+        if (!match) return null;
+        const denominator = match[2] ? Number(match[2]) : 1;
+        if (!denominator) return null;
+        return [Number(match[1]), denominator];
+      };
+      const sigma = dist.kind === "normal" ? dist.sigma : "";
+      const identityLiteral = sigma === "I" || sigma === "1";
+      const muLiteral = dist.kind === "normal" && dist.mu.trim() !== "0" ? literalNumber(dist.mu) : null;
+      const sigmaLiteral = dist.kind === "normal" && !identityLiteral ? literalNumber(sigma) : null;
       const size = info.ty.of.t === "mat" ? dimSizeOf(ctx, info.ty.of.r, setting) : 1;
+      if (muLiteral !== null && size !== 1) return "unknown";
+      if (sigmaLiteral !== null) return "unknown";
       let mean;
       if (dist.kind === "normal" && dist.mu !== "0") {
-        const existing = values.get(dist.mu);
-        if (existing) {
-          mean = existing;
+        if (muLiteral !== null) {
+          mean = { k: "m", m: { r: 1, c: 1, d: [f.fromRational(muLiteral[0], muLiteral[1])] } };
         } else {
-          mean = { k: "m", m: sampler.sampleGeneral(size, 1) };
-          values.set(dist.mu, mean);
+          const existing = values.get(dist.mu);
+          if (existing) {
+            mean = existing;
+          } else {
+            mean = { k: "m", m: sampler.sampleGeneral(size, 1) };
+            values.set(dist.mu, mean);
+          }
         }
       } else if (dist.kind === "normal") {
-        const f0 = sampler.field;
-        mean = { k: "m", m: { r: size, c: 1, d: new Array(size).fill(f0.zero) } };
+        const f02 = sampler.field;
+        mean = { k: "m", m: { r: size, c: 1, d: new Array(size).fill(f02.zero) } };
       } else {
         mean = { k: "m", m: sampler.sampleGeneral(size, 1) };
       }
-      const root = sampler.sampleGeneral(size, size);
-      const f = sampler.field;
-      if (dist.kind === "normal" && dist.sigma !== "I") {
-        values.set(dist.sigma, { k: "m", m: matMul(f, root, transpose(root)) });
+      const root = dist.kind === "normal" && identityLiteral ? { r: size, c: size, d: Array.from({ length: size * size }, (_, i) => Math.floor(i / size) === i % size ? f.one : f.zero) } : sampler.sampleGeneral(size, size);
+      const f0 = sampler.field;
+      if (dist.kind === "normal" && !identityLiteral) {
+        values.set(dist.sigma, { k: "m", m: matMul(f0, root, transpose(root)) });
       }
       const z = sampler.sampleGeneral(size, 1);
       const meanMat = isMatrixVal(mean) ? mean.m : { r: size, c: 1, d: new Array(size).fill(f.zero) };
@@ -10659,6 +10696,283 @@ function broadcastDifference(field, l, r) {
   return null;
 }
 
+// src/core/verdict/distribution.ts
+var NORMAL_DENSITIES = /* @__PURE__ */ new Set(["normalDensity", "normal", "N"]);
+function replaceSymbol(node, from, replacement) {
+  const map = (n) => {
+    if (n.k === "sym") return n.name === from ? replacement : n;
+    if ("args" in n && Array.isArray(n.args)) {
+      return { ...n, args: n.args.map(map) };
+    }
+    if (n.k === "bigop") {
+      return { ...n, lo: n.lo ? map(n.lo) : null, hi: n.hi ? map(n.hi) : null, body: map(n.body) };
+    }
+    if (n.k === "deriv") return { ...n, f: map(n.f), wrt: n.wrt.map(map) };
+    if (n.k === "block") return { ...n, rows: n.rows.map((row) => row.map(map)) };
+    if (n.k === "expect") return { ...n, args: n.args.map(map) };
+    return n;
+  };
+  return map(node);
+}
+function valuesDiffer(field, a, b) {
+  if (a.k !== b.k) return true;
+  if (a.k === "s" && b.k === "s") return !field.eq(a.v, b.v);
+  if (a.k === "m" && b.k === "m") {
+    if (a.m.r !== b.m.r || a.m.c !== b.m.c) return true;
+    for (let i = 0; i < a.m.d.length; i++) if (!field.eq(a.m.d[i], b.m.d[i])) return true;
+    return false;
+  }
+  return true;
+}
+function timesTwo(node) {
+  return {
+    k: "op",
+    op: "mul",
+    args: [{ k: "num", value: { n: 2, d: 1 } }, node],
+    span: node.span
+  };
+}
+function isAffineIn(lhs, rv, rvTy, ctx, defs) {
+  const rvNode = { k: "sym", name: rv, display: rv };
+  const f2x = replaceSymbol(lhs, rv, timesTwo(rvNode));
+  const twoLhs = timesTwo(lhs);
+  const field = new GFpField(P1);
+  const rng = rngFor(20261110, "affine-check");
+  for (let probe = 0; probe < 4; probe++) {
+    const sampler = new Sampler(field, rngFor(20261110, "affine-check", probe));
+    const stepLike = { symbols: /* @__PURE__ */ new Set([...collectSymbolNames(lhs), rv]), lhs, rhs: lhs, span: { from: 0, to: 0 } };
+    const dimVars = collectDimVarsFor(ctx, lhs, lhs, defs);
+    const setting = sizeSettings(dimVars)[0] ?? /* @__PURE__ */ new Map();
+    const sampled = sampleFor(ctx, stepLike, defs, setting, sampler, /* @__PURE__ */ new Set(), probe);
+    if (sampled === "unknown") return false;
+    const env = makeEnv(field, rng);
+    env.defs = defs;
+    env.sizes = new Map(setting);
+    env.quad = sampled.quad;
+    const draw = () => {
+      if (rvTy.t === "mat") {
+        const r = rvTy.r ? dimSizeOf(ctx, rvTy.r, setting) : 1;
+        const c = rvTy.c ? dimSizeOf(ctx, rvTy.c, setting) : 1;
+        return { k: "m", m: sampler.sampleGeneral(r, c) };
+      }
+      return { k: "s", v: field.random(rng) };
+    };
+    const matrixLike = rvTy.t === "mat";
+    const w1 = draw();
+    const w2 = draw();
+    const assign = (value) => matrixLike ? value : { k: "s", v: value.v };
+    const evalG = (which) => {
+      const values = new Map(sampled.values);
+      for (const [name, value] of sampled.values.entries()) values.set(name, value);
+      values.set(rv, which === "1" ? assign(w1) : assign(w2));
+      env.values = values;
+      const a = evalNode(field, f2x, env);
+      const b = evalNode(field, twoLhs, env);
+      return subtractVal(field, a, b);
+    };
+    try {
+      const g1 = evalG("1");
+      const g2 = evalG("2");
+      if (valuesDiffer(field, g1, g2)) return false;
+    } catch {
+      return false;
+    }
+  }
+  return true;
+}
+function collectSymbolNames(node) {
+  const out = /* @__PURE__ */ new Set();
+  const walk3 = (n) => {
+    if (n.k === "sym") {
+      out.add(n.name);
+      return;
+    }
+    if ("args" in n && Array.isArray(n.args)) {
+      for (const arg of n.args) walk3(arg);
+    }
+    if (n.k === "bigop") {
+      walk3(n.body);
+      if (n.lo) walk3(n.lo);
+      if (n.hi) walk3(n.hi);
+    }
+    if (n.k === "deriv") {
+      walk3(n.f);
+      for (const w of n.wrt) walk3(w);
+    }
+    if (n.k === "block") for (const row of n.rows) for (const cell of row) walk3(cell);
+    if (n.k === "expect") for (const arg of n.args) walk3(arg);
+  };
+  walk3(node);
+  return out;
+}
+function subtractVal(field, a, b) {
+  if (isMatrixVal(a) && isMatrixVal(b)) {
+    if (a.m.r !== b.m.r || a.m.c !== b.m.c) return a;
+    const d = a.m.d.map((x, i) => field.sub(x, b.m.d[i]));
+    return { k: "m", m: { r: a.m.r, c: a.m.c, d } };
+  }
+  if (a.k === "s" && b.k === "s") return { k: "s", v: field.sub(a.v, b.v) };
+  return a;
+}
+function normalRvs(ctx) {
+  const out = [];
+  for (const [name, info] of ctx.symbols) {
+    if (info.ty.t !== "rv") continue;
+    const dist = info.ty.dist;
+    if (dist.kind !== "normal") continue;
+    out.push({ name, mu: dist.mu, sigma: dist.sigma });
+  }
+  return out;
+}
+function momentStep(parent, lhs, rhs, id) {
+  const symbols = /* @__PURE__ */ new Set();
+  const collect = (node) => {
+    if (node.k === "sym") {
+      symbols.add(node.name);
+      return;
+    }
+    if ("args" in node && Array.isArray(node.args)) {
+      for (const arg of node.args) collect(arg);
+    }
+    if (node.k === "bigop") {
+      collect(node.body);
+      if (node.lo) collect(node.lo);
+      if (node.hi) collect(node.hi);
+    }
+    if (node.k === "expect") return;
+  };
+  collect(lhs);
+  collect(rhs);
+  return {
+    id,
+    row: parent.row,
+    span: parent.span,
+    text: parent.text,
+    lhs,
+    rhs,
+    relation: "=",
+    isDefinition: false,
+    symbols,
+    annotation: parent.annotation
+  };
+}
+function expectNode(op, arg) {
+  return { k: "expect", op, args: [arg], over: [], span: arg.span };
+}
+function checkDistributionClaim(step, ctx, defs, opts, card) {
+  const { lhs, rhs } = step;
+  const span = step.span;
+  const baseCard = {
+    ...card,
+    sizes: [],
+    assumptions: [
+      "the left side is a Gaussian; for a Gaussian the first two moments determine the law",
+      ...card.assumptions
+    ]
+  };
+  const failure = (message, verdict = "unchecked") => ({
+    id: step.id,
+    row: step.row,
+    span,
+    text: step.text,
+    lhsSpan: step.lhs?.span,
+    rhsSpan: step.rhs?.span,
+    relation: "sim",
+    verdict,
+    card: baseCard,
+    message,
+    reason: message,
+    annotation: step.annotation
+  });
+  if (!lhs || !rhs) return failure("a distribution claim needs both sides");
+  inferType(ctx, lhs);
+  inferType(ctx, rhs);
+  for (const def of defs.values()) inferType(ctx, def);
+  if (rhs.k !== "call" || !NORMAL_DENSITIES.has(rhs.fn)) {
+    return failure("SAMOSA only checks a claim to normality today");
+  }
+  if (rhs.args.length !== 2) {
+    return failure("the normal density takes a mean and a covariance");
+  }
+  const [mean, covariance] = rhs.args;
+  const rvs = normalRvs(ctx);
+  if (rvs.length === 0) {
+    return failure(
+      "declare the random variable first: % samosa: x ~ \\mathcal{N}(\\mu, \\Sigma)"
+    );
+  }
+  if (rvs.length > 1) {
+    return failure("SAMOSA checks one Gaussian variable per claim today");
+  }
+  const rv = rvs[0].name;
+  const tyOf = ctx.symbols.get(rv).ty;
+  const inner2 = tyOf.t === "rv" ? tyOf.of : tyOf;
+  const rvTy = inner2.t === "mat" ? { t: "mat", r: inner2.r, c: inner2.c } : { t: "scalar" };
+  if (!isAffineIn(lhs, rv, rvTy, ctx, defs)) {
+    return failure(
+      "not an affine function of the random variable; moments do not determine the law"
+    );
+  }
+  const meanStep = checkExact(
+    momentStep(step, expectNode("E", lhs), mean, `${step.id}:mean`),
+    ctx,
+    defs,
+    opts,
+    card
+  );
+  const covStep = checkExact(
+    momentStep(step, expectNode("Var", lhs), covariance, `${step.id}:covariance`),
+    ctx,
+    defs,
+    opts,
+    card
+  );
+  const pick = (child, which) => {
+    if (child.verdict === "ok") return null;
+    if (child.verdict === "wrong") {
+      return {
+        ...child,
+        id: step.id,
+        relation: "sim",
+        message: `the claimed ${which} does not match: ${child.message}`,
+        reason: `the claimed ${which} does not match`,
+        card: { ...child.card, assumptions: baseCard.assumptions },
+        annotation: step.annotation
+      };
+    }
+    return {
+      ...child,
+      id: step.id,
+      relation: "sim",
+      message: `SAMOSA could not check the ${which}: ${child.message}`,
+      reason: `SAMOSA could not check the ${which}: ${child.message}`,
+      annotation: step.annotation
+    };
+  };
+  const meanFailure = pick(meanStep, "mean");
+  if (meanFailure) return meanFailure;
+  const covFailure = pick(covStep, "covariance");
+  if (covFailure) return covFailure;
+  const carried = meanStep.card.assumptions.length ? meanStep.card : covStep.card;
+  return {
+    id: step.id,
+    row: step.row,
+    span,
+    text: step.text,
+    lhsSpan: step.lhs?.span,
+    rhsSpan: step.rhs?.span,
+    relation: "sim",
+    verdict: "ok",
+    mode: "exact",
+    card: {
+      ...carried,
+      assumptions: baseCard.assumptions
+    },
+    message: "the first two moments match; for a Gaussian these determine the law",
+    annotation: step.annotation
+  };
+}
+
 // src/core/verdict/proportionality.ts
 function checkProportionality(step, ctx, defs, opts, card) {
   const dimVars = collectDimVars(ctx, step, defs);
@@ -11027,6 +11341,9 @@ function checkStep(step, ctx, defs, opts, diagnostics) {
   }
   if (step.relation === "le" || step.relation === "lt" || step.relation === "ge" || step.relation === "gt") {
     return checkInequality(step, ctx, defs, opts, base2);
+  }
+  if (step.relation === "sim") {
+    return checkDistributionClaim(step, ctx, defs, opts, base2);
   }
   if (step.relation === "=>" || step.relation === "<=>") {
     return checkImplication(step, ctx, defs, opts, base2);

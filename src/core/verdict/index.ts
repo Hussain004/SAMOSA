@@ -36,6 +36,7 @@ import { checkExact } from './exact.ts';
 import { checkNumeric } from './numeric.ts';
 import { checkImplication } from './implication.ts';
 import { checkInequality } from './inequality.ts';
+import { checkDistributionClaim } from './distribution.ts';
 import { checkProportionality } from './proportionality.ts';
 import {
   ENGINE_VERSION,
@@ -352,6 +353,10 @@ function checkStep(
 
   if (step.relation === 'le' || step.relation === 'lt' || step.relation === 'ge' || step.relation === 'gt') {
     return checkInequality(step, ctx, defs, opts, base);
+  }
+
+  if (step.relation === 'sim') {
+    return checkDistributionClaim(step, ctx, defs, opts, base);
   }
 
   if (step.relation === '=>' || step.relation === '<=>') {

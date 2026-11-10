@@ -406,7 +406,7 @@ export function symbolType(ctx: TypeContext, name: string, span: Span): Ty {
 
   const decl = ctx.decls.get(name);
   if (decl) {
-    const ty = declType(decl);
+    const ty = declType(decl, ctx.decls);
     ctx.symbols.set(name, {
       name,
       display: decl.display || toDisplay(name),
@@ -455,13 +455,15 @@ export function symbolType(ctx: TypeContext, name: string, span: Span): Ty {
   return guess.ty;
 }
 
-function declType(decl: SymbolDecl): Ty {
+function declType(decl: SymbolDecl, decls?: Map<string, SymbolDecl>): Ty {
   if (decl.kind === 'scalar') return { t: 'scalar' };
   if (decl.kind === 'function') {
     return { t: 'fn', dom: (decl.dom ?? []).map((d) => ({ t: 'mat', r: d, c: d })), cod: { t: 'scalar' } };
   }
   if (decl.kind === 'random') {
-    const of = decl.rows ? { t: 'mat' as const, r: decl.rows, c: decl.cols ?? decl.rows } : { t: 'scalar' as const };
+    const of = decl.rows
+      ? { t: 'mat' as const, r: decl.rows, c: decl.cols ?? decl.rows }
+      : rvShape(decl.dist, decls, decl.name);
     return { t: 'rv', of, dist: decl.dist ?? { kind: 'normal', mu: '0', sigma: '1' } };
   }
   const r = decl.rows ?? freshDimCtx(decl);
@@ -471,6 +473,42 @@ function declType(decl: SymbolDecl): Ty {
 
 function freshDimCtx(decl: SymbolDecl): Dim {
   return { v: `#${decl.name}` };
+}
+
+/**
+ * The shape of a random variable is the shape of its law.
+ *
+ * x ~ N(mu, Sigma) has the shape of mu, or of the covariance when the mean
+ * is written as a literal: a Gaussian on a space is a vector, and the
+ * dimension comes from Sigma when it is declared. When nothing pins the
+ * dimension down (N(0, I)), a fresh one is returned so the checker can
+ * size it at check time. Two literals make it a scalar: N(0, 1) is the
+ * one-dimensional case.
+ */
+function rvShape(
+  dist: SymbolDecl['dist'],
+  decls: Map<string, SymbolDecl> | undefined,
+  name: string,
+): Ty {
+  const literal = (text: string): boolean => /^-?[0-9]+(\/[0-9]+)?$/.test(text.trim());
+  if (dist?.kind === 'normal') {
+    const muText = dist.mu.trim();
+    const sigmaText = dist.sigma.trim();
+    if (literal(muText) && literal(sigmaText)) return { t: 'scalar' };
+    const lookup = (text: string): SymbolDecl | undefined =>
+      decls?.get(text) ?? decls?.get(canonicalizeSymbol(text));
+    const mu = literal(muText) ? undefined : lookup(muText);
+    if (mu) {
+      if (mu.kind === 'scalar') return { t: 'scalar' };
+      if (mu.kind === 'vector') return { t: 'mat', r: mu.rows ?? freshDimCtx(mu), c: 1 };
+      if (mu.kind === 'matrix') return { t: 'mat', r: mu.rows ?? freshDimCtx(mu), c: mu.cols ?? 1 };
+    }
+    const sigma = sigmaText === 'I' ? undefined : lookup(sigmaText);
+    if (sigma?.rows) return { t: 'mat', r: sigma.rows, c: 1 };
+    // no dimension is pinned down: a fresh one, sized at check time
+    return { t: 'mat', r: { v: `#${name}` }, c: 1 };
+  }
+  return { t: 'scalar' };
 }
 
 function baseLetter(name: string): string {
@@ -504,7 +542,7 @@ function inferIndexBound(
       if (pos < 0) return;
       const decl = ctx.decls.get(base);
       const info = ctx.symbols.get(base);
-      const ty = info?.ty ?? (decl ? declType(decl) : undefined);
+      const ty = info?.ty ?? (decl ? declType(decl, ctx.decls) : undefined);
       if (ty?.t !== 'mat') return;
       const dim = pos === 0 ? ty.r : ty.c;
       const hi = dimNode(dim, span);
@@ -558,7 +596,7 @@ function componentOf(ctx: TypeContext, name: string): { ty: Ty; assumption: stri
   const [, base, subText] = m;
   const decl = ctx.decls.get(base);
   const info = ctx.symbols.get(base);
-  const ty = info?.ty ?? (decl ? declType(decl) : undefined);
+  const ty = info?.ty ?? (decl ? declType(decl, ctx.decls) : undefined);
   if (!ty || ty.t !== 'mat') return null;
   const letters = subText.split('');
   if (letters.length === 1 && ty.c === 1) {

@@ -295,7 +295,7 @@ const RELATION_COMMANDS: Record<string, Relation> = {
   preceq: 'le',
   succeq: 'ge',
   approx: 'approx',
-  sim: 'approx',
+  sim: 'sim',
   simeq: 'approx',
   equiv: '=',
   neq: 'other',

@@ -72,6 +72,7 @@ export type Relation =
   | 'lt'
   | 'gt'
   | 'approx'
+  | 'sim'
   | 'other';
 
 export interface Assertion {

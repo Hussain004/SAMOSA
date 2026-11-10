@@ -301,15 +301,40 @@ export function sampleFor<T>(
       // a random variable: sample the root of its covariance, so that the
       // covariance symbol and the variable agree
       const dist = info.ty.dist;
+      const f = sampler.field;
+      // a literal in the distribution is a specific number, not a generic
+      // symbol to guess. A literal covariance other than the identity is
+      // not supported, so such a row comes back unevaluated rather than
+      // sampled dishonestly
+      const literalNumber = (text: string): [number, number] | null => {
+        const match = text.trim().match(/^(-?\d+)(?:\/(\d+))?$/);
+        if (!match) return null;
+        const denominator = match[2] ? Number(match[2]) : 1;
+        if (!denominator) return null;
+        return [Number(match[1]), denominator];
+      };
+      const sigma = dist.kind === 'normal' ? dist.sigma : '';
+      const identityLiteral = sigma === 'I' || sigma === '1';
+      // a zero mean literal is unambiguous at any size; a nonzero literal
+      // mean for a vector is not, so it is not accepted
+      const muLiteral =
+        dist.kind === 'normal' && dist.mu.trim() !== '0' ? literalNumber(dist.mu) : null;
+      const sigmaLiteral = dist.kind === 'normal' && !identityLiteral ? literalNumber(sigma) : null;
       const size = info.ty.of.t === 'mat' ? dimSizeOf(ctx, info.ty.of.r, setting) : 1;
+      if (muLiteral !== null && size !== 1) return 'unknown';
+      if (sigmaLiteral !== null) return 'unknown';
       let mean: Val<T>;
       if (dist.kind === 'normal' && dist.mu !== '0') {
-        const existing = values.get(dist.mu);
-        if (existing) {
-          mean = existing;
+        if (muLiteral !== null) {
+          mean = { k: 'm', m: { r: 1, c: 1, d: [f.fromRational(muLiteral[0], muLiteral[1])] } };
         } else {
-          mean = { k: 'm', m: sampler.sampleGeneral(size, 1) };
-          values.set(dist.mu, mean);
+          const existing = values.get(dist.mu);
+          if (existing) {
+            mean = existing;
+          } else {
+            mean = { k: 'm', m: sampler.sampleGeneral(size, 1) };
+            values.set(dist.mu, mean);
+          }
         }
       } else if (dist.kind === 'normal') {
         // N(0, Sigma) has the mean it says: zero. A random mean here gave
@@ -319,10 +344,15 @@ export function sampleFor<T>(
       } else {
         mean = { k: 'm', m: sampler.sampleGeneral(size, 1) };
       }
-      const root = sampler.sampleGeneral(size, size);
-      const f = sampler.field;
-      if (dist.kind === 'normal' && dist.sigma !== 'I') {
-        values.set(dist.sigma, { k: 'm', m: matMul(f, root, transpose(root)) });
+      // the identity covariance is its own square root, and the quadrature
+      // with a random root drew the wrong distribution
+      const root =
+        dist.kind === 'normal' && identityLiteral
+          ? { r: size, c: size, d: Array.from({ length: size * size }, (_, i) => (Math.floor(i / size) === i % size ? f.one : f.zero)) }
+          : sampler.sampleGeneral(size, size);
+      const f0 = sampler.field;
+      if (dist.kind === 'normal' && !identityLiteral) {
+        values.set(dist.sigma, { k: 'm', m: matMul(f0, root, transpose(root)) });
       }
       const z = sampler.sampleGeneral(size, 1);
       const meanMat = isMatrixVal(mean) ? mean.m : { r: size, c: 1, d: new Array<T>(size).fill(f.zero) };

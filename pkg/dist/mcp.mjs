@@ -831,7 +831,7 @@ var RELATION_COMMANDS = {
   preceq: "le",
   succeq: "ge",
   approx: "approx",
-  sim: "approx",
+  sim: "sim",
   simeq: "approx",
   equiv: "=",
   neq: "other",
@@ -3906,7 +3906,7 @@ function symbolType(ctx, name, span) {
   }
   const decl = ctx.decls.get(name);
   if (decl) {
-    const ty = declType(decl);
+    const ty = declType(decl, ctx.decls);
     ctx.symbols.set(name, {
       name,
       display: decl.display || toDisplay(name),
@@ -3946,13 +3946,13 @@ function symbolType(ctx, name, span) {
   if (guess.chip) ctx.chips.push({ ...guess.chip, span, symbol: name });
   return guess.ty;
 }
-function declType(decl) {
+function declType(decl, decls) {
   if (decl.kind === "scalar") return { t: "scalar" };
   if (decl.kind === "function") {
     return { t: "fn", dom: (decl.dom ?? []).map((d) => ({ t: "mat", r: d, c: d })), cod: { t: "scalar" } };
   }
   if (decl.kind === "random") {
-    const of = decl.rows ? { t: "mat", r: decl.rows, c: decl.cols ?? decl.rows } : { t: "scalar" };
+    const of = decl.rows ? { t: "mat", r: decl.rows, c: decl.cols ?? decl.rows } : rvShape(decl.dist, decls, decl.name);
     return { t: "rv", of, dist: decl.dist ?? { kind: "normal", mu: "0", sigma: "1" } };
   }
   const r = decl.rows ?? freshDimCtx(decl);
@@ -3961,6 +3961,25 @@ function declType(decl) {
 }
 function freshDimCtx(decl) {
   return { v: `#${decl.name}` };
+}
+function rvShape(dist, decls, name) {
+  const literal2 = (text) => /^-?[0-9]+(\/[0-9]+)?$/.test(text.trim());
+  if (dist?.kind === "normal") {
+    const muText = dist.mu.trim();
+    const sigmaText = dist.sigma.trim();
+    if (literal2(muText) && literal2(sigmaText)) return { t: "scalar" };
+    const lookup = (text) => decls?.get(text) ?? decls?.get(canonicalizeSymbol(text));
+    const mu = literal2(muText) ? void 0 : lookup(muText);
+    if (mu) {
+      if (mu.kind === "scalar") return { t: "scalar" };
+      if (mu.kind === "vector") return { t: "mat", r: mu.rows ?? freshDimCtx(mu), c: 1 };
+      if (mu.kind === "matrix") return { t: "mat", r: mu.rows ?? freshDimCtx(mu), c: mu.cols ?? 1 };
+    }
+    const sigma = sigmaText === "I" ? void 0 : lookup(sigmaText);
+    if (sigma?.rows) return { t: "mat", r: sigma.rows, c: 1 };
+    return { t: "mat", r: { v: `#${name}` }, c: 1 };
+  }
+  return { t: "scalar" };
 }
 function baseLetter(name) {
   const stripped = name.replace(/^(\\[A-Za-z]+)+/, "");
@@ -3980,7 +3999,7 @@ function inferIndexBound(ctx, body, idx, span) {
       if (pos < 0) return;
       const decl = ctx.decls.get(base2);
       const info = ctx.symbols.get(base2);
-      const ty = info?.ty ?? (decl ? declType(decl) : void 0);
+      const ty = info?.ty ?? (decl ? declType(decl, ctx.decls) : void 0);
       if (ty?.t !== "mat") return;
       const dim = pos === 0 ? ty.r : ty.c;
       const hi = dimNode(dim, span);
@@ -4026,7 +4045,7 @@ function componentOf(ctx, name) {
   const [, base2, subText] = m;
   const decl = ctx.decls.get(base2);
   const info = ctx.symbols.get(base2);
-  const ty = info?.ty ?? (decl ? declType(decl) : void 0);
+  const ty = info?.ty ?? (decl ? declType(decl, ctx.decls) : void 0);
   if (!ty || ty.t !== "mat") return null;
   const letters = subText.split("");
   if (letters.length === 1 && ty.c === 1) {
@@ -5363,26 +5382,44 @@ function sampleFor(ctx, step, defs, setting, sampler, free = /* @__PURE__ */ new
     const peg = pegs.get(name) ?? 0;
     if (info.ty.t === "rv") {
       const dist = info.ty.dist;
+      const f = sampler.field;
+      const literalNumber = (text) => {
+        const match = text.trim().match(/^(-?\d+)(?:\/(\d+))?$/);
+        if (!match) return null;
+        const denominator = match[2] ? Number(match[2]) : 1;
+        if (!denominator) return null;
+        return [Number(match[1]), denominator];
+      };
+      const sigma = dist.kind === "normal" ? dist.sigma : "";
+      const identityLiteral = sigma === "I" || sigma === "1";
+      const muLiteral = dist.kind === "normal" && dist.mu.trim() !== "0" ? literalNumber(dist.mu) : null;
+      const sigmaLiteral = dist.kind === "normal" && !identityLiteral ? literalNumber(sigma) : null;
       const size = info.ty.of.t === "mat" ? dimSizeOf(ctx, info.ty.of.r, setting) : 1;
+      if (muLiteral !== null && size !== 1) return "unknown";
+      if (sigmaLiteral !== null) return "unknown";
       let mean;
       if (dist.kind === "normal" && dist.mu !== "0") {
-        const existing = values.get(dist.mu);
-        if (existing) {
-          mean = existing;
+        if (muLiteral !== null) {
+          mean = { k: "m", m: { r: 1, c: 1, d: [f.fromRational(muLiteral[0], muLiteral[1])] } };
         } else {
-          mean = { k: "m", m: sampler.sampleGeneral(size, 1) };
-          values.set(dist.mu, mean);
+          const existing = values.get(dist.mu);
+          if (existing) {
+            mean = existing;
+          } else {
+            mean = { k: "m", m: sampler.sampleGeneral(size, 1) };
+            values.set(dist.mu, mean);
+          }
         }
       } else if (dist.kind === "normal") {
-        const f0 = sampler.field;
-        mean = { k: "m", m: { r: size, c: 1, d: new Array(size).fill(f0.zero) } };
+        const f02 = sampler.field;
+        mean = { k: "m", m: { r: size, c: 1, d: new Array(size).fill(f02.zero) } };
       } else {
         mean = { k: "m", m: sampler.sampleGeneral(size, 1) };
       }
-      const root = sampler.sampleGeneral(size, size);
-      const f = sampler.field;
-      if (dist.kind === "normal" && dist.sigma !== "I") {
-        values.set(dist.sigma, { k: "m", m: matMul(f, root, transpose(root)) });
+      const root = dist.kind === "normal" && identityLiteral ? { r: size, c: size, d: Array.from({ length: size * size }, (_, i2) => Math.floor(i2 / size) === i2 % size ? f.one : f.zero) } : sampler.sampleGeneral(size, size);
+      const f0 = sampler.field;
+      if (dist.kind === "normal" && !identityLiteral) {
+        values.set(dist.sigma, { k: "m", m: matMul(f0, root, transpose(root)) });
       }
       const z2 = sampler.sampleGeneral(size, 1);
       const meanMat = isMatrixVal(mean) ? mean.m : { r: size, c: 1, d: new Array(size).fill(f.zero) };
@@ -10660,6 +10697,283 @@ function broadcastDifference(field, l, r) {
   return null;
 }
 
+// src/core/verdict/distribution.ts
+var NORMAL_DENSITIES = /* @__PURE__ */ new Set(["normalDensity", "normal", "N"]);
+function replaceSymbol(node, from, replacement) {
+  const map = (n) => {
+    if (n.k === "sym") return n.name === from ? replacement : n;
+    if ("args" in n && Array.isArray(n.args)) {
+      return { ...n, args: n.args.map(map) };
+    }
+    if (n.k === "bigop") {
+      return { ...n, lo: n.lo ? map(n.lo) : null, hi: n.hi ? map(n.hi) : null, body: map(n.body) };
+    }
+    if (n.k === "deriv") return { ...n, f: map(n.f), wrt: n.wrt.map(map) };
+    if (n.k === "block") return { ...n, rows: n.rows.map((row) => row.map(map)) };
+    if (n.k === "expect") return { ...n, args: n.args.map(map) };
+    return n;
+  };
+  return map(node);
+}
+function valuesDiffer(field, a, b) {
+  if (a.k !== b.k) return true;
+  if (a.k === "s" && b.k === "s") return !field.eq(a.v, b.v);
+  if (a.k === "m" && b.k === "m") {
+    if (a.m.r !== b.m.r || a.m.c !== b.m.c) return true;
+    for (let i2 = 0; i2 < a.m.d.length; i2++) if (!field.eq(a.m.d[i2], b.m.d[i2])) return true;
+    return false;
+  }
+  return true;
+}
+function timesTwo(node) {
+  return {
+    k: "op",
+    op: "mul",
+    args: [{ k: "num", value: { n: 2, d: 1 } }, node],
+    span: node.span
+  };
+}
+function isAffineIn(lhs, rv, rvTy, ctx, defs) {
+  const rvNode = { k: "sym", name: rv, display: rv };
+  const f2x = replaceSymbol(lhs, rv, timesTwo(rvNode));
+  const twoLhs = timesTwo(lhs);
+  const field = new GFpField(P1);
+  const rng = rngFor(20261110, "affine-check");
+  for (let probe = 0; probe < 4; probe++) {
+    const sampler = new Sampler(field, rngFor(20261110, "affine-check", probe));
+    const stepLike = { symbols: /* @__PURE__ */ new Set([...collectSymbolNames(lhs), rv]), lhs, rhs: lhs, span: { from: 0, to: 0 } };
+    const dimVars = collectDimVarsFor(ctx, lhs, lhs, defs);
+    const setting = sizeSettings(dimVars)[0] ?? /* @__PURE__ */ new Map();
+    const sampled = sampleFor(ctx, stepLike, defs, setting, sampler, /* @__PURE__ */ new Set(), probe);
+    if (sampled === "unknown") return false;
+    const env = makeEnv(field, rng);
+    env.defs = defs;
+    env.sizes = new Map(setting);
+    env.quad = sampled.quad;
+    const draw = () => {
+      if (rvTy.t === "mat") {
+        const r = rvTy.r ? dimSizeOf(ctx, rvTy.r, setting) : 1;
+        const c = rvTy.c ? dimSizeOf(ctx, rvTy.c, setting) : 1;
+        return { k: "m", m: sampler.sampleGeneral(r, c) };
+      }
+      return { k: "s", v: field.random(rng) };
+    };
+    const matrixLike = rvTy.t === "mat";
+    const w1 = draw();
+    const w2 = draw();
+    const assign = (value) => matrixLike ? value : { k: "s", v: value.v };
+    const evalG = (which) => {
+      const values = new Map(sampled.values);
+      for (const [name, value] of sampled.values.entries()) values.set(name, value);
+      values.set(rv, which === "1" ? assign(w1) : assign(w2));
+      env.values = values;
+      const a = evalNode(field, f2x, env);
+      const b = evalNode(field, twoLhs, env);
+      return subtractVal(field, a, b);
+    };
+    try {
+      const g1 = evalG("1");
+      const g2 = evalG("2");
+      if (valuesDiffer(field, g1, g2)) return false;
+    } catch {
+      return false;
+    }
+  }
+  return true;
+}
+function collectSymbolNames(node) {
+  const out = /* @__PURE__ */ new Set();
+  const walk2 = (n) => {
+    if (n.k === "sym") {
+      out.add(n.name);
+      return;
+    }
+    if ("args" in n && Array.isArray(n.args)) {
+      for (const arg of n.args) walk2(arg);
+    }
+    if (n.k === "bigop") {
+      walk2(n.body);
+      if (n.lo) walk2(n.lo);
+      if (n.hi) walk2(n.hi);
+    }
+    if (n.k === "deriv") {
+      walk2(n.f);
+      for (const w of n.wrt) walk2(w);
+    }
+    if (n.k === "block") for (const row of n.rows) for (const cell of row) walk2(cell);
+    if (n.k === "expect") for (const arg of n.args) walk2(arg);
+  };
+  walk2(node);
+  return out;
+}
+function subtractVal(field, a, b) {
+  if (isMatrixVal(a) && isMatrixVal(b)) {
+    if (a.m.r !== b.m.r || a.m.c !== b.m.c) return a;
+    const d = a.m.d.map((x2, i2) => field.sub(x2, b.m.d[i2]));
+    return { k: "m", m: { r: a.m.r, c: a.m.c, d } };
+  }
+  if (a.k === "s" && b.k === "s") return { k: "s", v: field.sub(a.v, b.v) };
+  return a;
+}
+function normalRvs(ctx) {
+  const out = [];
+  for (const [name, info] of ctx.symbols) {
+    if (info.ty.t !== "rv") continue;
+    const dist = info.ty.dist;
+    if (dist.kind !== "normal") continue;
+    out.push({ name, mu: dist.mu, sigma: dist.sigma });
+  }
+  return out;
+}
+function momentStep(parent, lhs, rhs, id) {
+  const symbols = /* @__PURE__ */ new Set();
+  const collect = (node) => {
+    if (node.k === "sym") {
+      symbols.add(node.name);
+      return;
+    }
+    if ("args" in node && Array.isArray(node.args)) {
+      for (const arg of node.args) collect(arg);
+    }
+    if (node.k === "bigop") {
+      collect(node.body);
+      if (node.lo) collect(node.lo);
+      if (node.hi) collect(node.hi);
+    }
+    if (node.k === "expect") return;
+  };
+  collect(lhs);
+  collect(rhs);
+  return {
+    id,
+    row: parent.row,
+    span: parent.span,
+    text: parent.text,
+    lhs,
+    rhs,
+    relation: "=",
+    isDefinition: false,
+    symbols,
+    annotation: parent.annotation
+  };
+}
+function expectNode(op, arg) {
+  return { k: "expect", op, args: [arg], over: [], span: arg.span };
+}
+function checkDistributionClaim(step, ctx, defs, opts, card) {
+  const { lhs, rhs } = step;
+  const span = step.span;
+  const baseCard = {
+    ...card,
+    sizes: [],
+    assumptions: [
+      "the left side is a Gaussian; for a Gaussian the first two moments determine the law",
+      ...card.assumptions
+    ]
+  };
+  const failure = (message, verdict = "unchecked") => ({
+    id: step.id,
+    row: step.row,
+    span,
+    text: step.text,
+    lhsSpan: step.lhs?.span,
+    rhsSpan: step.rhs?.span,
+    relation: "sim",
+    verdict,
+    card: baseCard,
+    message,
+    reason: message,
+    annotation: step.annotation
+  });
+  if (!lhs || !rhs) return failure("a distribution claim needs both sides");
+  inferType(ctx, lhs);
+  inferType(ctx, rhs);
+  for (const def of defs.values()) inferType(ctx, def);
+  if (rhs.k !== "call" || !NORMAL_DENSITIES.has(rhs.fn)) {
+    return failure("SAMOSA only checks a claim to normality today");
+  }
+  if (rhs.args.length !== 2) {
+    return failure("the normal density takes a mean and a covariance");
+  }
+  const [mean, covariance] = rhs.args;
+  const rvs = normalRvs(ctx);
+  if (rvs.length === 0) {
+    return failure(
+      "declare the random variable first: % samosa: x ~ \\mathcal{N}(\\mu, \\Sigma)"
+    );
+  }
+  if (rvs.length > 1) {
+    return failure("SAMOSA checks one Gaussian variable per claim today");
+  }
+  const rv = rvs[0].name;
+  const tyOf = ctx.symbols.get(rv).ty;
+  const inner2 = tyOf.t === "rv" ? tyOf.of : tyOf;
+  const rvTy = inner2.t === "mat" ? { t: "mat", r: inner2.r, c: inner2.c } : { t: "scalar" };
+  if (!isAffineIn(lhs, rv, rvTy, ctx, defs)) {
+    return failure(
+      "not an affine function of the random variable; moments do not determine the law"
+    );
+  }
+  const meanStep = checkExact(
+    momentStep(step, expectNode("E", lhs), mean, `${step.id}:mean`),
+    ctx,
+    defs,
+    opts,
+    card
+  );
+  const covStep = checkExact(
+    momentStep(step, expectNode("Var", lhs), covariance, `${step.id}:covariance`),
+    ctx,
+    defs,
+    opts,
+    card
+  );
+  const pick = (child, which) => {
+    if (child.verdict === "ok") return null;
+    if (child.verdict === "wrong") {
+      return {
+        ...child,
+        id: step.id,
+        relation: "sim",
+        message: `the claimed ${which} does not match: ${child.message}`,
+        reason: `the claimed ${which} does not match`,
+        card: { ...child.card, assumptions: baseCard.assumptions },
+        annotation: step.annotation
+      };
+    }
+    return {
+      ...child,
+      id: step.id,
+      relation: "sim",
+      message: `SAMOSA could not check the ${which}: ${child.message}`,
+      reason: `SAMOSA could not check the ${which}: ${child.message}`,
+      annotation: step.annotation
+    };
+  };
+  const meanFailure = pick(meanStep, "mean");
+  if (meanFailure) return meanFailure;
+  const covFailure = pick(covStep, "covariance");
+  if (covFailure) return covFailure;
+  const carried = meanStep.card.assumptions.length ? meanStep.card : covStep.card;
+  return {
+    id: step.id,
+    row: step.row,
+    span,
+    text: step.text,
+    lhsSpan: step.lhs?.span,
+    rhsSpan: step.rhs?.span,
+    relation: "sim",
+    verdict: "ok",
+    mode: "exact",
+    card: {
+      ...carried,
+      assumptions: baseCard.assumptions
+    },
+    message: "the first two moments match; for a Gaussian these determine the law",
+    annotation: step.annotation
+  };
+}
+
 // src/core/verdict/proportionality.ts
 function checkProportionality(step, ctx, defs, opts, card) {
   const dimVars = collectDimVars(ctx, step, defs);
@@ -11028,6 +11342,9 @@ function checkStep(step, ctx, defs, opts, diagnostics) {
   }
   if (step.relation === "le" || step.relation === "lt" || step.relation === "ge" || step.relation === "gt") {
     return checkInequality(step, ctx, defs, opts, base2);
+  }
+  if (step.relation === "sim") {
+    return checkDistributionClaim(step, ctx, defs, opts, base2);
   }
   if (step.relation === "=>" || step.relation === "<=>") {
     return checkImplication(step, ctx, defs, opts, base2);
@@ -14046,7 +14363,7 @@ server.registerTool(
     };
   }
 );
-var NOTATION = true ? "# Notation\n\nWhat SAMOSA reads, and how it reads it.\n\n## Rows\n\nSAMOSA looks for the math of a document:\n\n* LaTeX: `align`, `align*`, `aligned`, `gather`, `gather*`, `split`,\n  `equation`, `equation*`, `multline`, `eqnarray`, `displaymath`, `array`.\n* Markdown: `$$ ... $$` blocks.\n* A bare paste: every line is a row.\n\nInside a math environment, `\\\\` starts a new row and `&` is the alignment\nmarker. Both are removed before the row is parsed.\n\n## Symbols\n\nA symbol is a base letter, the accents on it, a subscript, and a label\nsuperscript. So:\n\n| Written | The symbol |\n| --- | --- |\n| `\\hat{x}_{k\\|k-1}` | one symbol, shown as x\u0302_{k\\|k-1} |\n| `\\bar\\Sigma_t` | a different symbol from `\\Sigma_t` |\n| `x` | a vector or a matrix, depending on the declarations |\n| `e` | Euler's number, unless it is subscripted |\n\nA run of letters is a product of single letter symbols: `cuv^\\top` is c\ntimes u times v transpose. The only exceptions are the known functions and\nthe functions you declared.\n\nA symbol you declared as a value is a factor, never a function, so\n`A (B + C)` and `x (y + z)` are products. An undeclared lowercase name before\na parenthesis, `f(x)`, is a call.\n\n`a \\times b` between two column vectors is the cross product, which makes\nboth of them size 3. Anywhere else `\\times` is the ordinary product.\n\n## Scripts\n\n| Written | Read as |\n| --- | --- |\n| `A^\\top`, `A^T`, `A^{\\mathsf T}` | the transpose |\n| `A^{-1}` | the inverse |\n| `A^{-\\top}`, `A^{-T}` | the inverse transpose |\n| `A^{2}` | the square, or the power, depending on the shape |\n| `A^{1/2}`, `A^{-1/2}` | the principal square root and its inverse, numeric mode only |\n| `x^{1/3}`, `x^{-2/3}`, `x^{\\frac{3}{2}}` | a rational power of a scalar, numeric mode only; an odd root keeps the sign of a negative number, an even root of one is outside the domain |\n| `A^{-2}` | the inverse of the square, and exact |\n| `A^{1/3}` | not read for a matrix: a question, with the reason |\n| `A^\\dagger` | the pseudo inverse, numeric mode only |\n| `P^+`, `x^*` | a label, folded into the name |\n| `x_{k\\|k-1}` | part of the name |\n| `\\sqrt[k]{x}` | the k-th root, `x^{1/k}`, for a whole number k |\n| `\\begin{bmatrix} \u2026 \\end{bmatrix}` | a block matrix, the blocks are its rows |\n| `\\|A\\|_F` | the Frobenius norm |\n| `\\|A\\|` | the spectral norm, with a chip |\n\n## Functions\n\n`\\exp`, `\\log`, `\\ln`, `\\sin`, `\\cos`, `\\tan`, `\\tanh`, `\\sqrt`, `\\det`,\n`\\operatorname{tr}`, `\\sigma` (the sigmoid), `\\operatorname{Var}`,\n`\\operatorname{Cov}`, and the densities `\\mathcal{N}` and `\\mathcal{U}`.\n\n`\\operatorname{Var}(g)` is `E[g g^\\top] - E[g] E[g]^\\top`, so the variance of a\nvector is its covariance matrix, and `g` can be any polynomial of the random\nvariables: `\\operatorname{Var}(A x)` and `\\operatorname{Var}(x + y)` are read\nas written. `\\operatorname{Cov}(g, h)` is `E[g h^\\top] - E[g] E[h]^\\top`. Two\nrandom variables declared apart are independent, and `x \\sim\n\\mathcal{N}(0, \\Sigma)` has mean zero.\n\nEverything else is a symbol, unless you declared it as a function with\n`f: fn n\u21921`.\n\n## Derivatives\n\n| Written | Read as |\n| --- | --- |\n| `\\frac{\\partial f}{\\partial x}` | the gradient or the Jacobian |\n| `\\frac{\\partial^2 f}{\\partial x\\,\\partial x^\\top}` | the Hessian |\n| `\\frac{\\partial f}{\\partial x^2}` | the Hessian, for a vector x |\n| `\\nabla_x f` | the gradient |\n| `\\mathrm{d}f` | the differential |\n\nThe denominator layout is the default: the gradient of a scalar with respect\nto a vector has the shape of that vector. The numerator layout can be\nswitched on, and the two are told apart by their shapes.\n\n## Relations\n\n| Written | Read as |\n| --- | --- |\n| `=` | an identity, checked |\n| `:=`, `\\coloneqq` | a definition |\n| `=>`, `\\implies` | an implication, checked by constraint completion |\n| `\\iff` | both directions |\n| `\\propto` | proportionality, checked over the reals |\n| `\\le`, `\\ge`, `<`, `>` | not checked in v1 |\n| `\\approx` | not checked in v1 |\n\n## Declarations\n\nThe compact syntax, for the editor, the CLI and the MCP server:\n\n```\nnames : type\nnames ~ distribution\nname := latex\ndimvar = number\n```\n\nThe types are:\n\n| Type | Meaning |\n| --- | --- |\n| `n` | a column vector of size n |\n| `n\xD7m` | a matrix |\n| `scalar` | a number |\n| `pos` | a strictly positive number, over the reals |\n| `int` | an integer |\n| `fn n\u21921` | a function |\n| `sym n`, `spd n`, `psd n`, `orth n`, `rot n`, `diag n`, `triu n`, `tril n`, `skew n`, `idem n`, `proj n`, `unit n`, `stoch n` | a matrix with that structure |\n| `rank 3 n\xD7n` | a matrix of that rank |\n\n`orth n` is the orthogonal group O(n), the matrices whose transpose is\ntheir inverse; `rot n` is the spelling for the rotations, the orthogonal\nmatrices with determinant one.\n\n`ident n`, `zero n`, `ones n`, `unit n` and `stoch n` are matrices of that\nsize, so `ident n` is the n by n identity, `zero n` the zero matrix, `ones n`\nthe matrix of ones, `unit n` a unit vector and `stoch n` a stochastic matrix.\nA `pos` symbol is a strictly positive number, so over the reals the sampler\ndraws a small positive magnitude; over a finite field no number is positive,\nso there it draws a field element.\n\nThe LaTeX forms are read as well:\n\n```latex\nA, B \\in \\mathbb{R}^{n\\times n}\n\\Sigma \\succ 0\nQ^\\top Q = I\nA = A^\\top\nx \\sim \\mathcal{N}(\\mu, \\Sigma)\nf: \\mathbb{R}^n \\to \\mathbb{R}\n```\n\n## The presets\n\nOne click of a preset fills the declarations. Every preset is editable, and\nediting one does not change the others.\n\n| Preset | The symbols |\n| --- | --- |\n| Kalman (Thrun) | A, B, C, \u03A3\u0304, Q as the measurement noise, R as the process noise |\n| Kalman (H, P, R) | the same, in the other convention |\n| Linear regression | X, y, w and the normal equations |\n| Logistic regression | X, w, b and the sigmoid |\n| MLP backprop | one hidden layer, W1, W2 and the deltas |\n| Attention | Q, K, V and the scaled scores |\n| Gaussian conditioning | the blocks of a joint Gaussian |\n| LQR | the Riccati recursion |\n| PCA | the covariance and its eigen decomposition |\n" : (() => {
+var NOTATION = true ? "# Notation\n\nWhat SAMOSA reads, and how it reads it.\n\n## Rows\n\nSAMOSA looks for the math of a document:\n\n* LaTeX: `align`, `align*`, `aligned`, `gather`, `gather*`, `split`,\n  `equation`, `equation*`, `multline`, `eqnarray`, `displaymath`, `array`.\n* Markdown: `$$ ... $$` blocks.\n* A bare paste: every line is a row.\n\nInside a math environment, `\\\\` starts a new row and `&` is the alignment\nmarker. Both are removed before the row is parsed.\n\n## Symbols\n\nA symbol is a base letter, the accents on it, a subscript, and a label\nsuperscript. So:\n\n| Written | The symbol |\n| --- | --- |\n| `\\hat{x}_{k\\|k-1}` | one symbol, shown as x\u0302_{k\\|k-1} |\n| `\\bar\\Sigma_t` | a different symbol from `\\Sigma_t` |\n| `x` | a vector or a matrix, depending on the declarations |\n| `e` | Euler's number, unless it is subscripted |\n\nA run of letters is a product of single letter symbols: `cuv^\\top` is c\ntimes u times v transpose. The only exceptions are the known functions and\nthe functions you declared.\n\nA symbol you declared as a value is a factor, never a function, so\n`A (B + C)` and `x (y + z)` are products. An undeclared lowercase name before\na parenthesis, `f(x)`, is a call.\n\n`a \\times b` between two column vectors is the cross product, which makes\nboth of them size 3. Anywhere else `\\times` is the ordinary product.\n\n## Scripts\n\n| Written | Read as |\n| --- | --- |\n| `A^\\top`, `A^T`, `A^{\\mathsf T}` | the transpose |\n| `A^{-1}` | the inverse |\n| `A^{-\\top}`, `A^{-T}` | the inverse transpose |\n| `A^{2}` | the square, or the power, depending on the shape |\n| `A^{1/2}`, `A^{-1/2}` | the principal square root and its inverse, numeric mode only |\n| `x^{1/3}`, `x^{-2/3}`, `x^{\\frac{3}{2}}` | a rational power of a scalar, numeric mode only; an odd root keeps the sign of a negative number, an even root of one is outside the domain |\n| `A^{-2}` | the inverse of the square, and exact |\n| `A^{1/3}` | not read for a matrix: a question, with the reason |\n| `A^\\dagger` | the pseudo inverse, numeric mode only |\n| `P^+`, `x^*` | a label, folded into the name |\n| `x_{k\\|k-1}` | part of the name |\n| `\\sqrt[k]{x}` | the k-th root, `x^{1/k}`, for a whole number k |\n| `\\begin{bmatrix} \u2026 \\end{bmatrix}` | a block matrix, the blocks are its rows |\n| `\\|A\\|_F` | the Frobenius norm |\n| `\\|A\\|` | the spectral norm, with a chip |\n\n## Functions\n\n`\\exp`, `\\log`, `\\ln`, `\\sin`, `\\cos`, `\\tan`, `\\tanh`, `\\sqrt`, `\\det`,\n`\\operatorname{tr}`, `\\sigma` (the sigmoid), `\\operatorname{Var}`,\n`\\operatorname{Cov}`, and the densities `\\mathcal{N}` and `\\mathcal{U}`.\n\n`\\operatorname{Var}(g)` is `E[g g^\\top] - E[g] E[g]^\\top`, so the variance of a\nvector is its covariance matrix, and `g` can be any polynomial of the random\nvariables: `\\operatorname{Var}(A x)` and `\\operatorname{Var}(x + y)` are read\nas written. `\\operatorname{Cov}(g, h)` is `E[g h^\\top] - E[g] E[h]^\\top`. Two\nrandom variables declared apart are independent, and `x \\sim\n\\mathcal{N}(0, \\Sigma)` has mean zero.\n\nA row `f ~ \\mathcal{N}(m, S)` with a Gaussian on the right is checked by its\ntwo moments, exactly: `E[f] = m` and `Var(f) = S` are evaluated by the\nrational quadrature, in the primes. The first two moments determine the law\nof a Gaussian, so the moment match is the distribution. The card says\n`the first two moments match` and lists the assumption that the left side is\na Gaussian (an affine function of one is, and SAMOSA checks that); a law\nwhose left side is not affine is not certified. Before declaring the random\nvariable with `x ~ N(mu, Sigma)`, SAMOSA cannot check the row and says so.\n\nEverything else is a symbol, unless you declared it as a function with\n`f: fn n\u21921`.\n\n## Derivatives\n\n| Written | Read as |\n| --- | --- |\n| `\\frac{\\partial f}{\\partial x}` | the gradient or the Jacobian |\n| `\\frac{\\partial^2 f}{\\partial x\\,\\partial x^\\top}` | the Hessian |\n| `\\frac{\\partial f}{\\partial x^2}` | the Hessian, for a vector x |\n| `\\nabla_x f` | the gradient |\n| `\\mathrm{d}f` | the differential |\n\nThe denominator layout is the default: the gradient of a scalar with respect\nto a vector has the shape of that vector. The numerator layout can be\nswitched on, and the two are told apart by their shapes.\n\n## Relations\n\n| Written | Read as |\n| --- | --- |\n| `=` | an identity, checked |\n| `:=`, `\\coloneqq` | a definition |\n| `=>`, `\\implies` | an implication, checked by constraint completion |\n| `\\iff` | both directions |\n| `\\propto` | proportionality, checked over the reals |\n| `\\le`, `\\ge`, `<`, `>` | not checked in v1 |\n| `\\approx` | not checked in v1 |\n\n## Declarations\n\nThe compact syntax, for the editor, the CLI and the MCP server:\n\n```\nnames : type\nnames ~ distribution\nname := latex\ndimvar = number\n```\n\nThe types are:\n\n| Type | Meaning |\n| --- | --- |\n| `n` | a column vector of size n |\n| `n\xD7m` | a matrix |\n| `scalar` | a number |\n| `pos` | a strictly positive number, over the reals |\n| `int` | an integer |\n| `fn n\u21921` | a function |\n| `sym n`, `spd n`, `psd n`, `orth n`, `rot n`, `diag n`, `triu n`, `tril n`, `skew n`, `idem n`, `proj n`, `unit n`, `stoch n` | a matrix with that structure |\n| `rank 3 n\xD7n` | a matrix of that rank |\n\n`orth n` is the orthogonal group O(n), the matrices whose transpose is\ntheir inverse; `rot n` is the spelling for the rotations, the orthogonal\nmatrices with determinant one.\n\n`ident n`, `zero n`, `ones n`, `unit n` and `stoch n` are matrices of that\nsize, so `ident n` is the n by n identity, `zero n` the zero matrix, `ones n`\nthe matrix of ones, `unit n` a unit vector and `stoch n` a stochastic matrix.\nA `pos` symbol is a strictly positive number, so over the reals the sampler\ndraws a small positive magnitude; over a finite field no number is positive,\nso there it draws a field element.\n\nThe LaTeX forms are read as well:\n\n```latex\nA, B \\in \\mathbb{R}^{n\\times n}\n\\Sigma \\succ 0\nQ^\\top Q = I\nA = A^\\top\nx \\sim \\mathcal{N}(\\mu, \\Sigma)\nf: \\mathbb{R}^n \\to \\mathbb{R}\n```\n\n## The presets\n\nOne click of a preset fills the declarations. Every preset is editable, and\nediting one does not change the others.\n\n| Preset | The symbols |\n| --- | --- |\n| Kalman (Thrun) | A, B, C, \u03A3\u0304, Q as the measurement noise, R as the process noise |\n| Kalman (H, P, R) | the same, in the other convention |\n| Linear regression | X, y, w and the normal equations |\n| Logistic regression | X, w, b and the sigmoid |\n| MLP backprop | one hidden layer, W1, W2 and the deltas |\n| Attention | Q, K, V and the scaled scores |\n| Gaussian conditioning | the blocks of a joint Gaussian |\n| LQR | the Riccati recursion |\n| PCA | the covariance and its eigen decomposition |\n" : (() => {
   try {
     return readFileSync(resolve(process.cwd(), "docs/NOTATION.md"), "utf8");
   } catch {

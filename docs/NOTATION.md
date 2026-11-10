@@ -70,6 +70,15 @@ as written. `\operatorname{Cov}(g, h)` is `E[g h^\top] - E[g] E[h]^\top`. Two
 random variables declared apart are independent, and `x \sim
 \mathcal{N}(0, \Sigma)` has mean zero.
 
+A row `f ~ \mathcal{N}(m, S)` with a Gaussian on the right is checked by its
+two moments, exactly: `E[f] = m` and `Var(f) = S` are evaluated by the
+rational quadrature, in the primes. The first two moments determine the law
+of a Gaussian, so the moment match is the distribution. The card says
+`the first two moments match` and lists the assumption that the left side is
+a Gaussian (an affine function of one is, and SAMOSA checks that); a law
+whose left side is not affine is not certified. Before declaring the random
+variable with `x ~ N(mu, Sigma)`, SAMOSA cannot check the row and says so.
+
 Everything else is a symbol, unless you declared it as a function with
 `f: fn n→1`.
 
