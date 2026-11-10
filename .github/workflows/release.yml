@@ -25,7 +25,26 @@ jobs:
           registry-url: https://registry.npmjs.org
 
       - run: pnpm install --frozen-lockfile
+
+      - name: The changelog has a section for the tag
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          section="$(awk -v version="$version" '
+            /^## \[/{ in_section = ($0 ~ ("\\[" version "]")); next }
+            in_section { print }
+          ' CHANGELOG.md)"
+          if [ -z "$(echo "$section" | tr -d '[:space:]')" ]; then
+            echo "CHANGELOG.md has no section for [$version]; add it before tagging"
+            exit 1
+          fi
+
       - run: pnpm build:pkg
+
+      - name: The committed generated files are what the engine says
+        run: |
+          pnpm gen:readme && git diff --exit-code README.md docs/COOKBOOK.md
+          pnpm gen:demo && git diff --exit-code src/landing/generated.json
+          pnpm gen:tex && git diff --exit-code src/landing/generated-tex.json
 
       # npm needs one of two things, both of them the owner's: trusted
       # publishing for this package on npmjs.com (no token at all), or an
