@@ -39,6 +39,17 @@ in the pull request. If you use the SARIF format, the results go to GitHub's
 code scanning, which is the same service that stores the findings of any
 other scanner you run.
 
+## The only way text leaves the app
+
+On a row SAMOSA cannot read, the card offers "report this row". It is a
+link to a prefilled GitHub issue, opened in a new tab, and the row text
+goes in the URL as a query parameter. The text is visible to you before
+you submit anything, and nothing is sent unless you click the link, edit
+the issue, and submit it. The row is capped at about 1500 characters.
+There is no other path for text to leave the app: no telemetry event
+carries the derivation, and the share link keeps it in the fragment,
+which the browser does not send to the server.
+
 ## Analytics
 
 The site uses Vercel's cookieless page view analytics, if it is enabled for

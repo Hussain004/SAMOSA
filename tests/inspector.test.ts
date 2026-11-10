@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { check } from '../src/core/index.ts';
-import { guaranteeSentence, whyTrustHref, formatBound } from '../src/app/verdicts.ts';
+import { guaranteeSentence, whyTrustHref, formatBound, reportIssueUrl } from '../src/app/verdicts.ts';
 
 /**
  * The sentence at the top of the card: one line a person can read before
@@ -75,5 +75,33 @@ D &:= \tfrac{1}{2} \\
     expect(formatBound(0)).toBe('0');
     expect(formatBound(1e-56)).toBe('1.0e-56');
     expect(formatBound(1e-150)).toBe('10^-150');
+  });
+});
+
+describe('the report this row link', () => {
+  it('puts the row in the query string, capped at 1500 characters', () => {
+    const report = check(String.raw`\begin{align*}
+a \bmod b &= 0
+\end{align*}`, { decls: 'a: n; b: n' });
+    const unchecked = report.steps.find((s) => s.verdict === 'unchecked');
+    expect(unchecked).toBeDefined();
+    if (!unchecked) return;
+    const url = reportIssueUrl(unchecked);
+    expect(url).toContain('https://github.com/Hussain004/SAMOSA/issues/new?');
+    expect(url).toContain('template=notation.yml');
+    expect(url).toContain(encodeURIComponent('\\bmod').slice(0, 10));
+    const row = new URL(url).searchParams.get('row');
+    expect(row!.length).toBeLessThanOrEqual(1500);
+  });
+
+  it('maps the reason onto the dropdown of the issue template', () => {
+    const report = check(String.raw`\begin{align*}
+\\frac{\\partial}{\\partial \\beta} J &= 0
+\\end{align*}`, { decls: 'J: scalar' });
+    const unchecked = report.steps.find((s) => s.verdict === 'unchecked');
+    if (!unchecked) throw new Error('expected an unchecked row');
+    const url = new URL(reportIssueUrl(unchecked));
+    const reason = url.searchParams.get('reason');
+    expect(['The unknown construct', 'A parse error', 'The shapes do not fit', 'I do not know']).toContain(reason);
   });
 });

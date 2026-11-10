@@ -127,3 +127,27 @@ export function whyTrustHref(mode: 'exact' | 'numeric' | 'quadrature' | undefine
       return '/docs/how-it-works#the-short-version';
   }
 }
+
+/**
+ * The one way text leaves the app: a link the user clicks, with the row in
+ * the URL, opening a prefilled GitHub issue. The row is visible to the
+ * user before they submit anything.
+ */
+export function reportIssueUrl(step: import('../core/index.ts').StepResult): string {
+  const row = (step.text ?? '').trim();
+  const capped = row.length > 1500 ? row.slice(0, 1500) : row;
+  const said = `${step.message ?? ''} ${step.reason ?? ''}`.toLowerCase();
+  const reason = /unknown construct|not read/.test(said)
+    ? 'The unknown construct'
+    : /parse|unexpected|end of input|expected/.test(said)
+      ? 'A parse error'
+      : /shape|sizes|do not fit/.test(said)
+        ? 'The shapes do not fit'
+        : 'I do not know';
+  const params = new URLSearchParams({
+    template: 'notation.yml',
+    row: capped,
+    reason,
+  });
+  return `https://github.com/Hussain004/SAMOSA/issues/new?${params.toString()}`;
+}

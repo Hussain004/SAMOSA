@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Report, StepResult } from '../core/index.ts';
 import { matrixLatex } from './matrix.ts';
-import { VERDICT_ICON, VERDICT_LABEL, VERDICT_TITLE, seedText, guaranteeSentence, whyTrustHref, formatBound } from './verdicts.ts';
+import { VERDICT_ICON, VERDICT_LABEL, VERDICT_TITLE, seedText, guaranteeSentence, whyTrustHref, formatBound, reportIssueUrl } from './verdicts.ts';
 import { saveReportCardPng, plainTex } from './report-card.ts';
 import { Tex } from './tex.tsx';
 
@@ -86,12 +86,25 @@ export function Inspector({ step, report, explanation, onApplyFix, onCopy, onClo
         </p>
       )}
 
-      <a
-        href={whyTrustHref(step.mode)}
-        className="mt-3 inline-flex items-center gap-1 text-[0.6875rem] text-[var(--color-faint)] underline decoration-dotted underline-offset-2 hover:text-[var(--color-text)]"
-      >
-        why trust this?
-      </a>
+      <div className="mt-3 flex flex-wrap items-center gap-4">
+        <a
+          href={whyTrustHref(step.mode)}
+          className="inline-flex items-center gap-1 text-[0.6875rem] text-[var(--color-faint)] underline decoration-dotted underline-offset-2 hover:text-[var(--color-text)]"
+        >
+          why trust this?
+        </a>
+        {step.verdict === 'unchecked' && (
+          <a
+            href={reportIssueUrl(step)}
+            target="_blank"
+            rel="noreferrer"
+            title="opens a prefilled GitHub issue in a new tab; the row goes in the URL, and you see it before you submit"
+            className="inline-flex items-center gap-1 text-[0.6875rem] text-[var(--color-faint)] underline decoration-dotted underline-offset-2 hover:text-[var(--color-text)]"
+          >
+            report this row →
+          </a>
+        )}
+      </div>
 
       <details className="mt-4" open>
         <summary className="cursor-pointer text-[0.6875rem] text-[var(--color-muted)]">the guarantee</summary>
