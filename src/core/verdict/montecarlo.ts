@@ -393,7 +393,7 @@ export function checkMonteCarlo(
 }
 
 /** The entries of the difference between two vals, matched by position. */
-function matrixEntries(
+export function matrixEntries(
   field: DecField,
   l: Val<Decimal>,
   r: Val<Decimal>,

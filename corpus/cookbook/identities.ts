@@ -289,7 +289,9 @@ J &:= \frac{1}{2} x^\top A x + \frac{1}{2} x^\top B x \\
   {
     id: 'stationary-point',
     name: 'a stationary point',
-    decls: 'A: n×n; x: n',
+    // an unstructured A can be singular, and then the premise has nonzero
+    // solutions and the claim is false; the identity is the SPD one
+    decls: 'A: spd n; x: n',
     source: String.raw`\begin{align*}
 J &:= \frac{1}{2} x^\top A x \\
 \frac{\partial J}{\partial x} = 0 &\implies x = 0

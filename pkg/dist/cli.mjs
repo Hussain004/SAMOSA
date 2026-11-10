@@ -9572,10 +9572,329 @@ function relativeDelta(field, a, b) {
   return diff / scale;
 }
 
+// src/core/verdict/montecarlo.ts
+var SAMPLES_PER_EXPECTATION = 2e4;
+var SIGMA_LEVEL = 6;
+var MAX_VARIATE_DIM = 4;
+function collectExpectations(node, out = []) {
+  if (node.k === "expect") {
+    out.push(node);
+    return out;
+  }
+  if ("args" in node && Array.isArray(node.args)) {
+    for (const arg of node.args) collectExpectations(arg, out);
+  }
+  if (node.k === "bigop") {
+    collectExpectations(node.body, out);
+    if (node.lo) collectExpectations(node.lo, out);
+    if (node.hi) collectExpectations(node.hi, out);
+  }
+  if (node.k === "deriv") {
+    collectExpectations(node.f, out);
+    for (const wrt of node.wrt) collectExpectations(wrt, out);
+  }
+  if (node.k === "block") for (const row of node.rows) for (const cell of row) collectExpectations(cell, out);
+  return out;
+}
+function normalColumn(field, rng, dim) {
+  const d = new Array(dim).fill(field.zero);
+  for (let i = 0; i < dim; i++) d[i] = field.normal(rng);
+  return { r: dim, c: 1, d };
+}
+function accumulate(field, m, sums, squares, count) {
+  for (let i = 0; i < m.d.length; i++) {
+    const acc = sums.get(i);
+    const sq = squares.get(i);
+    const n = count.get(i) ?? 0;
+    sums.set(i, (acc ?? field.zero).add(m.d[i]));
+    squares.set(i, (sq ?? field.zero).add(m.d[i].mul(m.d[i])));
+    count.set(i, n + 1);
+  }
+}
+function estimateExpectation(field, node, ctx, defs, values, quad, rng) {
+  const body = node.args[0];
+  if (!body) return null;
+  const rvSet = /* @__PURE__ */ new Set();
+  collectSymbols(body, rvSet);
+  const rvNames = [...rvSet].filter((name) => ctx.symbols.get(name)?.ty.t === "rv");
+  if (!rvNames.length) return null;
+  for (const name of rvNames) {
+    const info = ctx.symbols.get(name);
+    if (info.ty.t !== "rv") return null;
+    if (info.ty.dist.kind !== "normal") return null;
+  }
+  for (const rv of rvNames) {
+    const entry = quad.get(rv);
+    if (!entry) return null;
+    if (entry.dim > MAX_VARIATE_DIM) return null;
+  }
+  const rows = 0;
+  void rows;
+  const sums = /* @__PURE__ */ new Map();
+  const squares = /* @__PURE__ */ new Map();
+  const count = /* @__PURE__ */ new Map();
+  let shape = null;
+  let scalar2 = false;
+  for (let trial = 0; trial < SAMPLES_PER_EXPECTATION; trial++) {
+    const env = makeEnv(field, rng);
+    env.defs = defs;
+    const envValues = new Map(values);
+    for (const rv of rvNames) {
+      const entry = quad.get(rv);
+      const z = normalColumn(field, rng, Math.max(1, entry.dim));
+      const mean = entry.mean;
+      if (!isMatrixMean(mean)) {
+        envValues.set(rv, { k: "m", m: { r: 1, c: 1, d: [mean.v] } });
+        continue;
+      }
+      const x = matMul(field, entry.root, z);
+      envValues.set(rv, { k: "m", m: matAdd(field, mean.m, x) });
+    }
+    env.values = envValues;
+    let value;
+    try {
+      value = evalNode(field, body, env);
+    } catch {
+      return null;
+    }
+    if (value.k === "s") {
+      scalar2 = true;
+      accumulate(field, { r: 1, c: 1, d: [value.v] }, sums, squares, count);
+      shape = { r: 1, c: 1 };
+      continue;
+    }
+    accumulate(field, value.m, sums, squares, count);
+    shape = { r: value.m.r, c: value.m.c };
+  }
+  if (!shape) return null;
+  const n = SAMPLES_PER_EXPECTATION;
+  const meanD = new Array(sums.size).fill(field.zero);
+  const varD = new Array(sums.size).fill(field.zero);
+  for (const [i, sum2] of sums) {
+    meanD[i] = sum2.div(n);
+    varD[i] = decimal_default.max(
+      field.zero,
+      squares.get(i).div(n).sub(meanD[i].mul(meanD[i])).mul(n / (n - 1))
+    );
+  }
+  const meanVal = shape.r === 1 && shape.c === 1 && scalar2 ? { k: "s", v: meanD[0] } : { k: "m", m: { r: shape.r, c: shape.c, d: meanD } };
+  const stderrVal = shape.r === 1 && shape.c === 1 && scalar2 ? { k: "s", v: varD[0].div(n).sqrt() } : { k: "m", m: { r: shape.r, c: shape.c, d: varD.map((v) => v.div(n).sqrt()) } };
+  return { mean: meanVal, stderr: stderrVal };
+}
+function isMatrixMean(mean) {
+  return mean.k === "m";
+}
+function substituteExpectations(node, table) {
+  const slots = [];
+  const walk3 = (n) => {
+    const found = table.get(n);
+    if (found) {
+      const symbol = `@mc${slots.length}`;
+      slots.push({ node: n, symbol });
+      return { k: "sym", name: symbol, display: symbol, span: n.span };
+    }
+    if ("args" in n && Array.isArray(n.args)) {
+      return { ...n, args: n.args.map(walk3) };
+    }
+    if (n.k === "bigop") {
+      return { ...n, lo: n.lo ? walk3(n.lo) : null, hi: n.hi ? walk3(n.hi) : null, body: walk3(n.body) };
+    }
+    if (n.k === "deriv") {
+      return { ...n, f: walk3(n.f), wrt: n.wrt.map(walk3) };
+    }
+    if (n.k === "block") {
+      return { ...n, rows: n.rows.map((row) => row.map(walk3)) };
+    }
+    if (n.k === "expect") {
+      return { ...n, args: n.args.map(walk3) };
+    }
+    return n;
+  };
+  return { node: walk3(node), slots };
+}
+function hasNonPolynomialExpectation(step, ctx, defs) {
+  if (step.lhs) inferType(ctx, step.lhs);
+  if (step.rhs) inferType(ctx, step.rhs);
+  for (const def of defs.values()) inferType(ctx, def);
+  for (const node of [step.lhs, step.rhs]) {
+    if (!node) continue;
+    for (const expectNode2 of collectExpectations(node)) {
+      const body = expectNode2.args[0];
+      const set = /* @__PURE__ */ new Set();
+      collectSymbols(body, set);
+      for (const name of set) {
+        if (ctx.symbols.get(name)?.ty.t !== "rv") continue;
+        if (degreeInVar(body, name) > 7) return true;
+      }
+    }
+  }
+  return false;
+}
+function checkMonteCarlo(step, ctx, defs, opts, card) {
+  const baseCard = {
+    ...card,
+    sizes: [],
+    assumptions: [
+      "a Monte Carlo estimate of the expectation, seeded; it can refute and it can fail to refute; it never certifies",
+      ...card.assumptions
+    ]
+  };
+  const failure = (message2, verdict = "unchecked") => ({
+    id: step.id,
+    row: step.row,
+    span: step.span,
+    text: step.text,
+    lhsSpan: step.lhs?.span,
+    rhsSpan: step.rhs?.span,
+    relation: step.relation,
+    verdict,
+    card: baseCard,
+    message: message2,
+    reason: message2,
+    annotation: step.annotation
+  });
+  const lhs = step.lhs;
+  const rhs = step.rhs;
+  if (!lhs || !rhs) return failure("a row needs both sides");
+  const expectNodes = [...collectExpectations(lhs), ...collectExpectations(rhs)];
+  if (expectNodes.length === 0) return failure("this mode is for rows whose expectation is not a polynomial");
+  const dimVars = collectDimVarsFor(ctx, lhs, rhs, defs);
+  const settings = sizeSettings(dimVars).slice(0, 2);
+  const field = new DecField(50);
+  const sizes = [];
+  let refutations = 0;
+  let estimateCount = 0;
+  let worstExcess = 0;
+  for (const setting of settings) {
+    sizes.push(Object.fromEntries(setting));
+    const rng = rngFor(opts.seed, step.id, settingKey(setting), "mc");
+    const sampler = new Sampler(field, rng);
+    const env = makeEnv(field, rngFor(opts.seed, step.id, settingKey(setting), "env"));
+    env.defs = defs;
+    env.sizes = new Map(setting);
+    const sampled = sampleFor(ctx, step, defs, setting, sampler, freeVariables(step), 0);
+    if (sampled === "unknown") return failure("SAMOSA could not sample an instance for the Monte Carlo check");
+    for (const [name, value] of sampled.values.entries()) env.values.set(name, value);
+    for (const [name, quad] of sampled.quad.entries()) env.quad.set(name, quad);
+    const estimates = /* @__PURE__ */ new Map();
+    for (const node of expectNodes) {
+      const estimate = estimateExpectation(
+        field,
+        node,
+        ctx,
+        defs,
+        env.values,
+        sampled.quad,
+        rngFor(opts.seed, step.id, settingKey(setting), "samples")
+      );
+      if (!estimate) return failure("SAMOSA cannot estimate this expectation: the variable is not a Gaussian, or the body could not be averaged");
+      estimates.set(node, estimate);
+    }
+    estimateCount += estimates.size;
+    const lhsWalk = substituteExpectations(lhs, estimates);
+    const rhsWalk = substituteExpectations(rhs, estimates);
+    const envEst = makeEnv(field, rngFor(opts.seed, step.id, settingKey(setting), "est"));
+    envEst.defs = env.defs;
+    envEst.sizes = new Map(setting);
+    envEst.values = new Map(env.values);
+    for (const [walk3, estimates_] of [
+      [lhsWalk, estimates],
+      [rhsWalk, estimates]
+    ]) {
+      for (const slot of walk3.slots) {
+        const estimate = estimates_.get(slot.node);
+        if (estimate) envEst.values.set(slot.symbol, estimate.mean);
+      }
+    }
+    const l = evalNode(field, lhsWalk.node, envEst);
+    const r = evalNode(field, rhsWalk.node, envEst);
+    let maxExcess = 0;
+    const entries = matrixEntries(field, l, r);
+    if (entries === null) return failure("the two sides have incomparable shapes", "shape");
+    for (const [i, diff] of entries.entries()) {
+      let variance = new decimal_default(0);
+      for (const estimate of estimates.values()) {
+        variance = variance.add(stderrSquaredAt(estimate, i, field));
+      }
+      const stderr = variance.sqrt();
+      if (stderr.eq(0)) continue;
+      const excess = diff.abs().div(stderr).toNumber();
+      if (excess > maxExcess) maxExcess = excess;
+    }
+    if (maxExcess > SIGMA_LEVEL) {
+      refutations += 1;
+      worstExcess = Math.max(worstExcess, maxExcess);
+    } else {
+      worstExcess = Math.max(worstExcess, maxExcess);
+    }
+  }
+  if (refutations > 0) {
+    return failure(
+      `the Monte Carlo estimate of the expectation differs from the claim by more than ${SIGMA_LEVEL} standard errors (${estimateCount * SAMPLES_PER_EXPECTATION} seeded samples)`,
+      "wrong"
+    );
+  }
+  const message = `within ${SIGMA_LEVEL} standard errors of the claim (${estimateCount * SAMPLES_PER_EXPECTATION} seeded Monte Carlo samples); never certified`;
+  return {
+    id: step.id,
+    row: step.row,
+    span: step.span,
+    text: step.text,
+    lhsSpan: step.lhs?.span,
+    rhsSpan: step.rhs?.span,
+    relation: step.relation,
+    verdict: "inconclusive",
+    mode: "numeric",
+    card: { ...baseCard, sizes },
+    message,
+    reason: message,
+    annotation: step.annotation
+  };
+}
+function matrixEntries(field, l, r) {
+  const asMat = (v) => {
+    if (v.k === "s") return { r: 1, c: 1, d: [v.v] };
+    return v.m;
+  };
+  const a = asMat(l);
+  const b = asMat(r);
+  if (!a || !b) return null;
+  if (a.r !== b.r || a.c !== b.c) return null;
+  const out = new Array(a.d.length).fill(field.zero);
+  for (let i = 0; i < a.d.length; i++) out[i] = a.d[i].sub(b.d[i]);
+  return out;
+}
+function stderrSquaredAt(estimate, entry, field) {
+  const s = estimate.stderr;
+  if (s.k === "s") return s.v.mul(s.v);
+  const d = s.m.d;
+  if (entry >= d.length) return field.zero;
+  return d[entry].mul(d[entry]);
+}
+
 // src/core/verdict/implication.ts
+function unifyShapes(ctx, a, b, span) {
+  unifyDim(ctx, a.r, b.r, "in this equality", span);
+  unifyDim(ctx, a.c, b.c, "in this equality", span);
+}
 function checkImplication(step, ctx, defs, opts, card) {
   const premise = step.premise;
   const conclusion = step.conclusion;
+  if (premise?.lhs) inferType(ctx, premise.lhs);
+  if (premise?.rhs) inferType(ctx, premise.rhs);
+  if (conclusion?.lhs) inferType(ctx, conclusion.lhs);
+  if (conclusion?.rhs) inferType(ctx, conclusion.rhs);
+  for (const def of defs.values()) inferType(ctx, def);
+  if (premise?.lhs && premise?.rhs) {
+    const a = inferType(ctx, premise.lhs);
+    const b = inferType(ctx, premise.rhs);
+    if (a.t === "mat" && b.t === "mat") unifyShapes(ctx, a, b, premise.lhs.span);
+  }
+  if (conclusion?.lhs && conclusion?.rhs) {
+    const a = inferType(ctx, conclusion.lhs);
+    const b = inferType(ctx, conclusion.rhs);
+    if (a.t === "mat" && b.t === "mat") unifyShapes(ctx, a, b, conclusion.lhs.span);
+  }
   if (!premise || !conclusion || !conclusion.lhs || !conclusion.rhs) {
     const message = "this implication has no conclusion to check";
     return {
@@ -9621,6 +9940,19 @@ function checkImplication(step, ctx, defs, opts, card) {
         if (outcome.kind === "unknown") {
           if (outcome.domain) {
             continue;
+          }
+          if (outcome.newton || outcome.message === "could not evaluate the premise") {
+            const newton = newtonImplication(
+              step,
+              ctx,
+              defs,
+              opts,
+              card,
+              setting,
+              assumptions,
+              sizes
+            );
+            if (newton) return newton;
           }
           return {
             id: step.id,
@@ -9684,6 +10016,10 @@ function runImplicationTrial(step, ctx, defs, setting, p, rng) {
   const conclusionLhs = conclusion.lhs;
   const pivot = conclusionLhs && conclusionLhs.k === "sym" ? conclusionLhs.name : void 0;
   if (!pivot) return { kind: "unknown", message: "the conclusion is not about a single variable" };
+  const pivotRaw = env.values.get(pivot);
+  if (pivotRaw && pivotRaw.k === "s") {
+    env.values.set(pivot, { k: "m", m: { r: 1, c: 1, d: [field.mul(pivotRaw.v, field.one)] } });
+  }
   const pivotValue = env.values.get(pivot);
   if (!pivotValue || pivotValue.k !== "m") return { kind: "unknown", message: `no value for ${pivot}` };
   const n = pivotValue.m.r;
@@ -9717,7 +10053,8 @@ function runImplicationTrial(step, ctx, defs, setting, p, rng) {
   if (!second.d.every((x) => field.isZero(x))) {
     return {
       kind: "unknown",
-      message: "the premise is not affine in the variable, so the implication is not checked in v1"
+      message: "the premise is not affine in the variable",
+      newton: true
     };
   }
   const r0 = residual(pivotValue.m);
@@ -9759,6 +10096,7 @@ function runImplicationTrial(step, ctx, defs, setting, p, rng) {
   if (cl.k === "s" && realMatrix(cr) && zeroScalar(cl) && cr.k === "m") {
     cl = { k: "m", m: zeros(cr.m.r, cr.m.c, field.zero) };
   }
+  if (valuesEqual(field, cl, cr)) return { kind: "ok" };
   if (realMatrix(cl) && cr.k === "s" || cl.k === "s" && realMatrix(cr)) {
     return {
       kind: "unknown",
@@ -9815,6 +10153,151 @@ function secondDirectional(field, residual, x, dir) {
     d[i] = field.sub(field.add(plus.d[i], minus.d[i]), field.mul(two, centre.d[i]));
   }
   return { r: plus.r, c: plus.c, d };
+}
+function newtonImplication(step, ctx, defs, opts, card, setting, assumptions, sizes) {
+  const field = new DecField(50);
+  const rng = rngFor(opts.seed, step.id, settingKey(setting), "newton");
+  const sampler = new Sampler(field, rng);
+  const env = makeEnv(field, rngFor(opts.seed, step.id, settingKey(setting), "env"));
+  env.defs = defs;
+  env.sizes = new Map(setting);
+  const sampled = sampleFor(ctx, step, defs, setting, sampler);
+  if (sampled === "unknown") return null;
+  for (const [name, value] of sampled.values.entries()) env.values.set(name, value);
+  for (const [name, quadVar] of sampled.quad.entries()) env.quad.set(name, quadVar);
+  const conclusion = step.conclusion;
+  const pivot = conclusion.lhs && conclusion.lhs.k === "sym" ? conclusion.lhs.name : void 0;
+  if (!pivot) return null;
+  const pivotRaw = env.values.get(pivot);
+  if (pivotRaw && pivotRaw.k === "s") {
+    env.values.set(pivot, { k: "m", m: { r: 1, c: 1, d: [field.mul(pivotRaw.v, field.one)] } });
+  }
+  const pivotValue = env.values.get(pivot);
+  if (!pivotValue || pivotValue.k !== "m") return null;
+  const { r: n, c: dim } = pivotValue.m;
+  const total = n * dim;
+  if (total > 36) return null;
+  const residual = (x2) => {
+    const trialEnv = { ...env, values: new Map(env.values), memo: /* @__PURE__ */ new Map() };
+    trialEnv.values.set(pivot, { k: "m", m: x2 });
+    try {
+      const deriv = premiseDeriv(step);
+      if (deriv?.k === "deriv" && dim === 1) {
+        const grad = gradientAt(
+          field,
+          deriv,
+          trialEnv,
+          pivot,
+          x2,
+          n
+        );
+        if (!grad) return null;
+        const rhs = step.premise.rhs ? evalNode(field, step.premise.rhs, trialEnv) : { k: "s", v: field.zero };
+        const rhsScalar = asScalar(field, rhs);
+        if (rhsScalar === null) return null;
+        return {
+          r: grad.r,
+          c: grad.c,
+          d: grad.d.map((y) => field.sub(y, rhsScalar))
+        };
+      }
+      return evalResidual(field, step.premise, trialEnv);
+    } catch {
+      return null;
+    }
+  };
+  const premiseDeriv = (s) => s.premise?.lhs?.k === "deriv" ? s.premise.lhs : void 0;
+  let x = pivotValue.m;
+  for (let iteration = 0; iteration < 60; iteration++) {
+    const f = residual(x);
+    if (!f) return null;
+    const fsize = f.d.length;
+    const fx = Math.max(...f.d.map((y) => Math.abs(y.toNumber())));
+    if (fx < 1e-36) break;
+    const jac = { r: fsize, c: total, d: new Array(fsize * total).fill(field.zero) };
+    for (let j = 0; j < total; j++) {
+      const e = { r: n, c: dim, d: new Array(total).fill(field.zero) };
+      e.d[j] = field.one;
+      const rj = residual(addMat(field, x, e));
+      if (!rj) return null;
+      for (let i = 0; i < fsize; i++) jac.d[i * total + j] = rj.d[i].sub(f.d[i]);
+    }
+    if (jac.r !== jac.c) return null;
+    let stepFlat;
+    try {
+      const inv = matInv(field, jac);
+      stepFlat = matMul(field, inv, { r: fsize, c: 1, d: f.d });
+    } catch {
+      return null;
+    }
+    const stepMatrix = { r: n, c: dim, d: stepFlat.d };
+    x = subMat(field, x, stepMatrix);
+    const stepNorm = Math.max(...stepFlat.d.map((v) => Math.abs(v.toNumber())));
+    if (stepNorm < 1e-30) {
+      const fCheck = residual(x);
+      if (fCheck && Math.max(...fCheck.d.map((y) => Math.abs(y.toNumber()))) < 1e-20) break;
+    }
+  }
+  const solvedEnv = { ...env, values: new Map(env.values), memo: /* @__PURE__ */ new Map() };
+  solvedEnv.values.set(pivot, { k: "m", m: x });
+  let cl, cr;
+  try {
+    cl = evalNode(field, conclusion.lhs, solvedEnv);
+    cr = evalNode(field, conclusion.rhs, solvedEnv);
+  } catch {
+    return null;
+  }
+  const realMatrix = (v) => v.k === "m" && !(v.m.r === 1 && v.m.c === 1);
+  const zeroScalar = (v) => v.k === "s" && v.v.eq(field.zero);
+  if (realMatrix(cl) && cr.k === "s" && zeroScalar(cr) && cl.k === "m") {
+    cr = { k: "m", m: zeros(cl.m.r, cl.m.c, field.zero) };
+  }
+  if (cl.k === "s" && realMatrix(cr) && zeroScalar(cl) && cr.k === "m") {
+    cl = { k: "m", m: zeros(cr.m.r, cr.m.c, field.zero) };
+  }
+  if (realMatrix(cl) && cr.k === "s" || cl.k === "s" && realMatrix(cr)) {
+    return null;
+  }
+  const entries = matrixEntries(field, cl, cr);
+  if (entries === null) return null;
+  const maxDiff = entries.reduce((acc, v) => v.abs().gt(acc) ? v.abs() : acc, new decimal_default(0));
+  const newtonCard = {
+    ...card,
+    sizes,
+    assumptions: [
+      "the premise is not affine; the conclusion was checked at the Newton root of the premise, not everywhere",
+      ...assumptions
+    ]
+  };
+  const common = {
+    id: step.id,
+    row: step.row,
+    span: step.span,
+    text: step.text,
+    lhsSpan: conclusion.lhs?.span,
+    rhsSpan: conclusion.rhs?.span,
+    relation: step.relation,
+    annotation: step.annotation
+  };
+  if (maxDiff.gt(new decimal_default("1e-20"))) {
+    return {
+      ...common,
+      verdict: "wrong",
+      mode: "numeric",
+      card: newtonCard,
+      message: "the implication does not follow at the root of the premise",
+      reason: "the implication does not follow at the root of the premise",
+      counterexample: buildCounterexample(ctx, step, setting, sampled.values, cl, cr, field)
+    };
+  }
+  return {
+    ...common,
+    verdict: "inconclusive",
+    mode: "numeric",
+    card: newtonCard,
+    message: "the implication holds at the root found by Newton; SAMOSA does not certify it",
+    reason: "the implication holds at the root found by Newton; SAMOSA does not certify it"
+  };
 }
 
 // src/core/numpy.ts
@@ -10973,306 +11456,6 @@ function checkDistributionClaim(step, ctx, defs, opts, card) {
   };
 }
 
-// src/core/verdict/montecarlo.ts
-var SAMPLES_PER_EXPECTATION = 2e4;
-var SIGMA_LEVEL = 6;
-var MAX_VARIATE_DIM = 4;
-function collectExpectations(node, out = []) {
-  if (node.k === "expect") {
-    out.push(node);
-    return out;
-  }
-  if ("args" in node && Array.isArray(node.args)) {
-    for (const arg of node.args) collectExpectations(arg, out);
-  }
-  if (node.k === "bigop") {
-    collectExpectations(node.body, out);
-    if (node.lo) collectExpectations(node.lo, out);
-    if (node.hi) collectExpectations(node.hi, out);
-  }
-  if (node.k === "deriv") {
-    collectExpectations(node.f, out);
-    for (const wrt of node.wrt) collectExpectations(wrt, out);
-  }
-  if (node.k === "block") for (const row of node.rows) for (const cell of row) collectExpectations(cell, out);
-  return out;
-}
-function normalColumn(field, rng, dim) {
-  const d = new Array(dim).fill(field.zero);
-  for (let i = 0; i < dim; i++) d[i] = field.normal(rng);
-  return { r: dim, c: 1, d };
-}
-function accumulate(field, m, sums, squares, count) {
-  for (let i = 0; i < m.d.length; i++) {
-    const acc = sums.get(i);
-    const sq = squares.get(i);
-    const n = count.get(i) ?? 0;
-    sums.set(i, (acc ?? field.zero).add(m.d[i]));
-    squares.set(i, (sq ?? field.zero).add(m.d[i].mul(m.d[i])));
-    count.set(i, n + 1);
-  }
-}
-function estimateExpectation(field, node, ctx, defs, values, quad, rng) {
-  const body = node.args[0];
-  if (!body) return null;
-  const rvSet = /* @__PURE__ */ new Set();
-  collectSymbols(body, rvSet);
-  const rvNames = [...rvSet].filter((name) => ctx.symbols.get(name)?.ty.t === "rv");
-  if (!rvNames.length) return null;
-  for (const name of rvNames) {
-    const info = ctx.symbols.get(name);
-    if (info.ty.t !== "rv") return null;
-    if (info.ty.dist.kind !== "normal") return null;
-  }
-  for (const rv of rvNames) {
-    const entry = quad.get(rv);
-    if (!entry) return null;
-    if (entry.dim > MAX_VARIATE_DIM) return null;
-  }
-  const rows = 0;
-  void rows;
-  const sums = /* @__PURE__ */ new Map();
-  const squares = /* @__PURE__ */ new Map();
-  const count = /* @__PURE__ */ new Map();
-  let shape = null;
-  let scalar2 = false;
-  for (let trial = 0; trial < SAMPLES_PER_EXPECTATION; trial++) {
-    const env = makeEnv(field, rng);
-    env.defs = defs;
-    const envValues = new Map(values);
-    for (const rv of rvNames) {
-      const entry = quad.get(rv);
-      const z = normalColumn(field, rng, Math.max(1, entry.dim));
-      const mean = entry.mean;
-      if (!isMatrixMean(mean)) {
-        envValues.set(rv, { k: "m", m: { r: 1, c: 1, d: [mean.v] } });
-        continue;
-      }
-      const x = matMul(field, entry.root, z);
-      envValues.set(rv, { k: "m", m: matAdd(field, mean.m, x) });
-    }
-    env.values = envValues;
-    let value;
-    try {
-      value = evalNode(field, body, env);
-    } catch {
-      return null;
-    }
-    if (value.k === "s") {
-      scalar2 = true;
-      accumulate(field, { r: 1, c: 1, d: [value.v] }, sums, squares, count);
-      shape = { r: 1, c: 1 };
-      continue;
-    }
-    accumulate(field, value.m, sums, squares, count);
-    shape = { r: value.m.r, c: value.m.c };
-  }
-  if (!shape) return null;
-  const n = SAMPLES_PER_EXPECTATION;
-  const meanD = new Array(sums.size).fill(field.zero);
-  const varD = new Array(sums.size).fill(field.zero);
-  for (const [i, sum2] of sums) {
-    meanD[i] = sum2.div(n);
-    varD[i] = decimal_default.max(
-      field.zero,
-      squares.get(i).div(n).sub(meanD[i].mul(meanD[i])).mul(n / (n - 1))
-    );
-  }
-  const meanVal = shape.r === 1 && shape.c === 1 && scalar2 ? { k: "s", v: meanD[0] } : { k: "m", m: { r: shape.r, c: shape.c, d: meanD } };
-  const stderrVal = shape.r === 1 && shape.c === 1 && scalar2 ? { k: "s", v: varD[0].div(n).sqrt() } : { k: "m", m: { r: shape.r, c: shape.c, d: varD.map((v) => v.div(n).sqrt()) } };
-  return { mean: meanVal, stderr: stderrVal };
-}
-function isMatrixMean(mean) {
-  return mean.k === "m";
-}
-function substituteExpectations(node, table) {
-  const slots = [];
-  const walk3 = (n) => {
-    const found = table.get(n);
-    if (found) {
-      const symbol = `@mc${slots.length}`;
-      slots.push({ node: n, symbol });
-      return { k: "sym", name: symbol, display: symbol, span: n.span };
-    }
-    if ("args" in n && Array.isArray(n.args)) {
-      return { ...n, args: n.args.map(walk3) };
-    }
-    if (n.k === "bigop") {
-      return { ...n, lo: n.lo ? walk3(n.lo) : null, hi: n.hi ? walk3(n.hi) : null, body: walk3(n.body) };
-    }
-    if (n.k === "deriv") {
-      return { ...n, f: walk3(n.f), wrt: n.wrt.map(walk3) };
-    }
-    if (n.k === "block") {
-      return { ...n, rows: n.rows.map((row) => row.map(walk3)) };
-    }
-    if (n.k === "expect") {
-      return { ...n, args: n.args.map(walk3) };
-    }
-    return n;
-  };
-  return { node: walk3(node), slots };
-}
-function hasNonPolynomialExpectation(step, ctx, defs) {
-  if (step.lhs) inferType(ctx, step.lhs);
-  if (step.rhs) inferType(ctx, step.rhs);
-  for (const def of defs.values()) inferType(ctx, def);
-  for (const node of [step.lhs, step.rhs]) {
-    if (!node) continue;
-    for (const expectNode2 of collectExpectations(node)) {
-      const body = expectNode2.args[0];
-      const set = /* @__PURE__ */ new Set();
-      collectSymbols(body, set);
-      for (const name of set) {
-        if (ctx.symbols.get(name)?.ty.t !== "rv") continue;
-        if (degreeInVar(body, name) > 7) return true;
-      }
-    }
-  }
-  return false;
-}
-function checkMonteCarlo(step, ctx, defs, opts, card) {
-  const baseCard = {
-    ...card,
-    sizes: [],
-    assumptions: [
-      "a Monte Carlo estimate of the expectation, seeded; it can refute and it can fail to refute; it never certifies",
-      ...card.assumptions
-    ]
-  };
-  const failure = (message2, verdict = "unchecked") => ({
-    id: step.id,
-    row: step.row,
-    span: step.span,
-    text: step.text,
-    lhsSpan: step.lhs?.span,
-    rhsSpan: step.rhs?.span,
-    relation: step.relation,
-    verdict,
-    card: baseCard,
-    message: message2,
-    reason: message2,
-    annotation: step.annotation
-  });
-  const lhs = step.lhs;
-  const rhs = step.rhs;
-  if (!lhs || !rhs) return failure("a row needs both sides");
-  const expectNodes = [...collectExpectations(lhs), ...collectExpectations(rhs)];
-  if (expectNodes.length === 0) return failure("this mode is for rows whose expectation is not a polynomial");
-  const dimVars = collectDimVarsFor(ctx, lhs, rhs, defs);
-  const settings = sizeSettings(dimVars).slice(0, 2);
-  const field = new DecField(50);
-  const sizes = [];
-  let refutations = 0;
-  let estimateCount = 0;
-  let worstExcess = 0;
-  for (const setting of settings) {
-    sizes.push(Object.fromEntries(setting));
-    const rng = rngFor(opts.seed, step.id, settingKey(setting), "mc");
-    const sampler = new Sampler(field, rng);
-    const env = makeEnv(field, rngFor(opts.seed, step.id, settingKey(setting), "env"));
-    env.defs = defs;
-    env.sizes = new Map(setting);
-    const sampled = sampleFor(ctx, step, defs, setting, sampler, freeVariables(step), 0);
-    if (sampled === "unknown") return failure("SAMOSA could not sample an instance for the Monte Carlo check");
-    for (const [name, value] of sampled.values.entries()) env.values.set(name, value);
-    for (const [name, quad] of sampled.quad.entries()) env.quad.set(name, quad);
-    const estimates = /* @__PURE__ */ new Map();
-    for (const node of expectNodes) {
-      const estimate = estimateExpectation(
-        field,
-        node,
-        ctx,
-        defs,
-        env.values,
-        sampled.quad,
-        rngFor(opts.seed, step.id, settingKey(setting), "samples")
-      );
-      if (!estimate) return failure("SAMOSA cannot estimate this expectation: the variable is not a Gaussian, or the body could not be averaged");
-      estimates.set(node, estimate);
-    }
-    estimateCount += estimates.size;
-    const lhsWalk = substituteExpectations(lhs, estimates);
-    const rhsWalk = substituteExpectations(rhs, estimates);
-    const envEst = makeEnv(field, rngFor(opts.seed, step.id, settingKey(setting), "est"));
-    envEst.defs = env.defs;
-    envEst.sizes = new Map(setting);
-    envEst.values = new Map(env.values);
-    for (const [walk3, estimates_] of [
-      [lhsWalk, estimates],
-      [rhsWalk, estimates]
-    ]) {
-      for (const slot of walk3.slots) {
-        const estimate = estimates_.get(slot.node);
-        if (estimate) envEst.values.set(slot.symbol, estimate.mean);
-      }
-    }
-    const l = evalNode(field, lhsWalk.node, envEst);
-    const r = evalNode(field, rhsWalk.node, envEst);
-    let maxExcess = 0;
-    const entries = matrixEntries(field, l, r);
-    if (entries === null) return failure("the two sides have incomparable shapes", "shape");
-    for (const [i, diff] of entries.entries()) {
-      let variance = new decimal_default(0);
-      for (const estimate of estimates.values()) {
-        variance = variance.add(stderrSquaredAt(estimate, i, field));
-      }
-      const stderr = variance.sqrt();
-      if (stderr.eq(0)) continue;
-      const excess = diff.abs().div(stderr).toNumber();
-      if (excess > maxExcess) maxExcess = excess;
-    }
-    if (maxExcess > SIGMA_LEVEL) {
-      refutations += 1;
-      worstExcess = Math.max(worstExcess, maxExcess);
-    } else {
-      worstExcess = Math.max(worstExcess, maxExcess);
-    }
-  }
-  if (refutations > 0) {
-    return failure(
-      `the Monte Carlo estimate of the expectation differs from the claim by more than ${SIGMA_LEVEL} standard errors (${estimateCount * SAMPLES_PER_EXPECTATION} seeded samples)`,
-      "wrong"
-    );
-  }
-  const message = `within ${SIGMA_LEVEL} standard errors of the claim (${estimateCount * SAMPLES_PER_EXPECTATION} seeded Monte Carlo samples); never certified`;
-  return {
-    id: step.id,
-    row: step.row,
-    span: step.span,
-    text: step.text,
-    lhsSpan: step.lhs?.span,
-    rhsSpan: step.rhs?.span,
-    relation: step.relation,
-    verdict: "inconclusive",
-    mode: "numeric",
-    card: { ...baseCard, sizes },
-    message,
-    reason: message,
-    annotation: step.annotation
-  };
-}
-function matrixEntries(field, l, r) {
-  const asMat = (v) => {
-    if (v.k === "s") return { r: 1, c: 1, d: [v.v] };
-    return v.m;
-  };
-  const a = asMat(l);
-  const b = asMat(r);
-  if (!a || !b) return null;
-  if (a.r !== b.r || a.c !== b.c) return null;
-  const out = new Array(a.d.length).fill(field.zero);
-  for (let i = 0; i < a.d.length; i++) out[i] = a.d[i].sub(b.d[i]);
-  return out;
-}
-function stderrSquaredAt(estimate, entry, field) {
-  const s = estimate.stderr;
-  if (s.k === "s") return s.v.mul(s.v);
-  const d = s.m.d;
-  if (entry >= d.length) return field.zero;
-  return d[entry].mul(d[entry]);
-}
-
 // src/core/verdict/proportionality.ts
 function checkProportionality(step, ctx, defs, opts, card) {
   const dimVars = collectDimVars(ctx, step, defs);
@@ -11689,7 +11872,7 @@ function checkStep(step, ctx, defs, opts, diagnostics) {
     transposed = key(rhsTy.r) === key(lhsTy.c) && key(rhsTy.c) === key(lhsTy.r) && key(rhsTy.r) !== key(rhsTy.c);
   }
   if (lhsTy.t === "mat" && rhsTy.t === "mat") {
-    unifyShapes(ctx, lhsTy, rhsTy, step.span);
+    unifyShapes2(ctx, lhsTy, rhsTy, step.span);
   }
   const allErrors = ctx.errors.splice(0, ctx.errors.length);
   const shapeConflicts = ctx.shapeConflicts.splice(0, ctx.shapeConflicts.length);
@@ -11778,7 +11961,7 @@ function checkStep(step, ctx, defs, opts, diagnostics) {
   if (mode === "exact") return checkExact(step, ctx, defs, opts, base2);
   return checkNumeric(step, ctx, defs, opts, base2);
 }
-function unifyShapes(ctx, a, b, span) {
+function unifyShapes2(ctx, a, b, span) {
   const r = unifyDim(ctx, a.r, b.r, "in this equality", span);
   const c = unifyDim(ctx, a.c, b.c, "in this equality", span);
   void r;
@@ -12226,7 +12409,9 @@ J &:= \frac{1}{2} x^\top A x + \frac{1}{2} x^\top B x \\
   {
     id: "stationary-point",
     name: "a stationary point",
-    decls: "A: n\xD7n; x: n",
+    // an unstructured A can be singular, and then the premise has nonzero
+    // solutions and the claim is false; the identity is the SPD one
+    decls: "A: spd n; x: n",
     source: String.raw`\begin{align*}
 J &:= \frac{1}{2} x^\top A x \\
 \frac{\partial J}{\partial x} = 0 &\implies x = 0
