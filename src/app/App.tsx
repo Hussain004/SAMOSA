@@ -177,6 +177,15 @@ export function App() {
     copy(url);
   }, [copy, settings, source]);
 
+  // the embed snippet: an iframe of /embed with the derivation in the
+  // fragment; nothing leaves the machine that embedded it
+  const embed = useCallback(() => {
+    const url = shareUrl(source, settings);
+    const fragment = url.split('#v1.')[1];
+    const snippet = `<iframe src="https://samosa-math.vercel.app/embed#v1.${fragment}" width="100%" height="360" style="border:0;border-radius:8px" title="SAMOSA: the derivation, checked"></iframe>`;
+    copy(snippet);
+  }, [copy, settings, source]);
+
   // the bottom sheet: a drag handle, two snap points, a flick to dismiss
   const sheetVh = () => (typeof window === 'undefined' ? 800 : window.innerHeight);
   const sheetIsPhone = typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches;
@@ -266,10 +275,11 @@ export function App() {
         label: 'Export as JSON',
         run: () => report && download('samosa.json', exportJson(report, source, settings), 'application/json'),
       },
+      { id: 'embed', label: 'Embed', run: embed },
       { id: 'md', label: 'Export as Markdown', run: () => report && download('samosa.md', exportMarkdown(report, source)) },
       { id: 'tex', label: 'Export as LaTeX', run: () => report && download('samosa.tex', exportLatex(report, source)) },
     ],
-    [nextBug, spotTheBug, stopSpotTheBug, report, source, settings, theme],
+    [nextBug, spotTheBug, stopSpotTheBug, report, source, settings, theme, embed],
   );
 
   const commands = useMemo<Command[]>(
@@ -280,6 +290,11 @@ export function App() {
         id: 'share',
         label: 'Copy the share link',
         run: () => copy(shareUrl(source, settings)),
+      },
+      {
+        id: 'embed',
+        label: 'Copy the embed iframe',
+        run: embed,
       },
       { id: 'json', label: 'Export as JSON', run: () => download('samosa.json', exportJson(report, source, settings), 'application/json') },
       { id: 'md', label: 'Export as Markdown', run: () => download('samosa.md', exportMarkdown(report, source)) },
@@ -309,7 +324,7 @@ export function App() {
       },
       { id: 'reset', label: 'Start over', run: () => setSource(DEFAULT_SOURCE) },
     ],
-    [copy, report, reroll, setSettings, setSource, settings, source],
+    [copy, embed, report, reroll, setSettings, setSource, settings, source],
   );
 
   const step = report?.steps.find((s) => s.id === selectedStep) ?? null;

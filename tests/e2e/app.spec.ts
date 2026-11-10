@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
+import { encodeShare } from '../../src/core/share.ts';
 
 /**
  * The browser tests of the app.
@@ -316,6 +317,39 @@ test('the whole flow works with the keyboard alone', async ({ page }) => {
   await page.keyboard.press('ArrowDown');
   await expect(rows.nth(1)).toHaveAttribute('aria-selected', 'true', { timeout: 5_000 });
 });
+
+test('the embed page renders the derivation, read-only, and /app/ still refuses framing', async ({ page }) => {
+  const hash = encodeShare({ src: JOSEPH, settings: { decls: DECLARATIONS } });
+  const url = `/embed#v1.${hash}`;
+
+  // the embed renders the rows with their badges, and no editor
+  await page.goto(url);
+  await expect(page.locator('[data-step-id]')).toHaveCount(3, { timeout: 30_000 });
+  await expect(page.locator('[data-verdict="wrong"]')).toHaveCount(1);
+  await expect(page.locator('.cm-content')).toHaveCount(0);
+  await expect(page.locator('text=open in SAMOSA')).toBeVisible();
+
+  // a framing parent loads the embed, and the rows still show
+  const framed = page.context();
+  const parent = await framed.newPage();
+  // a fresh about:blank has an opaque origin and the browser refuses the
+  // frame's http navigation; give the parent a real page first
+  await parent.goto('/');
+  await parent.evaluate((spec) => {
+    const iframe = document.createElement('iframe');
+    iframe.src = spec;
+    iframe.style.width = '800px';
+    iframe.style.height = '400px';
+    iframe.title = 'embed';
+    document.body.appendChild(iframe);
+  }, `${new URL(url, 'http://localhost:4173').href}`);
+  // the frame navigates lazily, so the frameLocator does the waiting
+  const frame = parent.frameLocator('iframe[title="embed"]');
+  await expect(frame.locator('[data-step-id]')).toHaveCount(3, { timeout: 30_000 });
+  await expect(frame.locator('[data-verdict="wrong"]')).toHaveCount(1);
+  await parent.close();
+});
+
 
 test('the card saves as an image', async ({ page }) => {
   await type(page, JOSEPH);

@@ -10,12 +10,18 @@ import { resolve } from 'node:path';
 const CSP =
   "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'";
 
+// the embed is built to be framed by anybody; the app is not
+const EMBED_CSP =
+  "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'none'; frame-ancestors *; base-uri 'none'; form-action 'none'; object-src 'none'";
+
 /** The local preview serves the policy the host serves, so the browser tests
  * run against the real thing. */
-const servePolicy: Connect.NextHandleFunction = (_req, res, next) => {
-  // every path, as on the host: the policy used to cover / and /app/ only,
-  // and /app without its slash, the link everyone shares, had none
-  res.setHeader('Content-Security-Policy', CSP);
+const servePolicy: Connect.NextHandleFunction = (req, res, next) => {
+  // as on the host: the embed carries the relaxed policy, everything else
+  // carries the app's
+  const path = (req.url ?? '').split('?')[0];
+  const csp = path === '/embed' ? EMBED_CSP : CSP;
+  res.setHeader('Content-Security-Policy', csp);
   res.setHeader('Referrer-Policy', 'no-referrer');
   next();
 };
@@ -46,6 +52,7 @@ export default defineConfig({
       input: {
         landing: resolve(import.meta.dirname, 'index.html'),
         app: resolve(import.meta.dirname, 'app/index.html'),
+        embed: resolve(import.meta.dirname, 'embed.html'),
       },
       output: {
         manualChunks(id: string) {

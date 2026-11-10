@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SAMOSA · the derivation, checked</title>
+    <meta
+      name="description"
+      content="A derivation, checked with SAMOSA, embedded. No interaction, nothing uploaded, every row carries the sizes, the trials and the bound."
+    />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        background: #0b0a08;
+        color: #ede6da;
+        font-family: ui-monospace, "DejaVu Sans Mono", monospace;
+        min-height: 100vh;
+      }
+      #root { max-width: 940px; margin: 0 auto; padding: 14px 16px 10px; }
+      .rows { display: flex; flex-direction: column; gap: 6px; }
+      .row {
+        display: grid;
+        grid-template-columns: 88px 1fr;
+        gap: 10px;
+        align-items: baseline;
+        padding: 6px 8px;
+        border-radius: 6px;
+        background: #141210;
+        border: 1px solid #221f1c;
+      }
+      .badge {
+        font-size: 10px;
+        letter-spacing: 0.06em;
+        padding: 2px 6px;
+        border-radius: 4px;
+        border: 1px solid #333;
+        color: #b9b0a1;
+        white-space: nowrap;
+      }
+      .badge.v-ok { color: #7dc78f; border-color: #2e4a36; }
+      .badge.v-wrong { color: #e0654a; border-color: #53302a; }
+      .badge.v-shape { color: #f2a241; border-color: #54401c; }
+      .badge.v-unchecked, .badge.v-inconclusive { color: #b9b0a1; border-color: #3a352f; }
+      .badge.v-defined { color: #8f8378; border-color: #332f2b; }
+      .math { overflow-x: auto; }
+      .math .katex-display { margin: 0; text-align: left; }
+      .fine { margin-top: 14px; font-size: 11px; color: #6b645b; display: flex; justify-content: space-between; gap: 12px; }
+      .fine a { color: #c9a227; text-decoration: none; }
+      .broken { padding: 40px 16px; color: #8f8378; font-size: 13px; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/embed/main.tsx"></script>
+  </body>
+</html>

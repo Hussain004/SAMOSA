@@ -251,10 +251,10 @@ Node, so the same code runs in the browser, in the CLI and in the MCP
 server. The rules it lives by: no model in the verdict path, never a
 checkmark without a guarantee, and nothing that leaves the machine.
 
-The bundle budget is 300 KB of gzipped initial JavaScript for the app and
+The bundle budget is 340 KB of gzipped initial JavaScript for the app and
 120 KB for the landing page, checked on every build by `pnpm check:bundle`.
-The app's limit moved from 250 KB to 300 KB, and the move is recorded in
-the plan and here.
+The app's limit moved from 250 KB to 300 KB, and from 300 KB to 340 KB,
+and both moves are recorded in the plan and here.
 
 ## Contributing
 

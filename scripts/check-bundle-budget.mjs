@@ -7,11 +7,13 @@ import { resolve } from 'node:path';
  * The bundle budget.
  *
  * The plan sets a limit of 120 KB gzip for the landing page, which should
- * load in an instant, and 300 KB for the app, whose math is rendered at
+ * load in an instant, and 340 KB for the app, whose math is rendered at
  * build time but whose editor, worker and inspector are all on the first
  * screen. The app moved its limit from 250 KB to 300 KB after the measured
- * build passed the old number without margin, and the move is recorded in
- * the plan and the README, so this script follows the recorded limit.
+ * build passed the old number without margin, and from 300 KB to 340 KB
+ * when the engine grew the inequality and the distribution-claim checkers,
+ * and the move is recorded in the plan and the README, so this script
+ * follows the recorded limit.
  */
 
 const root = resolve(import.meta.dirname, '..');
@@ -23,7 +25,7 @@ const BUDGETS = {
   landing: 120 * 1024,
   // The app: React, the editor, the math and the engine. All of it is
   // needed on the first screen, so the limit is what it really costs.
-  app: 300 * 1024,
+  app: 340 * 1024,
 };
 
 function gzipSize(file) {
