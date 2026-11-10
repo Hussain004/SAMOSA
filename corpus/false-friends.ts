@@ -13,6 +13,8 @@ export interface FalseFriend {
   decls?: string;
   /** true when the step is caught with a wrong or a shape error today */
   caught?: boolean;
+  /** the handle to credit, when a trap was contributed by someone */
+  handle?: string;
 }
 
 export const FALSE_FRIENDS: Array<FalseFriend> = [

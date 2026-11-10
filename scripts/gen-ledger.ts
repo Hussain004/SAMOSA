@@ -54,15 +54,15 @@ const ledger = {
   generated:
     'the false friends from corpus/false-friends.ts, and the dated list of false checkmarks from CHANGELOG.md',
   note: 'none of these may ever come back ok; the structures test holds the engine to the list',
-  friends: FALSE_FRIENDS.map(({ name, src, decls }) => ({ name, src, decls })),
+  friends: FALSE_FRIENDS.map(({ name, src, decls, handle }) => ({ name, src, decls, handle })),
   dated: DATED,
 };
 
 writeFileSync(resolve(root, 'src/landing/ledger.json'), JSON.stringify(ledger, null, 2) + '\n');
 
-const bullet = (name: string, src: string) =>
-  `| ${name} | \`${src.replace(/\|/g, '\\|')}\` |`;
-const friendsList = ledger.friends.map(({ name, src }) => bullet(name, src)).join('\n');
+const bullet = (name: string, src: string, handle?: string) =>
+  `| ${name}${handle ? ` — @${handle}` : ''} | \`${src.replace(/\|/g, '\\|')}\` |`;
+const friendsList = ledger.friends.map(({ name, src, handle }) => bullet(name, src, handle)).join('\n');
 const datedList = ledger.dated
   .map(
     (entry) => `### ${entry.date} — ${entry.version}\n\n**${entry.title}.**\n\n> ${entry.quote}\n`,

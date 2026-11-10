@@ -12,7 +12,7 @@ export function LedgerSection() {
           body={`Every plausible-but-false identity we know: ${LEDGER.friends.length} of them, none of which may ever come back ok. The list is generated from the test corpus, the same list the structures test holds the engine to, and CI fails on a new one.`}
         />
         <div className="mt-10 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          {LEDGER.friends.map((friend: { name: string; src: string }) => (
+          {LEDGER.friends.map((friend: { name: string; src: string; handle?: string }) => (
             <div
               key={friend.name}
               className="flex flex-col rounded border border-[var(--color-line)] bg-[var(--color-panel)] px-3 py-2"
@@ -23,7 +23,10 @@ export function LedgerSection() {
               <code className="mt-1.5 block break-words font-mono text-[0.6875rem] leading-snug text-[var(--color-muted)]">
                 {friend.src}
               </code>
-              <span className="mt-1.5 text-[0.625rem] leading-snug text-[var(--color-faint)]">{friend.name}</span>
+              <span className="mt-1.5 text-[0.625rem] leading-snug text-[var(--color-faint)]">
+                {friend.name}
+                {friend.handle ? ` — @${friend.handle}` : ''}
+              </span>
             </div>
           ))}
         </div>

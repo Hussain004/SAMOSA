@@ -1,0 +1,49 @@
+name: A false friend, caught in your practice
+description: An identity SAMOSA checks as ok that is false, or the other way round.
+labels: trap
+body:
+  - type: markdown
+    attributes:
+      value: |
+        SAMOSA is measured on the false friends corpus, and the corpus is
+        exactly the traps people fall into. The best trap reports are ones
+        you were about to write in a paper. If you found a false identity
+        SAMOSA ratified, this is the form to use.
+        Every accepted trap is added to the corpus, the ledger and the
+        Cookbook measurement, and CI fails on it forever.
+
+  - type: textarea
+    id: claim
+    attributes:
+      label: The claim SAMOSA gets wrong
+      description: The row, alone, as LaTeX. Include the declarations if any.
+      placeholder: |
+        % samosa: A: n×n; B: n×n
+        (A + B)^{-1} = A^{-1} + B^{-1}
+    validations:
+      required: true
+
+  - type: dropdown
+    id: verdict
+    attributes:
+      label: What SAMOSA says today
+      description: Run the row in the app or with `npx samosa check` and tell us.
+      options:
+        - It says ok (a false checkmark; this is the important one)
+        - It says wrong (the claim is true; the sampler needs it)
+        - I have not run it yet
+        - It says unchecked
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Where it bites
+      description: A sentence or two. Where did you meet this claim, and who writes it down?
+
+  - type: input
+    id: handle
+    attributes:
+      label: Your handle (optional)
+      description: If the trap is accepted into the corpus you are credited in the ledger unless you say otherwise.
