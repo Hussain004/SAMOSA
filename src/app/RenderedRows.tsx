@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import katex from 'katex';
 import type { Report, StepResult } from '../core/index.ts';
 import { VERDICT_LABEL, VERDICT_ICON } from './verdicts.ts';
+import { escapeHtml } from './tex.tsx';
 
 export interface RenderedProps {
   /** the whole source, so the spans of a step can be sliced */
@@ -215,13 +216,6 @@ export function renderStep(step: StepResult, source = '', plain = false): string
   } catch {
     return escapeHtml(latex);
   }
-}
-
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
 }
 
 /**

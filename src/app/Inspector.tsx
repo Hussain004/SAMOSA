@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
-import katex from 'katex';
+import { useEffect, useState } from 'react';
 import type { Report, StepResult } from '../core/index.ts';
 import { matrixLatex } from './matrix.ts';
-import { VERDICT_ICON, VERDICT_LABEL, VERDICT_TITLE } from './verdicts.ts';
+import { VERDICT_ICON, VERDICT_LABEL, VERDICT_TITLE, seedText } from './verdicts.ts';
+import { Tex } from './tex.tsx';
 
 export interface InspectorProps {
   step: StepResult | null;
@@ -60,7 +60,7 @@ export function Inspector({ step, report, explanation, onApplyFix, onCopy, onClo
 
       <div className="mt-4 grid gap-2 text-xs sm:grid-cols-2">
         <Field label="mode" value={step.mode ?? VERDICT_LABEL[step.verdict]} />
-        <Field label="seed" value={String(card.seed)} />
+        <Field label="seed" value={seedText(card.seed)} />
         <Field label="trials per size" value={String(card.trialsPerSize)} />
         {/* A step that is wrong has no guarantee to show, so the fields of
             the guarantee are only there when the step holds. */}
@@ -240,27 +240,6 @@ function CounterexampleView({
       </details>
     </div>
   );
-}
-
-/** Renders a piece of LaTeX, and never throws at the reader. */
-function Tex({ latex, display = false, className }: { latex: string; display?: boolean; className?: string }) {
-  const html = useMemo(() => {
-    try {
-      return katex.renderToString(latex, {
-        displayMode: display,
-        throwOnError: false,
-        strict: 'ignore',
-        output: 'html',
-      });
-    } catch {
-      return escapeHtml(latex);
-    }
-  }, [latex, display]);
-  return <div className={className} dangerouslySetInnerHTML={{ __html: html }} />;
-}
-
-function escapeHtml(text: string): string {
-  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 function Field({ label, value }: { label: string; value: string }) {

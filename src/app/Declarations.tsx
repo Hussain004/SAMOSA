@@ -1,5 +1,5 @@
 import type { Chip } from '../core/index.ts';
-import { canonicalizeSymbol } from '../core/index.ts';
+import { canonicalizeSymbol, parseDeclarations } from '../core/index.ts';
 
 /**
  * The declarations, in the open.
@@ -31,16 +31,7 @@ const DECLARE = [
 
 /** The names a declarations string declares, the way the parser reads them. */
 function declaredNames(decls: string): Set<string> {
-  const out = new Set<string>();
-  for (const segment of decls.split(';')) {
-    const match = segment.match(/^(.+?)\s*:/);
-    if (!match) continue;
-    for (const name of match[1].split(',')) {
-      const trimmed = name.trim();
-      if (trimmed) out.add(canonicalizeSymbol(trimmed));
-    }
-  }
-  return out;
+  return new Set(parseDeclarations(decls).decls.map((d) => d.name));
 }
 
 export function DeclarationsStrip({ decls, chips, onDeclare, onEdit }: DeclarationsStripProps) {

@@ -7,6 +7,17 @@ import type { Verdict } from '../core/index.ts';
  * is readable without colour vision and by a screen reader.
  */
 
+/** The seed, in the one format everywhere: hex, uppercase, 0x. */
+export const seedText = (seed: number): string => `0x${seed.toString(16).toUpperCase().padStart(6, '0')}`;
+
+/** Reads a seed in either form: hex (0x…) or decimal. */
+export function parseSeed(input: string): number | null {
+  const text = input.trim();
+  if (/^0x[0-9a-fA-F]{1,8}$/.test(text)) return parseInt(text, 16) >>> 0;
+  if (/^\d{1,10}$/.test(text)) return Number(text) >>> 0;
+  return null;
+}
+
 export const VERDICT_ICON: Record<Verdict, string> = {
   ok: '✓',
   wrong: '✗',

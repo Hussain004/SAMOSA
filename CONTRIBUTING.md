@@ -17,7 +17,7 @@ The seed is in every report, and the same seed always gives the same
 verdict, so a report is a complete reproduction:
 
 ```bash
-npx samosa-math check derivation.tex --decls "A: n×n" --seed 5910618
+npx samosa-math check derivation.tex --decls "A: n×n" --seed 0x5A305A
 ```
 
 ## Working on the engine

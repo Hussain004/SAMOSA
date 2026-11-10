@@ -8,7 +8,7 @@ import { DeclarationsStrip } from './Declarations.tsx';
 import { canonicalizeSymbol } from '../core/index.ts';
 import { exportJson, exportMarkdown, exportLatex } from './export.ts';
 import { MENU } from '../../corpus/menu.ts';
-import { VERDICT_LABEL } from './verdicts.ts';
+import { VERDICT_LABEL, seedText, parseSeed } from './verdicts.ts';
 import { FontSizeControl, applyFontScale, readFontScale, stepFontScale } from '../font-size.tsx';
 
 const HEADER_BUTTON =
@@ -198,7 +198,7 @@ export function App() {
         label: 'Copy the share link',
         run: () => copy(shareUrl(source, settings)),
       },
-      { id: 'json', label: 'Export as JSON', run: () => download('samosa.json', exportJson(report, source, settings)) },
+      { id: 'json', label: 'Export as JSON', run: () => download('samosa.json', exportJson(report, source, settings), 'application/json') },
       { id: 'md', label: 'Export as Markdown', run: () => download('samosa.md', exportMarkdown(report, source)) },
       { id: 'tex', label: 'Export as LaTeX', run: () => download('samosa.tex', exportLatex(report, source)) },
       {
@@ -378,15 +378,7 @@ export function App() {
             </div>
           )}
           <div className="mt-3 flex flex-wrap items-center gap-4 text-[0.6875rem] text-[var(--color-muted)]">
-            <label className="flex items-center gap-2">
-              seed
-              <input
-                type="number"
-                value={settings.seed}
-                onChange={(e) => setSettings({ seed: Number(e.target.value) >>> 0 })}
-                className="w-24 rounded border border-[var(--color-line)] bg-black/40 px-1.5 py-1 text-xs outline-none"
-              />
-            </label>
+            <SeedField value={settings.seed} onApply={(seed) => setSettings({ seed })} />
             <label className="flex items-center gap-2">
               trials
               <input
@@ -566,7 +558,7 @@ export function App() {
         <span className="text-[var(--color-chutney)]">●</span>
         <span className="hidden sm:inline">all checks local, nothing uploaded</span>
         <span className="hidden text-[var(--color-faint)] sm:inline">·</span>
-        <span>seed {settings.seed}</span>
+        <span>seed {seedText(settings.seed)}</span>
         <span className="text-[var(--color-faint)]">·</span>
         {spotTheBug && !revealed ? (
           <span className="text-[var(--color-saffron)]">find the wrong row</span>
@@ -597,8 +589,35 @@ export function App() {
   );
 }
 
-function download(name: string, text: string): void {
-  const blob = new Blob([text], { type: 'text/plain' });
+/**
+ * The seed field: one small box that reads the seed in either form people
+ * write it in, hex or decimal, and applies it live.
+ */
+function SeedField({ value, onApply }: { value: number; onApply: (seed: number) => void }) {
+  const [raw, setRaw] = useState(() => seedText(value));
+  // the store changed the seed somewhere else (the reroll), so keep the box in step
+  useEffect(() => setRaw(seedText(value)), [value]);
+  return (
+    <label className="flex items-center gap-2">
+      seed
+      <input
+        type="text"
+        inputMode="text"
+        spellCheck={false}
+        value={raw}
+        onChange={(e) => {
+          setRaw(e.target.value);
+          const parsed = parseSeed(e.target.value);
+          if (parsed !== null) onApply(parsed);
+        }}
+        className="w-24 rounded border border-[var(--color-line)] bg-black/40 px-1.5 py-1 text-xs outline-none"
+      />
+    </label>
+  );
+}
+
+function download(name: string, text: string, mime = 'text/plain'): void {
+  const blob = new Blob([text], { type: mime });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
