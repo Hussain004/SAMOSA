@@ -13,6 +13,8 @@ export type Op =
   | 'inv'
   | 'invT'
   | 'T'
+  | 'dagger'
+  | 'conj'
   | 'tr'
   | 'det'
   | 'adj'

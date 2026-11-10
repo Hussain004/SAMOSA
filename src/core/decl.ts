@@ -31,6 +31,9 @@ export type Prop =
   | 'idem'
   | 'proj'
   | 'unit'
+  | 'unitary'
+  | 'complex'
+  | 'hermitian'
   | 'stoch'
   | 'pos'
   | 'int'
@@ -92,6 +95,9 @@ const PROP_WORDS: Record<string, Prop> = {
   proj: 'proj',
   projector: 'proj',
   unit: 'unit',
+  unitary: 'unitary',
+  complex: 'complex',
+  hermitian: 'hermitian',
   stoch: 'stoch',
   stochastic: 'stoch',
   ones: 'ones',

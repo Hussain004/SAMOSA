@@ -126,6 +126,10 @@ function renderOp(node: Extract<Node, { k: 'op' }>): string {
       return `${base(node.args[0])}^{-\\top}`;
     case 'T':
       return `${base(node.args[0])}^\\top`;
+    case 'dagger':
+      return `${base(node.args[0])}^\\dagger`;
+    case 'conj':
+      return `\\overline{${a[0]}}`;
     case 'tr':
       return `\\operatorname{tr}\\left(${a[0]}\\right)`;
     case 'det':
@@ -156,6 +160,8 @@ function renderOp(node: Extract<Node, { k: 'op' }>): string {
       return `\\left|${a[0]}\\right|`;
     case 'sqrtm':
       return `\\sqrt{${a[0]}}`;
+    default:
+      return '';
   }
 }
 

@@ -41,6 +41,9 @@ export function isRational(node: Node, ctx: TypeContext, defs: Map<string, Node>
       if (node.op === 'abs' || node.op === 'sqrtm') return false;
       // an unsquared norm needs an order too, and 50 digits, so numeric mode
       if (node.op === 'norm' || node.op === 'normF') return false;
+      // an adjoint or a conjugation is rational over GF(p^2), which the
+      // complex exact mode supplies; numeric mode never runs these rows
+      if (node.op === 'dagger' || node.op === 'conj') return node.args.every((a) => isRational(a, ctx, defs, seen));
       // a fractional power is a root, which GF(p) has not either
       if (node.op === 'pow' && node.args[1]?.k === 'num' && node.args[1].value.d !== 1) return false;
       return node.args.every((a) => isRational(a, ctx, defs, seen));
@@ -48,7 +51,14 @@ export function isRational(node: Node, ctx: TypeContext, defs: Map<string, Node>
     case 'call': {
       const def = defs.get(node.fn);
       if (def) return isRational(def, ctx, defs, seen);
-      return node.fn === 'det' || node.fn === 'tr' || node.fn === 'trace' || node.fn === 'var' || node.fn === 'cov';
+      return (
+        node.fn === 'det' ||
+        node.fn === 'tr' ||
+        node.fn === 'trace' ||
+        node.fn === 'var' ||
+        node.fn === 'cov' ||
+        node.fn === 'conj'
+      );
     }
     case 'deriv':
       return isRational(node.f, ctx, defs, seen);
@@ -110,4 +120,42 @@ export function sizeSettings(dimVars: string[]): Map<string, number>[] {
     out.push(m);
   }
   return out;
+}
+
+/** True when the row involves complex numbers: a complex or unitary structure, or an adjoint. */
+export function rowUsesComplexNumbers(ctx: TypeContext, step: Step): boolean {
+  const walkAll = (node: Node): Node[] => {
+    const out: Node[] = [];
+    const stack: Node[] = [node];
+    while (stack.length) {
+      const n = stack.pop()!;
+      out.push(n);
+      if ('args' in n && Array.isArray((n as { args?: Node[] }).args)) {
+        for (const arg of (n as { args: Node[] }).args) stack.push(arg);
+      }
+      if (n.k === 'bigop') {
+        stack.push(n.body);
+        if (n.lo) stack.push(n.lo);
+        if (n.hi) stack.push(n.hi);
+      }
+      if (n.k === 'deriv') {
+        stack.push(n.f);
+        for (const w of n.wrt) stack.push(w);
+      }
+      if (n.k === 'block') for (const row of n.rows) for (const cell of row) stack.push(cell);
+      if (n.k === 'expect') for (const arg of n.args) stack.push(arg);
+    }
+    return out;
+  };
+  for (const node of [step.lhs, step.rhs]) {
+    if (!node) continue;
+    for (const n of walkAll(node)) {
+      if (n.k === 'op' && (n.op === 'dagger' || n.op === 'conj')) return true;
+      if (n.k === 'call' && n.fn === 'conj') return true;
+    }
+  }
+  for (const [, info] of ctx.symbols) {
+    if (info.props.some((p) => p === 'unitary' || p === 'complex')) return true;
+  }
+  return false;
 }

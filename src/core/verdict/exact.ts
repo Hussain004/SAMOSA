@@ -2,8 +2,12 @@
  * The exact mode: a step over finite fields, decided by sampling.
  */
 import { P1, P2, GFpField } from '../fields/gfp.ts';
+import { P1_2, P2_2, GFp2Field } from '../fields/gfp2.ts';
+import { rowUsesComplexNumbers } from './plan.ts';
 import { degreeOf, type TypeContext } from '../types.ts';
 import type { Node } from '../ir.ts';
+import type { Field } from '../fields/types.ts';
+import type { GFp2 } from '../fields/gfp2.ts';
 import { Sampler } from '../sample.ts';
 import { rngFor, type Rng } from '../prng.ts';
 import { makeEnv } from '../evaluate.ts';
@@ -36,7 +40,11 @@ export function checkExact(
 ): StepResult {
   const dimVars = collectDimVars(ctx, step, defs);
   const settings = sizeSettings(dimVars);
-  const primes: [number, number] = [P1, P2];
+  // a derivation with complex numbers runs in GF(p^2), where the two primes
+  // are the two that are congruent to 3 modulo 4
+  const complex = rowUsesComplexNumbers(ctx, step);
+  const primes: [number, number] = complex ? [P1_2, P2_2] : [P1, P2];
+
 
   // One corner per structured symbol: an orthogonal matrix is a rotation or
   // a reflection, so with k of them there are 2^k combinations and the trial
@@ -73,13 +81,15 @@ export function checkExact(
   for (const setting of settings) {
     // the trials that ran, per prime and per corner
     const perCorner = new Map<number, number[]>([
-      [P1, new Array<number>(1 << corners).fill(0)],
-      [P2, new Array<number>(1 << corners).fill(0)],
+      [primes[0], new Array<number>(1 << corners).fill(0)],
+      [primes[1], new Array<number>(1 << corners).fill(0)],
     ]);
     for (let trial = 0; trial < trialsNeeded; trial++) {
       for (const p of primes) {
         const rng = rngFor(opts.seed, step.id, settingKey(setting), trial, p);
-        const outcome = runExactTrial(step, ctx, defs, setting, p, rng, trial);
+        const outcome = complex
+          ? runExactTrial<GFp2>(step, ctx, defs, setting, p, rng, trial, (q) => new GFp2Field(q))
+          : runExactTrial<number>(step, ctx, defs, setting, p, rng, trial, (q) => new GFpField(q));
         if (outcome.kind === 'ok') {
           perCorner.get(p)![trial & mask]++;
           continue;
@@ -129,8 +139,8 @@ export function checkExact(
     // A wrong step may vanish on every corner but one, and a trial in
     // another corner cannot see it, so the evidence of a size is the trials
     // of its least drawn corner, not the sum (review 3.1, round 2).
-    const ranP1 = Math.min(...perCorner.get(P1)!);
-    const ranP2 = Math.min(...perCorner.get(P2)!);
+    const ranP1 = Math.min(...perCorner.get(primes[0])!);
+    const ranP2 = Math.min(...perCorner.get(primes[1])!);
     if (ranP1 > 0 && ranP2 > 0) {
       working.push({ setting, ranP1, ranP2 });
     }
@@ -228,7 +238,7 @@ export type TrialOutcome =
   | { kind: 'unknown'; message: string; domain?: boolean; shape?: boolean };
 
 
-export function runExactTrial(
+export function runExactTrial<T>(
   step: Step,
   ctx: TypeContext,
   defs: Map<string, Node>,
@@ -236,8 +246,9 @@ export function runExactTrial(
   p: number,
   rng: Rng,
   trial: number,
+  makeField: (p: number) => Field<T>,
 ): TrialOutcome {
-  const field = new GFpField(p);
+  const field = makeField(p);
   const sampler = new Sampler(field, rng);
   const env = makeEnv(field, rng);
   env.defs = defs;

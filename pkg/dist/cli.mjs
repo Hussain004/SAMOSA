@@ -766,13 +766,15 @@ var DEFAULT_FUNCTIONS = /* @__PURE__ */ new Set([
   "sigma",
   "relu",
   "softmax",
+  "conj",
   "logdet",
   "norm",
   "abs",
   "sech",
   "sqrt",
   "var",
-  "cov"
+  "cov",
+  "conj"
 ]);
 var PROTECTED_COMMANDS = /* @__PURE__ */ new Set([
   "frac",
@@ -802,6 +804,7 @@ var PROTECTED_COMMANDS = /* @__PURE__ */ new Set([
   "sigma",
   "relu",
   "softmax",
+  "conj",
   "text",
   "begin",
   "end",
@@ -1068,7 +1071,9 @@ var Parser = class _Parser {
     }
     for (const script of scripts) {
       const span = { from: node.span.from, to: script.to };
-      if (script.kind === "transpose") {
+      if (script.kind === "dagger") {
+        node = { k: "op", op: "dagger", args: [node], span };
+      } else if (script.kind === "transpose") {
         node = { k: "op", op: "T", args: [node], span };
       } else if (script.kind === "inverse") {
         node = { k: "op", op: "inv", args: [node], span };
@@ -1218,7 +1223,9 @@ var Parser = class _Parser {
         this.pos++;
         const sup = this.readSuperscript();
         const classified = classifySuperscript(sup.text);
-        if (classified.kind === "transpose") {
+        if (classified.kind === "dagger") {
+          node = { k: "op", op: "dagger", args: [node], span: { from: node.span.from, to: sup.span.to } };
+        } else if (classified.kind === "transpose") {
           node = { k: "op", op: "T", args: [node], span: { from: node.span.from, to: sup.span.to } };
         } else if (classified.kind === "inverse") {
           node = { k: "op", op: "inv", args: [node], span: { from: node.span.from, to: sup.span.to } };
@@ -1722,7 +1729,8 @@ var Parser = class _Parser {
       case "sigmoid":
       case "sigma":
       case "relu":
-      case "softmax": {
+      case "softmax":
+      case "conj": {
         this.pos++;
         if (name === "sigma" && this.kind() !== "lparen") {
           const sym2 = this.makeSym([], "\\sigma", null, null, { from: t.from, to: t.to });
@@ -1731,6 +1739,10 @@ var Parser = class _Parser {
         if (this.kind() === "lparen") {
           const { args, unknown } = this.parseArgs();
           return this.makeCall(name === "sigma" ? "sigmoid" : name, t.from, args, unknown);
+        }
+        if (name === "conj") {
+          const arg = this.parsePrimary();
+          return { k: "call", fn: "conj", args: [arg], span: { from: t.from, to: arg.span.to } };
         }
         if (this.kind() === "lbrace") {
           const arg = this.parseGroupAsExpression();
@@ -2390,6 +2402,7 @@ function classifySuperscript(text) {
     return { kind: "transpose" };
   }
   if (s === "-1") return { kind: "inverse" };
+  if (s === "\\dagger" || s === "\u2020" || s === "H" || s === "\\mathsf{H}") return { kind: "dagger" };
   if (s === "-\\top" || s === "-T" || s === "-\\mathsf{T}") return { kind: "inverseT" };
   if (s === "1/2" || s === "\\frac{1}{2}" || s === "\\frac12") return { kind: "sqrtm" };
   if (s === "-1/2" || s === "-\\frac{1}{2}" || s === "-\\frac12") return { kind: "invSqrtm" };
@@ -3175,6 +3188,9 @@ var PROP_WORDS = {
   proj: "proj",
   projector: "proj",
   unit: "unit",
+  unitary: "unitary",
+  complex: "complex",
+  hermitian: "hermitian",
   stoch: "stoch",
   stochastic: "stoch",
   ones: "ones",
@@ -4200,6 +4216,11 @@ function opType(ctx, node) {
       if (isMatrix(a)) return { t: "mat", r: a.c, c: a.r };
       return { t: "scalar" };
     }
+    case "dagger": {
+      const a = args[0];
+      if (isMatrix(a)) return { t: "mat", r: a.c, c: a.r };
+      return { t: "scalar" };
+    }
     case "tr":
     case "det":
     case "norm2":
@@ -4247,6 +4268,10 @@ function opType(ctx, node) {
       return { t: "scalar" };
     }
     case "sqrtm": {
+      const a = args[0];
+      return a;
+    }
+    case "conj": {
       const a = args[0];
       return a;
     }
@@ -4307,6 +4332,7 @@ function callType(ctx, fn, args, span) {
     case "sigmoid":
     case "relu":
     case "softmax":
+    case "conj":
       return types[0] ?? { t: "scalar" };
     case "normalDensity":
     case "uniformDensity":
@@ -4424,6 +4450,8 @@ function degreeOf(ctx, node, sizes, defs) {
           return { n: args[0].d + (size - 1) * args[0].n, d: size * args[0].n };
         }
         case "T":
+        case "dagger":
+        case "conj":
         case "tr":
         case "vec":
         case "diag":
@@ -5514,6 +5542,9 @@ var PROP_WORDS2 = {
   idem: "idempotent",
   proj: "a projector",
   unit: "unit length",
+  unitary: "unitary",
+  complex: "complex",
+  hermitian: "Hermitian",
   stoch: "stochastic",
   pos: "positive",
   int: "an integer",
@@ -5550,13 +5581,14 @@ function isRational(node, ctx, defs, seen) {
     case "op": {
       if (node.op === "abs" || node.op === "sqrtm") return false;
       if (node.op === "norm" || node.op === "normF") return false;
+      if (node.op === "dagger" || node.op === "conj") return node.args.every((a) => isRational(a, ctx, defs, seen));
       if (node.op === "pow" && node.args[1]?.k === "num" && node.args[1].value.d !== 1) return false;
       return node.args.every((a) => isRational(a, ctx, defs, seen));
     }
     case "call": {
       const def = defs.get(node.fn);
       if (def) return isRational(def, ctx, defs, seen);
-      return node.fn === "det" || node.fn === "tr" || node.fn === "trace" || node.fn === "var" || node.fn === "cov";
+      return node.fn === "det" || node.fn === "tr" || node.fn === "trace" || node.fn === "var" || node.fn === "cov" || node.fn === "conj";
     }
     case "deriv":
       return isRational(node.f, ctx, defs, seen);
@@ -5605,6 +5637,163 @@ function sizeSettings(dimVars) {
     out.push(m);
   }
   return out;
+}
+function rowUsesComplexNumbers(ctx, step) {
+  const walkAll = (node) => {
+    const out = [];
+    const stack = [node];
+    while (stack.length) {
+      const n = stack.pop();
+      out.push(n);
+      if ("args" in n && Array.isArray(n.args)) {
+        for (const arg of n.args) stack.push(arg);
+      }
+      if (n.k === "bigop") {
+        stack.push(n.body);
+        if (n.lo) stack.push(n.lo);
+        if (n.hi) stack.push(n.hi);
+      }
+      if (n.k === "deriv") {
+        stack.push(n.f);
+        for (const w of n.wrt) stack.push(w);
+      }
+      if (n.k === "block") for (const row of n.rows) for (const cell of row) stack.push(cell);
+      if (n.k === "expect") for (const arg of n.args) stack.push(arg);
+    }
+    return out;
+  };
+  for (const node of [step.lhs, step.rhs]) {
+    if (!node) continue;
+    for (const n of walkAll(node)) {
+      if (n.k === "op" && (n.op === "dagger" || n.op === "conj")) return true;
+      if (n.k === "call" && n.fn === "conj") return true;
+    }
+  }
+  for (const [, info] of ctx.symbols) {
+    if (info.props.some((p) => p === "unitary" || p === "complex")) return true;
+  }
+  return false;
+}
+
+// src/core/fields/gfp2.ts
+var GFp2Field = class {
+  name = "GF(p^2)";
+  eps = 1e-9;
+  /** the base field, doing the exact arithmetic */
+  base;
+  p;
+  zero;
+  one;
+  /** the element i */
+  i;
+  /** a rational image of pi, as the field can represent one */
+  pi;
+  /** structural discriminator, so a field is recognized even across a duplicate instance of this class */
+  isGFp2 = true;
+  constructor(p) {
+    this.base = new GFpField(p);
+    this.p = p;
+    this.zero = { a: this.base.zero, b: this.base.zero };
+    this.one = { a: this.base.one, b: this.base.zero };
+    this.i = { a: this.base.zero, b: this.base.one };
+    this.pi = { a: this.base.fromRational(314159265, 1e8), b: this.base.zero };
+  }
+  add(x, y) {
+    return { a: this.base.add(x.a, y.a), b: this.base.add(x.b, y.b) };
+  }
+  sub(x, y) {
+    return { a: this.base.sub(x.a, y.a), b: this.base.sub(x.b, y.b) };
+  }
+  neg(x) {
+    return { a: this.base.neg(x.a), b: this.base.neg(x.b) };
+  }
+  mul(x, y) {
+    const ac = this.base.mul(x.a, y.a);
+    const bd = this.base.mul(x.b, y.b);
+    const ad = this.base.mul(x.a, y.b);
+    const bc = this.base.mul(x.b, y.a);
+    return { a: this.base.sub(ac, bd), b: this.base.add(ad, bc) };
+  }
+  /** The complex conjugate: a + bi becomes a - bi. */
+  conj(x) {
+    return { a: x.a, b: this.base.neg(x.b) };
+  }
+  /** The norm a^2 + b^2, as a base field element. */
+  norm(x) {
+    const aa = this.base.mul(x.a, x.a);
+    const bb = this.base.mul(x.b, x.b);
+    return { a: this.base.add(aa, bb), b: this.base.zero };
+  }
+  inv(x) {
+    if (this.isZero(x)) throw new Error("inverse of zero in GF(p^2)");
+    const n = this.norm(x);
+    const invNorm = this.base.inv(n.a);
+    const c = this.conj(x);
+    return { a: this.base.mul(c.a, invNorm), b: this.base.mul(c.b, invNorm) };
+  }
+  div(x, y) {
+    return this.mul(x, this.inv(y));
+  }
+  fromRational(n, d) {
+    return { a: this.base.fromRational(n, d), b: this.base.zero };
+  }
+  isZero(x) {
+    return this.base.isZero(x.a) && this.base.isZero(x.b);
+  }
+  eq(x, y) {
+    return this.base.eq(x.a, y.a) && this.base.eq(x.b, y.b);
+  }
+  /** A consistent but arbitrary order; this field has none. Used where a stable pivot is needed. */
+  cmp(x, y) {
+    if (this.base.cmp(x.a, y.a) !== 0) return this.base.cmp(x.a, y.a);
+    return this.base.cmp(x.b, y.b);
+  }
+  abs(_x) {
+    throw new Error("abs is not available in GF(p^2); this step needs an ordered field");
+  }
+  sqrt(_x) {
+    throw new Error("sqrt is not available in GF(p^2)");
+  }
+  exp(_x) {
+    throw new Error("exp is not available in GF(p^2)");
+  }
+  log(_x) {
+    throw new Error("log is not available in GF(p^2)");
+  }
+  sin(_x) {
+    throw new Error("sin is not available in GF(p^2)");
+  }
+  cos(_x) {
+    throw new Error("cos is not available in GF(p^2)");
+  }
+  tanh(_x) {
+    throw new Error("tanh is not available in GF(p^2)");
+  }
+  toNumber(x) {
+    return this.base.toNumber(x.a);
+  }
+  random(rng) {
+    return { a: this.base.random(rng), b: this.base.random(rng) };
+  }
+  normal(_rng) {
+    throw new Error("GF(p^2) has no normal distribution");
+  }
+  pow(x, k) {
+    let acc = this.one;
+    let base2 = x;
+    let e = k;
+    while (e > 0) {
+      if (e & 1) acc = this.mul(acc, base2);
+      base2 = this.mul(base2, base2);
+      e = Math.floor(e / 2);
+    }
+    return acc;
+  }
+};
+var P1_2 = 2147483647;
+var P2_2 = 2147483587;
+function isGFp2Field(f) {
+  return typeof f?.isGFp2 === "boolean" && f.isGFp2 === true;
 }
 
 // src/core/prng.ts
@@ -5678,6 +5867,7 @@ var Sampler = class {
       return { k: "m", m: this.sampleIdempotent(r, c, rank) };
     }
     if (has("unit")) return { k: "m", m: this.sampleUnit(r, c) };
+    if (has("unitary")) return { k: "m", m: this.sampleUnitary(r, spec.variety) };
     if (has("stoch")) return { k: "m", m: this.sampleStochastic(r, c) };
     if (has("diag")) return { k: "m", m: this.sampleDiagonal(r, c) };
     if (has("triu")) return { k: "m", m: this.sampleTriangular(r, c, true) };
@@ -5699,14 +5889,23 @@ var Sampler = class {
     for (let i = 0; i < r; i++) for (let j = 0; j < c; j++) d[i * c + j] = f(i, j);
     return { r, c, d };
   }
+  /** A GFp2 matrix, built by a generator. */
+  matG(r, c, f) {
+    const d = new Array(r * c);
+    for (let i = 0; i < r; i++) for (let j = 0; j < c; j++) d[i * c + j] = f(i, j);
+    return { r, c, d };
+  }
   /** One random element of the field. */
   element() {
     const f = this.field;
     if (isGFpField(f)) return randField(this.rng, f.p);
+    if (f instanceof GFp2Field) return f.random(this.rng);
     return f.normal(this.rng);
   }
   norm() {
-    return this.field.normal(this.rng);
+    const f = this.field;
+    if (f instanceof GFp2Field) return f.random(this.rng);
+    return f.normal(this.rng);
   }
   /** iid entries. */
   sampleGeneral(r, c) {
@@ -5805,6 +6004,49 @@ var Sampler = class {
     const inv = matInv(f, vtu);
     return matMul(f, matMul(f, u, inv), transpose(v));
   }
+  /**
+   * A random unitary matrix over GF(p^2).
+   *
+   * The Cayley form of a unitary matrix: for a skew-Hermitian S (S* = -S),
+   * the matrix U = (I - S)(I + S)^{-1} is unitary whenever I + S is
+   * invertible. S = A - A* for a random complex A is skew-Hermitian, and
+   * I + S is invertible with overwhelming probability; S is redrawn when it
+   * is not. Over the reals this recipe gives a rotation-like orthogonal
+   * matrix, but unitary matrices over GF(p^2) are what this prop declares.
+   */
+  sampleUnitary(n, variety = 0) {
+    const f = this.field;
+    if (isGFpField(f)) {
+      return this.sampleOrthogonal(n, (variety & 1) === 1);
+    }
+    if (!(f instanceof GFp2Field)) {
+      return this.sampleOrthogonal(n, false);
+    }
+    const f2 = f;
+    const rng = this.rng;
+    const c1 = f2.one;
+    const c0 = f2.zero;
+    for (let attempt = 0; attempt < 40; attempt++) {
+      const a = this.matG(n, n, () => f2.random(rng));
+      const aDag = this.matG(n, n, (i, j) => f2.conj(a.d[j * n + i]));
+      const s = this.matG(n, n, (i, j) => f2.sub(a.d[i * n + j], aDag.d[i * n + j]));
+      const eye = identity(n, c1, c0);
+      const plus = matAdd(f2, eye, s);
+      let inv;
+      try {
+        inv = matInv(f2, plus);
+      } catch {
+        continue;
+      }
+      const minus = matSub(f2, eye, s);
+      const u = matMul(f2, minus, inv);
+      if ((variety & 1) === 1) {
+        return this.mat(n, n, (i, j) => j === 0 ? f2.neg(u.d[i * n]) : u.d[i * n + j]);
+      }
+      return u;
+    }
+    return this.mat(n, n, (i, j) => i === j ? f.one : f.zero);
+  }
   /** A unit vector: a normalized Gaussian, or a stereographic point. */
   sampleUnit(r, c) {
     const f = this.field;
@@ -5855,6 +6097,7 @@ var Sampler = class {
   sampleScalar(variety = 0, index = 0) {
     const f = this.field;
     if (isGFpField(f)) return randField(this.rng, f.p);
+    if (f instanceof GFp2Field) return f.random(this.rng);
     const z = this.norm();
     const sign2 = (variety >> index & 1) === 1 ? -1 : 1;
     const cls = (variety + index) % 3;
@@ -5865,6 +6108,7 @@ var Sampler = class {
   samplePositiveScalar() {
     const f = this.field;
     if (isGFpField(f)) return randField(this.rng, f.p);
+    if (f instanceof GFp2Field) return f.random(this.rng);
     return f.add(f.abs(this.norm()), f.fromRational(5, 100));
   }
 };
@@ -6446,6 +6690,12 @@ function evalOp(f, op, args, _env) {
       const a = requireMatrix(args[0], "an inverse transpose");
       return { k: "m", m: matInv(f, transpose(a)) };
     }
+    case "dagger": {
+      const a = args[0];
+      const conjugated = conjVal(f, a);
+      if (isScalarVal(conjugated)) return conjugated;
+      return { k: "m", m: transpose(conjugated.m) };
+    }
     case "T": {
       const a = args[0];
       if (isScalarVal(a)) return scalar(a.v);
@@ -6568,6 +6818,8 @@ function evalCall(f, fn, args, env) {
       for (const e of exps) sum2 = f.add(sum2, e);
       return { k: "m", m: { r: m.r, c: m.c, d: exps.map((e) => f.div(e, sum2)) } };
     }
+    case "conj":
+      return conjVal(f, a0);
     case "det":
       return scalar(matDet(f, requireMatrix(a0, "a determinant")));
     case "tr":
@@ -6618,6 +6870,14 @@ function evalCall(f, fn, args, env) {
       throw new EvalError(`unknown function ${fn}`);
     }
   }
+}
+function conjScalarVal(f, x) {
+  if (isGFp2Field(f)) return f.conj(x);
+  return x;
+}
+function conjVal(f, v) {
+  if (isScalarVal(v)) return { k: "s", v: conjScalarVal(f, v.v) };
+  return { k: "m", m: { r: v.m.r, c: v.m.c, d: v.m.d.map((x) => conjScalarVal(f, x)) } };
 }
 function toDual(f, m) {
   return { r: m.r, c: m.c, d: m.d.map((x) => ({ v: x, t: f.zero })) };
@@ -6873,7 +7133,8 @@ function evaluateSides(field, lhsNode, rhsNode, env, sampler) {
 function checkExact(step, ctx, defs, opts, card) {
   const dimVars = collectDimVars(ctx, step, defs);
   const settings = sizeSettings(dimVars);
-  const primes = [P1, P2];
+  const complex = rowUsesComplexNumbers(ctx, step);
+  const primes = complex ? [P1_2, P2_2] : [P1, P2];
   const corners = cornerCount(step, ctx, defs);
   if (corners > 7) {
     const message = "this step has too many structured symbols to draw every corner of";
@@ -6899,13 +7160,13 @@ function checkExact(step, ctx, defs, opts, card) {
   const assumptions = collectAssumptions(ctx, step);
   for (const setting of settings) {
     const perCorner = /* @__PURE__ */ new Map([
-      [P1, new Array(1 << corners).fill(0)],
-      [P2, new Array(1 << corners).fill(0)]
+      [primes[0], new Array(1 << corners).fill(0)],
+      [primes[1], new Array(1 << corners).fill(0)]
     ]);
     for (let trial = 0; trial < trialsNeeded; trial++) {
       for (const p of primes) {
         const rng = rngFor(opts.seed, step.id, settingKey(setting), trial, p);
-        const outcome = runExactTrial(step, ctx, defs, setting, p, rng, trial);
+        const outcome = complex ? runExactTrial(step, ctx, defs, setting, p, rng, trial, (q) => new GFp2Field(q)) : runExactTrial(step, ctx, defs, setting, p, rng, trial, (q) => new GFpField(q));
         if (outcome.kind === "ok") {
           perCorner.get(p)[trial & mask]++;
           continue;
@@ -6948,8 +7209,8 @@ function checkExact(step, ctx, defs, opts, card) {
         };
       }
     }
-    const ranP1 = Math.min(...perCorner.get(P1));
-    const ranP2 = Math.min(...perCorner.get(P2));
+    const ranP1 = Math.min(...perCorner.get(primes[0]));
+    const ranP2 = Math.min(...perCorner.get(primes[1]));
     if (ranP1 > 0 && ranP2 > 0) {
       working.push({ setting, ranP1, ranP2 });
     }
@@ -7022,8 +7283,8 @@ function checkExact(step, ctx, defs, opts, card) {
     annotation: step.annotation
   };
 }
-function runExactTrial(step, ctx, defs, setting, p, rng, trial) {
-  const field = new GFpField(p);
+function runExactTrial(step, ctx, defs, setting, p, rng, trial, makeField) {
+  const field = makeField(p);
   const sampler = new Sampler(field, rng);
   const env = makeEnv(field, rng);
   env.defs = defs;
@@ -12090,6 +12351,10 @@ function renderOp(node) {
       return `${base(node.args[0])}^{-\\top}`;
     case "T":
       return `${base(node.args[0])}^\\top`;
+    case "dagger":
+      return `${base(node.args[0])}^\\dagger`;
+    case "conj":
+      return `\\overline{${a[0]}}`;
     case "tr":
       return `\\operatorname{tr}\\left(${a[0]}\\right)`;
     case "det":
@@ -12120,6 +12385,8 @@ function renderOp(node) {
       return `\\left|${a[0]}\\right|`;
     case "sqrtm":
       return `\\sqrt{${a[0]}}`;
+    default:
+      return "";
   }
 }
 function operand(node) {

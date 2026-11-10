@@ -197,6 +197,21 @@
       "decls": "A: n×n"
     },
     {
+      "name": "a unitary matrix is not unitary without the conjugation",
+      "src": "U^\\top U = I",
+      "decls": "U: unitary n×n"
+    },
+    {
+      "name": "the conjugate of a complex number is not the number",
+      "src": "\\operatorname{conj}(x) = x",
+      "decls": "x: complex"
+    },
+    {
+      "name": "conj(x)^2 = x^2 for complex x",
+      "src": "\\operatorname{conj}(x)^2 = x^2",
+      "decls": "x: complex"
+    },
+    {
       "name": "block rows do not commute",
       "src": "\\begin{pmatrix} A & B \\end{pmatrix} = \\begin{pmatrix} B & A \\end{pmatrix}",
       "decls": "A, B: n×n"

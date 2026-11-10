@@ -1,5 +1,6 @@
 import type { Field } from './fields/types.ts';
 import { isGFpField } from './fields/gfp.ts';
+import { GFp2Field, type GFp2 } from './fields/gfp2.ts';
 import { identity, matAdd, matInv, matMul, matScale, matSub, transpose, zeros, type Mat } from './linalg.ts';
 import type { Prop } from './decl.ts';
 import type { Rng } from './prng.ts';
@@ -63,6 +64,7 @@ export class Sampler<T> {
       return { k: 'm', m: this.sampleIdempotent(r, c, rank) };
     }
     if (has('unit')) return { k: 'm', m: this.sampleUnit(r, c) };
+    if (has('unitary')) return { k: 'm', m: this.sampleUnitary(r, spec.variety) };
     if (has('stoch')) return { k: 'm', m: this.sampleStochastic(r, c) };
     if (has('diag')) return { k: 'm', m: this.sampleDiagonal(r, c) };
     if (has('triu')) return { k: 'm', m: this.sampleTriangular(r, c, true) };
@@ -88,15 +90,25 @@ export class Sampler<T> {
     return { r, c, d };
   }
 
+  /** A GFp2 matrix, built by a generator. */
+  private matG(r: number, c: number, f: (i: number, j: number) => GFp2): Mat<GFp2> {
+    const d = new Array<GFp2>(r * c);
+    for (let i = 0; i < r; i++) for (let j = 0; j < c; j++) d[i * c + j] = f(i, j);
+    return { r, c, d };
+  }
+
   /** One random element of the field. */
   private element(): T {
     const f = this.field;
     if (isGFpField(f)) return randField(this.rng, f.p) as T;
+    if (f instanceof GFp2Field) return f.random(this.rng) as T;
     return f.normal(this.rng);
   }
 
   private norm(): T {
-    return this.field.normal(this.rng) as T;
+    const f = this.field;
+    if (f instanceof GFp2Field) return f.random(this.rng) as T;
+    return f.normal(this.rng) as T;
   }
 
   /** iid entries. */
@@ -211,6 +223,54 @@ export class Sampler<T> {
     return matMul(f, matMul(f, u, inv), transpose(v));
   }
 
+  /**
+   * A random unitary matrix over GF(p^2).
+   *
+   * The Cayley form of a unitary matrix: for a skew-Hermitian S (S* = -S),
+   * the matrix U = (I - S)(I + S)^{-1} is unitary whenever I + S is
+   * invertible. S = A - A* for a random complex A is skew-Hermitian, and
+   * I + S is invertible with overwhelming probability; S is redrawn when it
+   * is not. Over the reals this recipe gives a rotation-like orthogonal
+   * matrix, but unitary matrices over GF(p^2) are what this prop declares.
+   */
+  sampleUnitary(n: number, variety = 0): Mat<T> {
+    const f = this.field;
+    if (isGFpField(f)) {
+      // no complex numbers over a prime field: an orthogonal matrix is the best reading
+      return this.sampleOrthogonal(n, (variety & 1) === 1);
+    }
+    if (!(f instanceof GFp2Field)) {
+      // the reals: same Cayley over R, a unitary matrix is a real orthogonal matrix here
+      return this.sampleOrthogonal(n, false);
+    }
+    const f2 = f as unknown as GFp2Field;
+    const rng = this.rng;
+    const c1 = f2.one;
+    const c0 = f2.zero;
+    for (let attempt = 0; attempt < 40; attempt++) {
+      const a = this.matG(n, n, () => f2.random(rng));
+      const aDag = this.matG(n, n, (i, j) => f2.conj(a.d[j * n + i]));
+      const s = this.matG(n, n, (i, j) => f2.sub(a.d[i * n + j], aDag.d[i * n + j]));
+      const eye = identity(n, c1, c0);
+      const plus = matAdd(f2, eye, s);
+      let inv: Mat<GFp2>;
+      try {
+        inv = matInv(f2, plus);
+      } catch {
+        continue; // I + S singular: redraw
+      }
+      const minus = matSub(f2, eye, s);
+      const u = matMul(f2, minus, inv);
+      // reflect with one column if the variety says so
+      if ((variety & 1) === 1) {
+        return this.mat(n, n, (i, j) => (j === 0 ? (f2.neg(u.d[i * n]) as unknown as T) : (u.d[i * n + j] as unknown as T)));
+      }
+      return u as unknown as Mat<T>;
+    }
+    // 40 draws of a singular I + S: give up and hand back a diagonal of unit entries
+    return this.mat(n, n, (i, j) => (i === j ? f.one : (f.zero as T)));
+  }
+
   /** A unit vector: a normalized Gaussian, or a stereographic point. */
   sampleUnit(r: number, c: number): Mat<T> {
     const f = this.field;
@@ -269,6 +329,7 @@ export class Sampler<T> {
   sampleScalar(variety = 0, index = 0): T {
     const f = this.field;
     if (isGFpField(f)) return randField(this.rng, f.p) as T;
+    if (f instanceof GFp2Field) return f.random(this.rng) as T;
     const z = this.norm();
     const sign = ((variety >> index) & 1) === 1 ? -1 : 1;
     const cls = (variety + index) % 3;
@@ -285,6 +346,7 @@ export class Sampler<T> {
   samplePositiveScalar(): T {
     const f = this.field;
     if (isGFpField(f)) return randField(this.rng, f.p) as T;
+    if (f instanceof GFp2Field) return f.random(this.rng) as T;
     return f.add(f.abs(this.norm()), f.fromRational(5, 100));
   }
 }

@@ -1,5 +1,6 @@
 import type { Field } from './fields/types.ts';
 import { isGFpField } from './fields/gfp.ts';
+import { isGFp2Field, GFp2Field } from './fields/gfp2.ts';
 import { DualField, type DualValue } from './fields/dual.ts';
 import { HyperDualField, type HyperDualValue } from './fields/hyperdual.ts';
 import {
@@ -432,6 +433,13 @@ function evalOp<T>(f: Field<T>, op: string, args: Val<T>[], _env: EvalEnv<T>): V
       const a = requireMatrix(args[0], 'an inverse transpose');
       return { k: 'm', m: matInv(f, transpose(a)) };
     }
+    case 'dagger': {
+      // the adjoint: conjugate transpose; on a real field it is the transpose
+      const a = args[0];
+      const conjugated = conjVal(f, a);
+      if (isScalarVal(conjugated)) return conjugated;
+      return { k: 'm', m: transpose(conjugated.m) };
+    }
     case 'T': {
       const a = args[0];
       if (isScalarVal(a)) return scalar(a.v);
@@ -567,6 +575,8 @@ function evalCall<T>(f: Field<T>, fn: string, args: Val<T>[], env: EvalEnv<T>): 
       for (const e of exps) sum = f.add(sum, e);
       return { k: 'm', m: { r: m.r, c: m.c, d: exps.map((e) => f.div(e, sum)) } };
     }
+    case 'conj':
+      return conjVal(f, a0);
     case 'det':
       return scalar(matDet(f, requireMatrix(a0, 'a determinant')));
     case 'tr':
@@ -620,6 +630,24 @@ function evalCall<T>(f: Field<T>, fn: string, args: Val<T>[], env: EvalEnv<T>): 
       throw new EvalError(`unknown function ${fn}`);
     }
   }
+}
+
+/**
+ * The conjugation of a field element.
+ *
+ * On GF(p^2) the conjugate is a + bi becoming a - bi (the Frobenius image).
+ * On every other field (GF(p), the reals, the decimals) an element is its
+ * own conjugate, so this is the identity there.
+ */
+export function conjScalarVal<T>(f: Field<T>, x: T): T {
+  if (isGFp2Field(f)) return (f as unknown as GFp2Field).conj(x as never) as never;
+  return x;
+}
+
+/** Element-wise conjugation of a value. */
+export function conjVal<T>(f: Field<T>, v: Val<T>): Val<T> {
+  if (isScalarVal(v)) return { k: 's', v: conjScalarVal(f, v.v) };
+  return { k: 'm', m: { r: v.m.r, c: v.m.c, d: v.m.d.map((x) => conjScalarVal(f, x)) } };
 }
 
 /** The identity matrix of a size, for the polymorphic symbols. */

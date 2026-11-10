@@ -251,6 +251,7 @@ export const DEFAULT_FUNCTIONS = new Set([
   'sigma',
   'relu',
   'softmax',
+  'conj',
   'logdet',
   'norm',
   'abs',
@@ -258,6 +259,7 @@ export const DEFAULT_FUNCTIONS = new Set([
   'sqrt',
   'var',
   'cov',
+  'conj',
 ]);
 
 /**
@@ -268,7 +270,7 @@ const PROTECTED_COMMANDS = new Set([
   'frac', 'dfrac', 'tfrac', 'sqrt', 'nabla', 'partial', 'sum', 'prod',
   'langle', 'rangle', 'mathrm', 'operatorname', 'mathsf', 'mathtt', 'mathbb',
   'det', 'exp', 'log', 'ln', 'sin', 'cos', 'tan', 'tanh', 'sigmoid', 'sigma',
-  'relu', 'softmax', 'text', 'begin', 'end', 'left', 'right', 'overbrace',
+  'relu', 'softmax', 'conj', 'text', 'begin', 'end', 'left', 'right', 'overbrace',
   'underbrace',
 ]);
 
@@ -530,7 +532,7 @@ export class Parser {
     let sub: string | null = null;
     let labelSup: string | null = null;
     let spanEnd = base.span.to;
-    const scripts: Array<{ kind: 'transpose' | 'inverse' | 'inverseT' | 'sqrtm' | 'invSqrtm' | 'power'; text?: string; to: number }> = [];
+    const scripts: Array<{ kind: 'transpose' | 'dagger' | 'inverse' | 'inverseT' | 'sqrtm' | 'invSqrtm' | 'power'; text?: string; to: number }> = [];
 
     // the scripts may come in either order, so P^\kappa_{B_R} works
     for (;;) {
@@ -574,7 +576,9 @@ export class Parser {
 
     for (const script of scripts) {
       const span = { from: node.span.from, to: script.to };
-      if (script.kind === 'transpose') {
+      if (script.kind === 'dagger') {
+        node = { k: 'op', op: 'dagger', args: [node], span };
+      } else if (script.kind === 'transpose') {
         node = { k: 'op', op: 'T', args: [node], span };
       } else if (script.kind === 'inverse') {
         node = { k: 'op', op: 'inv', args: [node], span };
@@ -750,7 +754,9 @@ export class Parser {
         this.pos++;
         const sup = this.readSuperscript();
         const classified = classifySuperscript(sup.text);
-        if (classified.kind === 'transpose') {
+        if (classified.kind === 'dagger') {
+          node = { k: 'op', op: 'dagger', args: [node], span: { from: node.span.from, to: sup.span.to } };
+        } else if (classified.kind === 'transpose') {
           node = { k: 'op', op: 'T', args: [node], span: { from: node.span.from, to: sup.span.to } };
         } else if (classified.kind === 'inverse') {
           node = { k: 'op', op: 'inv', args: [node], span: { from: node.span.from, to: sup.span.to } };
@@ -1345,7 +1351,8 @@ export class Parser {
       case 'sigmoid':
       case 'sigma':
       case 'relu':
-      case 'softmax': {
+      case 'softmax':
+      case 'conj': {
         this.pos++;
         if (name === 'sigma' && this.kind() !== 'lparen') {
           // \sigma on its own is the standard deviation
@@ -1355,6 +1362,11 @@ export class Parser {
         if (this.kind() === 'lparen') {
           const { args, unknown } = this.parseArgs();
           return this.makeCall(name === 'sigma' ? 'sigmoid' : name, t.from, args, unknown);
+        }
+        if (name === 'conj') {
+          // conj x without parens is conj of the next primary
+          const arg = this.parsePrimary();
+          return { k: 'call', fn: 'conj', args: [arg], span: { from: t.from, to: arg.span.to } };
         }
         if (this.kind() === 'lbrace') {
           const arg = this.parseGroupAsExpression();
@@ -2090,6 +2102,7 @@ function describeToken(t: Token): string {
 
 type SupKind =
   | { kind: 'transpose' }
+  | { kind: 'dagger' }
   | { kind: 'inverse' }
   | { kind: 'inverseT' }
   | { kind: 'sqrtm' }
@@ -2125,6 +2138,7 @@ export function classifySuperscript(text: string): SupKind {
     return { kind: 'transpose' };
   }
   if (s === '-1') return { kind: 'inverse' };
+  if (s === '\\dagger' || s === '†' || s === 'H' || s === '\\mathsf{H}') return { kind: 'dagger' };
   if (s === '-\\top' || s === '-T' || s === '-\\mathsf{T}') return { kind: 'inverseT' };
   // a half power is a square root, written as 1/2, \frac{1}{2} or \frac12
   // (review 4.2). The negative half power is the inverse of the square root.

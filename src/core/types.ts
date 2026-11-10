@@ -779,6 +779,11 @@ function opType(ctx: TypeContext, node: Extract<Node, { k: 'op' }>): Ty {
       if (isMatrix(a)) return { t: 'mat', r: a.c, c: a.r };
       return { t: 'scalar' };
     }
+    case 'dagger': {
+      const a = args[0];
+      if (isMatrix(a)) return { t: 'mat', r: a.c, c: a.r };
+      return { t: 'scalar' };
+    }
     case 'tr':
     case 'det':
     case 'norm2':
@@ -826,6 +831,10 @@ function opType(ctx: TypeContext, node: Extract<Node, { k: 'op' }>): Ty {
       return { t: 'scalar' };
     }
     case 'sqrtm': {
+      const a = args[0];
+      return a;
+    }
+    case 'conj': {
       const a = args[0];
       return a;
     }
@@ -893,6 +902,7 @@ function callType(ctx: TypeContext, fn: string, args: Node[], span: Span): Ty {
     case 'sigmoid':
     case 'relu':
     case 'softmax':
+    case 'conj':
       // these act element wise, so they keep the shape of their argument
       return types[0] ?? { t: 'scalar' };
     case 'normalDensity':
@@ -1030,6 +1040,8 @@ export function degreeOf(
           return { n: args[0].d + (size - 1) * args[0].n, d: size * args[0].n };
         }
         case 'T':
+        case 'dagger':
+        case 'conj':
         case 'tr':
         case 'vec':
         case 'diag':

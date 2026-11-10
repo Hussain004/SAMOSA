@@ -2,7 +2,7 @@
 
 The plausible-but-false identities, and the checkmarks SAMOSA had not earned.
 
-## The 40 friends nobody wants
+## The 43 friends nobody wants
 
 These are the mistakes people actually write. None of them may ever come
 back ok: the structures test holds the engine to this list on every commit,
@@ -50,6 +50,9 @@ is missing, the step is unchecked, which is honest, never a checkmark.
 | a square of a Gaussian is not its mean | `E[x^2] = E[x]` |
 | the adjugate of a product is not the product of the adjugates | `\operatorname{adj}(A B) = \operatorname{adj}(A)\operatorname{adj}(B)` |
 | the vectorisation does not survive a transpose | `\operatorname{vec}(A^\top) = \operatorname{vec}(A)` |
+| a unitary matrix is not unitary without the conjugation | `U^\top U = I` |
+| the conjugate of a complex number is not the number | `\operatorname{conj}(x) = x` |
+| conj(x)^2 = x^2 for complex x | `\operatorname{conj}(x)^2 = x^2` |
 | block rows do not commute | `\begin{pmatrix} A & B \end{pmatrix} = \begin{pmatrix} B & A \end{pmatrix}` |
 
 ## The dated list of false checkmarks found and fixed

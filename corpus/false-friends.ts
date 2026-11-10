@@ -58,6 +58,9 @@ export const FALSE_FRIENDS: Array<FalseFriend> = [
   { name: 'a square of a Gaussian is not its mean', src: String.raw`E[x^2] = E[x]`, decls: 'x ~ N(\\mu, 1); \\mu: scalar', caught: true },
   { name: 'the adjugate of a product is not the product of the adjugates', src: String.raw`\operatorname{adj}(A B) = \operatorname{adj}(A)\operatorname{adj}(B)`, decls: 'A, B: n×n' },
   { name: 'the vectorisation does not survive a transpose', src: String.raw`\operatorname{vec}(A^\top) = \operatorname{vec}(A)`, decls: 'A: n×n' },
+  { name: 'a unitary matrix is not unitary without the conjugation', src: String.raw`U^\top U = I`, decls: 'U: unitary n×n', caught: true },
+  { name: 'the conjugate of a complex number is not the number', src: String.raw`\operatorname{conj}(x) = x`, decls: 'x: complex', caught: true },
+  { name: 'conj(x)^2 = x^2 for complex x', src: String.raw`\operatorname{conj}(x)^2 = x^2`, decls: 'x: complex', caught: true },
   {
     name: 'block rows do not commute',
     src: String.raw`\begin{pmatrix} A & B \end{pmatrix} = \begin{pmatrix} B & A \end{pmatrix}`,
