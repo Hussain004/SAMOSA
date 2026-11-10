@@ -19,6 +19,16 @@ import { splitRows as engineSplitRows } from '../src/core/steps.ts';
 import type { Node } from '../src/core/ir.ts';
 
 const root = resolve(import.meta.dirname, '..');
+
+/**
+ * `--record <version>` appends the measurement to corpus/coverage-history.json.
+ * A release runs the coverage with this flag; a development run does not, so
+ * the curve on the landing page is one point per release, not one per run.
+ */
+const RECORD = (() => {
+  const at = process.argv.indexOf('--record');
+  return at >= 0 ? process.argv[at + 1] : null;
+})();
 const cache = resolve(root, '.coverage');
 
 const PAPER_COUNT = Number(process.argv[2] ?? 40);
@@ -173,6 +183,21 @@ async function main(): Promise<void> {
       2,
     ),
   );
+  if (RECORD) {
+    const historyPath = resolve(root, 'corpus/coverage-history.json');
+    const history: Array<Record<string, unknown>> = JSON.parse(readFileSync(historyPath, 'utf8'));
+    history.push({
+      version: RECORD,
+      date: new Date().toISOString().slice(0, 10),
+      papers: fetched,
+      rows: rows.length,
+      claims,
+      parsed,
+      percent: Number(percent.toFixed(1)),
+    });
+    writeFileSync(historyPath, JSON.stringify(history, null, 2) + '\n');
+    console.log(`the history was appended to corpus/coverage-history.json: ${RECORD}, ${percent.toFixed(1)}%`);
+  }
   console.log('');
   console.log(`the report is in ${resolve(cache, 'coverage.json')}`);
 }

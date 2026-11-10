@@ -4,7 +4,9 @@ How much of a real paper SAMOSA reads, measured over the display math of
 recent arXiv papers.
 
 The method is in `scripts/coverage.ts`, the sample is in
-`.coverage/coverage.json`, and the run is:
+`.coverage/coverage.json`, and the per-release history the landing charts is
+in `corpus/coverage-history.json` (a release records with
+`--record <version>`; a development run does not). The run is:
 
 ```bash
 node_modules/.bin/vite-node scripts/coverage.ts
