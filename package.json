@@ -44,7 +44,9 @@
     "bench": "vite-node scripts/bench.ts --check",
     "bench:write": "vite-node scripts/bench.ts --write",
     "test:e2e": "playwright test",
-    "check:corpus": "node scripts/check-corpus.mjs"
+    "check:corpus": "node scripts/check-corpus.mjs",
+    "bench:samosa": "vite-node bench/samosa-bench.ts",
+    "bench:score": "vite-node bench/score-answers.ts"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.4",

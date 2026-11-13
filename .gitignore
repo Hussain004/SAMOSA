@@ -24,3 +24,6 @@ public/docs
 brag-output-*
 *.vsix
 .lighthouseci
+
+# SAMOSA-Bench: model outputs are never committed before the numbers are final
+bench/answers/

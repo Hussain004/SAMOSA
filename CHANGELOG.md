@@ -4,6 +4,24 @@ All notable changes to SAMOSA. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 follows [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+SAMOSA-Bench v0: the auditor's report card.
+
+### Added
+
+- `bench/` — SAMOSA-Bench, the measurement companion to the Cookbook and
+  the ledger. 137 probes projected from the measured corpora (94 Cookbook
+  identities, 43 false friends), a baseline runner (`pnpm bench:samosa`,
+  writes `bench/report.json`), and the scorer for the model arm
+  (`pnpm bench:score -- answers.jsonl [--model name]`) that reports
+  precision, recall, accuracy and abstention per model next to SAMOSA's own
+  verdict on the same probes. The committed baseline: 93/94 Cookbook
+  identities verified (Riccati abstains, by design), 39/43 false friends
+  caught, both gates held. The model arm is not built: no LLM outputs or
+  human labels exist in this repository, and none are claimed anywhere.
+  `tests/bench.test.ts` guards the probe list's structure.
+
 ## [1.3.0] - 2026-11-11
 
 The implication row checks, the distribution row checks, the counterexample

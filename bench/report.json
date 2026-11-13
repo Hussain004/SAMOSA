@@ -1,0 +1,1385 @@
+{
+  "probes": {
+    "true": 94,
+    "false": 43,
+    "total": 137
+  },
+  "cookbook": {
+    "verified": 93,
+    "caught": 0,
+    "abstained": 1,
+    "gateFailures": []
+  },
+  "ledger": {
+    "verified": 0,
+    "caught": 39,
+    "abstained": 4,
+    "gateFailures": []
+  },
+  "results": [
+    {
+      "id": "true-transpose-of-sum",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the transpose of a sum",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-transpose-of-product",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the transpose of a product",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-transpose-of-transpose",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the transpose of a transpose",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-product-of-sums",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "a product of two sums",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-inverse-of-product",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the inverse of a product",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-inverse-of-inverse",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the inverse of an inverse",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-inverse-of-transpose",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the inverse of a transpose",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-left-inverse",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "a left inverse is a left inverse",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-right-inverse",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "a right inverse is a right inverse",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-inverse-of-sum",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the inverse of a sum, in the Woodbury form",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-det-of-product",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the determinant of a product",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-det-of-transpose",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the determinant of a transpose",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-det-of-inverse",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the determinant of an inverse",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-det-lemma",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the matrix determinant lemma",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-sherman-morrison",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the Sherman-Morrison formula",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-trace-cyclic",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the trace of a product is cyclic",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-trace-of-sum",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the trace of a sum",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-trace-of-transpose",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the trace of a transpose",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-trace-of-product-of-transpose",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the trace of a product with a transpose",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-frob-norm-of-transpose",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the Frobenius norm of a transpose",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-spectral-norm-of-transpose",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the spectral norm of a transpose",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-quadratic-form",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the transpose of a quadratic form",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-assoc",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the product is associative",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-identity-product",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the identity is the neutral element",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-transpose-of-scalar-product",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the transpose of a product of three",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-kron-of-sum",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the Kronecker product of a sum",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-hadamard-of-sum",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the Hadamard product of a sum",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-gradient-of-quadratic",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the gradient of a quadratic form",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-gradient-of-quadratic-matrix",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the gradient of a matrix quadratic form",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-hessian-of-quadratic",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the Hessian of a quadratic form",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-gradient-of-transpose",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the gradient of a transpose",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-gradient-of-sum",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the gradient of a sum",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-stationary-point",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "a stationary point",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-variance-of-sum",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the variance of a sum",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-covariance-of-scaled",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the covariance of a scaled variable",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-gaussian-moment",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the second moment of a Gaussian",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-gaussian-mean",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the mean of a Gaussian",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-gaussian-trace",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the trace of a Gaussian covariance",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-kalman-covariance",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the covariance of the Kalman update",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-kalman-gain",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the Kalman gain",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-joseph-form",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the Joseph form",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-push-through",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the push-through identity",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-woodbury",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the Woodbury identity",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-riccati",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the Riccati recursion",
+      "outcome": "abstained",
+      "verdicts": []
+    },
+    {
+      "id": "true-least-squares",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the normal equations",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-ridge-gradient",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the gradient of a ridge regression",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-softmax",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the gradient of the softmax cross entropy",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-inner-product-as-sum",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the inner product as a sum",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-trace-as-sum",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the trace of a matrix as a sum",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-frobenius-as-double-sum",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the Frobenius inner product as a double sum",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-quadratic-of-ones",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the sum of every entry as a quadratic form",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-logsumexp-gradient",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the gradient of the log of a sum of exponentials",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-kl-of-gaussians",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the KL of two Gaussians",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-kron-mixed-product",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the mixed product of Kronecker products",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-kron-transpose",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the transpose of a Kronecker product",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-kron-trace",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the trace of a Kronecker product",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-kron-inverse",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the inverse of a Kronecker product",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-kron-conjugate-inverse",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the inverse of a conjugated Kronecker product",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-det-of-product-of-transpose",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the determinant of a Gram matrix",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-det-of-householder",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the determinant of a Householder reflection",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-schur-complement-determinant",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the Schur complement determinant lemma",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-schur-complement-determinant-of-d",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the Schur complement determinant lemma, the other way round",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-block-triangular-determinant",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the determinant of a block triangular matrix",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-logdet-of-inverse",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the log determinant of an inverse",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-logdet-of-product",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the log determinant of a product",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-logdet-gradient",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the gradient of the log determinant",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-det-gradient",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the gradient of the determinant",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-frobenius-gradient",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the gradient of the squared Frobenius norm",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-quadratic-symmetric-gradient",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the gradient of a quadratic form",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-quadratic-norm-gradient",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the gradient of a squared norm",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-trace-gradient",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the gradient of a trace",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-trace-inverse-gradient",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the gradient of the trace of an inverse",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-inverse-trace-gradient",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the gradient of the trace of an inverse, the simple one",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-bilinear-gradient",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the gradient of a bilinear form",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-block-trace",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the trace of a block matrix",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-block-transpose",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the transpose of a block matrix",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-block-sum",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "a block matrix is the sum of its blocks",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-block-triangular-inverse",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the inverse of a block triangular matrix",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-skew-symmetric",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "a difference with its transpose is skew symmetric",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-symmetrized-sum",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "a sum with its transpose is symmetric",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-householder-symmetric",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "a Householder matrix is symmetric",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-householder-orthogonal",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "a Householder matrix is orthogonal",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-householder-annihilates-vector",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "a Householder matrix flips its own vector",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-projection-idempotent",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "an orthogonal projection is idempotent",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-projection-symmetric",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "an orthogonal projection is symmetric",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-projection-annihilates",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "an orthogonal projection leaves its own range alone",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-residual-projection",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the residual of a projection is zero",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-projection-complement",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the complement of a projection is a projection",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-orthogonal-transpose-inverse",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "an orthogonal matrix is its transpose inverse",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-hadamard-transpose",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the transpose of a Hadamard product",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-outer-product-square",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "an outer product squared is a multiple of itself",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-outer-product-trace",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the trace of an outer product",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-expectation-quadratic-of-normal",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the second moment of a normal vector",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "true-expectation-of-normal-vector",
+      "source": "cookbook",
+      "expect": "ok",
+      "name": "the mean of a normal vector",
+      "outcome": "verified",
+      "verdicts": [
+        "ok"
+      ]
+    },
+    {
+      "id": "false-the-determinant-of-an-orthogonal-matrix-is-not-one",
+      "source": "ledger",
+      "expect": "wrong",
+      "name": "the determinant of an orthogonal matrix is not one",
+      "outcome": "caught",
+      "verdicts": [
+        "wrong"
+      ]
+    },
+    {
+      "id": "false-two-orthogonal-matrices-do-not-commute",
+      "source": "ledger",
+      "expect": "wrong",
+      "name": "two orthogonal matrices do not commute",
+      "outcome": "caught",
+      "verdicts": [
+        "wrong"
+      ]
+    },
+    {
+      "id": "false-the-absolute-value-is-not-the-identity",
+      "source": "ledger",
+      "expect": "wrong",
+      "name": "the absolute value is not the identity",
+      "outcome": "caught",
+      "verdicts": [
+        "wrong"
+      ]
+    },
+    {
+      "id": "false-the-absolute-value-does-not-split-a-sum",
+      "source": "ledger",
+      "expect": "wrong",
+      "name": "the absolute value does not split a sum",
+      "outcome": "caught",
+      "verdicts": [
+        "wrong"
+      ]
+    },
+    {
+      "id": "false-the-square-root-of-a-square-is-not-the-number",
+      "source": "ledger",
+      "expect": "wrong",
+      "name": "the square root of a square is not the number",
+      "outcome": "caught",
+      "verdicts": [
+        "wrong"
+      ]
+    },
+    {
+      "id": "false-the-square-root-of-a-square-is-not-the-negative-for-a-positive-one",
+      "source": "ledger",
+      "expect": "wrong",
+      "name": "the square root of a square is not the negative, for a positive one",
+      "outcome": "caught",
+      "verdicts": [
+        "wrong"
+      ]
+    },
+    {
+      "id": "false-the-inverse-of-a-sum-is-not-the-sum-of-the-inverses",
+      "source": "ledger",
+      "expect": "wrong",
+      "name": "the inverse of a sum is not the sum of the inverses",
+      "outcome": "caught",
+      "verdicts": [
+        "wrong"
+      ]
+    },
+    {
+      "id": "false-the-trace-of-a-product-is-not-the-product-of-the-traces",
+      "source": "ledger",
+      "expect": "wrong",
+      "name": "the trace of a product is not the product of the traces",
+      "outcome": "caught",
+      "verdicts": [
+        "wrong"
+      ]
+    },
+    {
+      "id": "false-the-determinant-of-a-sum-is-not-the-sum-of-the-determinants",
+      "source": "ledger",
+      "expect": "wrong",
+      "name": "the determinant of a sum is not the sum of the determinants",
+      "outcome": "caught",
+      "verdicts": [
+        "wrong"
+      ]
+    },
+    {
+      "id": "false-the-exponential-does-not-split-a-sum-of-matrices",
+      "source": "ledger",
+      "expect": "wrong",
+      "name": "the exponential does not split a sum of matrices",
+      "outcome": "caught",
+      "verdicts": [
+        "wrong"
+      ]
+    },
+    {
+      "id": "false-the-inverse-of-a-product-is-not-the-product-of-the-inverses",
+      "source": "ledger",
+      "expect": "wrong",
+      "name": "the inverse of a product is not the product of the inverses",
+      "outcome": "caught",
+      "verdicts": [
+        "wrong"
+      ]
+    },
+    {
+      "id": "false-the-transpose-of-a-product-is-not-the-product-of-the-transposes",
+      "source": "ledger",
+      "expect": "wrong",
+      "name": "the transpose of a product is not the product of the transposes",
+      "outcome": "caught",
+      "verdicts": [
+        "wrong"
+      ]
+    },
+    {
+      "id": "false-the-inverse-of-the-transpose-is-not-the-inverse",
+      "source": "ledger",
+      "expect": "wrong",
+      "name": "the inverse of the transpose is not the inverse",
+      "outcome": "caught",
+      "verdicts": [
+        "wrong"
+      ]
+    },
+    {
+      "id": "false-a-square-is-not-twice-the-matrix",
+      "source": "ledger",
+      "expect": "wrong",
+      "name": "a square is not twice the matrix",
+      "outcome": "caught",
+      "verdicts": [
+        "wrong"
+      ]
+    },
+    {
+      "id": "false-subtraction-does-not-commute",
+      "source": "ledger",
+      "expect": "wrong",
+      "name": "subtraction does not commute",
+      "outcome": "caught",
+      "verdicts": [
+        "wrong"
+      ]
+    },
+    {
+      "id": "false-a-quotient-is-not-the-product",
+      "source": "ledger",
+      "expect": "wrong",
+      "name": "a quotient is not the product",
+      "outcome": "caught",
+      "verdicts": [
+        "wrong"
+      ]
+    },
+    {
+      "id": "false-the-squared-norm-does-not-split-a-sum",
+      "source": "ledger",
+      "expect": "wrong",
+      "name": "the squared norm does not split a sum",
+      "outcome": "caught",
+      "verdicts": [
+        "wrong"
+      ]
+    },
+    {
+      "id": "false-the-unsquared-norm-does-not-split-a-sum",
+      "source": "ledger",
+      "expect": "wrong",
+      "name": "the unsquared norm does not split a sum",
+      "outcome": "caught",
+      "verdicts": [
+        "wrong"
+      ]
+    },
+    {
+      "id": "false-an-inner-product-is-not-the-product-of-the-norms",
+      "source": "ledger",
+      "expect": "wrong",
+      "name": "an inner product is not the product of the norms",
+      "outcome": "caught",
+      "verdicts": [
+        "wrong"
+      ]
+    },
+    {
+      "id": "false-a-squared-inner-product-is-not-the-product-of-the-squared-norms",
+      "source": "ledger",
+      "expect": "wrong",
+      "name": "a squared inner product is not the product of the squared norms",
+      "outcome": "caught",
+      "verdicts": [
+        "wrong"
+      ]
+    },
+    {
+      "id": "false-the-frobenius-norm-does-not-split-a-sum",
+      "source": "ledger",
+      "expect": "wrong",
+      "name": "the Frobenius norm does not split a sum",
+      "outcome": "caught",
+      "verdicts": [
+        "wrong"
+      ]
+    },
+    {
+      "id": "false-a-kronecker-product-does-not-commute",
+      "source": "ledger",
+      "expect": "wrong",
+      "name": "a Kronecker product does not commute",
+      "outcome": "caught",
+      "verdicts": [
+        "wrong"
+      ]
+    },
+    {
+      "id": "false-an-element-wise-product-is-not-a-matrix-product",
+      "source": "ledger",
+      "expect": "wrong",
+      "name": "an element wise product is not a matrix product",
+      "outcome": "caught",
+      "verdicts": [
+        "wrong"
+      ]
+    },
+    {
+      "id": "false-a-lower-triangular-matrix-is-not-symmetric",
+      "source": "ledger",
+      "expect": "wrong",
+      "name": "a lower triangular matrix is not symmetric",
+      "outcome": "caught",
+      "verdicts": [
+        "wrong"
+      ]
+    },
+    {
+      "id": "false-a-triangular-matrix-does-not-commute-with-its-transpose",
+      "source": "ledger",
+      "expect": "wrong",
+      "name": "a triangular matrix does not commute with its transpose",
+      "outcome": "caught",
+      "verdicts": [
+        "wrong"
+      ]
+    },
+    {
+      "id": "false-the-log-of-a-square-is-not-twice-the-log-for-a-scalar",
+      "source": "ledger",
+      "expect": "wrong",
+      "name": "the log of a square is not twice the log, for a scalar",
+      "outcome": "abstained",
+      "verdicts": [
+        "inconclusive"
+      ]
+    },
+    {
+      "id": "false-the-exponential-does-not-split-a-sum-of-scalars",
+      "source": "ledger",
+      "expect": "wrong",
+      "name": "the exponential does not split a sum of scalars",
+      "outcome": "caught",
+      "verdicts": [
+        "wrong"
+      ]
+    },
+    {
+      "id": "false-a-cube-root-is-not-a-square-root",
+      "source": "ledger",
+      "expect": "wrong",
+      "name": "a cube root is not a square root",
+      "outcome": "caught",
+      "verdicts": [
+        "wrong"
+      ]
+    },
+    {
+      "id": "false-two-fractional-powers-do-not-multiply-their-exponents",
+      "source": "ledger",
+      "expect": "wrong",
+      "name": "two fractional powers do not multiply their exponents",
+      "outcome": "caught",
+      "verdicts": [
+        "wrong"
+      ]
+    },
+    {
+      "id": "false-the-variance-of-an-affine-map-is-not-taken-on-the-other-side",
+      "source": "ledger",
+      "expect": "wrong",
+      "name": "the variance of an affine map is not taken on the other side",
+      "outcome": "caught",
+      "verdicts": [
+        "wrong"
+      ]
+    },
+    {
+      "id": "false-the-second-moment-of-a-gaussian-with-a-mean-is-not-its-covariance",
+      "source": "ledger",
+      "expect": "wrong",
+      "name": "the second moment of a Gaussian with a mean is not its covariance",
+      "outcome": "caught",
+      "verdicts": [
+        "wrong"
+      ]
+    },
+    {
+      "id": "false-the-cross-product-does-not-commute",
+      "source": "ledger",
+      "expect": "wrong",
+      "name": "the cross product does not commute",
+      "outcome": "caught",
+      "verdicts": [
+        "wrong"
+      ]
+    },
+    {
+      "id": "false-the-cross-product-is-not-associative",
+      "source": "ledger",
+      "expect": "wrong",
+      "name": "the cross product is not associative",
+      "outcome": "caught",
+      "verdicts": [
+        "wrong"
+      ]
+    },
+    {
+      "id": "false-a-reflection-flips-a-cross-product",
+      "source": "ledger",
+      "expect": "wrong",
+      "name": "a reflection flips a cross product",
+      "outcome": "caught",
+      "verdicts": [
+        "wrong"
+      ]
+    },
+    {
+      "id": "false-a-cube-root-of-a-matrix-is-not-read",
+      "source": "ledger",
+      "expect": "wrong",
+      "name": "a cube root of a matrix is not read",
+      "outcome": "abstained",
+      "verdicts": [
+        "unchecked"
+      ]
+    },
+    {
+      "id": "false-the-matrix-square-root-is-not-the-identity",
+      "source": "ledger",
+      "expect": "wrong",
+      "name": "the matrix square root is not the identity",
+      "outcome": "caught",
+      "verdicts": [
+        "wrong"
+      ]
+    },
+    {
+      "id": "false-a-square-of-a-gaussian-is-not-its-mean",
+      "source": "ledger",
+      "expect": "wrong",
+      "name": "a square of a Gaussian is not its mean",
+      "outcome": "caught",
+      "verdicts": [
+        "wrong"
+      ]
+    },
+    {
+      "id": "false-the-adjugate-of-a-product-is-not-the-product-of-the-adjugates",
+      "source": "ledger",
+      "expect": "wrong",
+      "name": "the adjugate of a product is not the product of the adjugates",
+      "outcome": "abstained",
+      "verdicts": []
+    },
+    {
+      "id": "false-the-vectorisation-does-not-survive-a-transpose",
+      "source": "ledger",
+      "expect": "wrong",
+      "name": "the vectorisation does not survive a transpose",
+      "outcome": "abstained",
+      "verdicts": []
+    },
+    {
+      "id": "false-a-unitary-matrix-is-not-unitary-without-the-conjugation",
+      "source": "ledger",
+      "expect": "wrong",
+      "name": "a unitary matrix is not unitary without the conjugation",
+      "outcome": "caught",
+      "verdicts": [
+        "wrong"
+      ]
+    },
+    {
+      "id": "false-the-conjugate-of-a-complex-number-is-not-the-number",
+      "source": "ledger",
+      "expect": "wrong",
+      "name": "the conjugate of a complex number is not the number",
+      "outcome": "caught",
+      "verdicts": [
+        "wrong"
+      ]
+    },
+    {
+      "id": "false-conj-x-2-x-2-for-complex-x",
+      "source": "ledger",
+      "expect": "wrong",
+      "name": "conj(x)^2 = x^2 for complex x",
+      "outcome": "caught",
+      "verdicts": [
+        "wrong"
+      ]
+    },
+    {
+      "id": "false-block-rows-do-not-commute",
+      "source": "ledger",
+      "expect": "wrong",
+      "name": "block rows do not commute",
+      "outcome": "caught",
+      "verdicts": [
+        "wrong"
+      ]
+    }
+  ]
+}
