@@ -6,7 +6,7 @@ import Decimal from 'decimal.js';
 import { DecField } from '../fields/dec.ts';
 import { GFpField, P1, P2 } from '../fields/gfp.ts';
 import { matrixEntries } from './montecarlo.ts';
-import { inferType, unifyDim } from '../types.ts';
+import { degreeOf, inferType, unifyDim, type Deg } from '../types.ts';
 import type { Dim } from '../decl.ts';
 import {
   directionalDerivative,
@@ -22,6 +22,7 @@ import { scalar, type Val } from '../value.ts';
 import {
   collectDimVars,
   collectAssumptions,
+  collectSymbols,
   sampleFor,
   asScalar,
   settingKey,
@@ -116,13 +117,23 @@ export function checkImplication(
   const sizes: Record<string, number>[] = [];
   const assumptions = collectAssumptions(ctx, step);
 
+  // the trials that ran at each size, and the size of the pivot there: the
+  // bound is priced on what was drawn, as in the exact mode
+  const ran: Array<{ setting: Map<string, number>; p1: number; p2: number; pivotSize: number }> = [];
   for (const setting of settings) {
     sizes.push(Object.fromEntries(setting) as Record<string, number>);
+    const tally = { setting, p1: 0, p2: 0, pivotSize: 0 };
+    ran.push(tally);
     for (let trial = 0; trial < opts.trials; trial++) {
       for (const p of primes) {
         const rng = rngFor(opts.seed, step.id, settingKey(setting), trial, p);
         const outcome = runImplicationTrial(step, ctx, defs, setting, p, rng);
-        if (outcome.kind === 'ok') continue;
+        if (outcome.kind === 'ok') {
+          if (p === P1) tally.p1++;
+          else tally.p2++;
+          tally.pivotSize = Math.max(tally.pivotSize, outcome.pivotSize);
+          continue;
+        }
         if (outcome.kind === 'unknown') {
           if (outcome.domain) {
             // this size cannot work (a singular matrix, say), so it is skipped
@@ -180,6 +191,52 @@ export function checkImplication(
     }
   }
 
+  // The bound (rule 2). The premise is affine in the pivot x, so it reads
+  // M x + c = 0, and Cramer's rule puts every entry of the solution over
+  // det(M): with k unknowns and a premise of degree P, the solution has
+  // degree at most kP over kP. The conclusion is compared on that solution,
+  // so its residual has degree at most kP (1 + deg R), counting R's own
+  // pivot occurrences at kP each. The affine test itself errs with
+  // probability at most 2P / p per trial, which is added to the degree as
+  // a union bound.
+  let worstDegree = 0;
+  let worstBound = 0;
+  let anyRan = false;
+  for (const { setting, p1, p2, pivotSize } of ran) {
+    if (p1 + p2 === 0) continue;
+    anyRan = true;
+    const errorsAt = ctx.errors.length;
+    const total = (d: Deg): number => d.n + d.d;
+    const pl = degreeOf(ctx, premise.lhs!, setting, defs);
+    const pr = premise.rhs ? degreeOf(ctx, premise.rhs, setting, defs) : { n: 0, d: 0 };
+    const rr = degreeOf(ctx, conclusion.rhs!, setting, defs);
+    ctx.errors.length = errorsAt;
+    const premiseDegree = Math.max(pl.n + pr.d, pr.n + pl.d, 1);
+    const solved = Math.max(1, pivotSize) * premiseDegree;
+    const d = solved * (1 + total(rr)) + 2 * premiseDegree;
+    worstDegree = Math.max(worstDegree, d);
+    worstBound = Math.max(worstBound, Math.pow(d / P1, p1) * Math.pow(d / P2, p2));
+  }
+  const symbols = new Set<string>();
+  collectSymbols(premise.lhs, symbols);
+  collectSymbols(conclusion.rhs, symbols);
+  if (!anyRan || !(worstBound < 1)) {
+    const message = anyRan
+      ? 'the implication held on every instance, but too few to bound the chance of a wrong step'
+      : 'every size was outside the domain of the premise, so nothing was checked';
+    return {
+      id: step.id,
+      row: step.row,
+      span: step.span,
+      relation: step.relation,
+      verdict: anyRan ? 'inconclusive' : 'unchecked',
+      card: { ...card, sizes, primes, assumptions },
+      message,
+      reason: message,
+      annotation: step.annotation,
+    };
+  }
+
   return {
     id: step.id,
     row: step.row,
@@ -189,7 +246,14 @@ export function checkImplication(
     relation: step.relation,
     verdict: 'ok',
     mode: 'exact',
-    card: { ...card, sizes, primes, assumptions },
+    card: {
+      ...card,
+      sizes,
+      primes,
+      degree: symbols.size > 0 ? worstDegree : 0,
+      bound: worstBound,
+      assumptions,
+    },
     message: 'the implication holds at every size tested',
     annotation: step.annotation,
   };
@@ -197,7 +261,7 @@ export function checkImplication(
 
 
 export type ImpOutcome =
-  | { kind: 'ok' }
+  | { kind: 'ok'; pivotSize: number }
   | { kind: 'wrong'; message: string; counterexample: Counterexample }
   | { kind: 'unknown'; message: string; domain?: boolean; shape?: boolean; newton?: boolean };
 
@@ -313,7 +377,7 @@ export function runImplicationTrial(
   } catch {
     return { kind: 'unknown', message: 'could not evaluate the conclusion' };
   }
-  if (valuesEqual(field, cl, cr)) return { kind: 'ok' };
+  if (valuesEqual(field, cl, cr)) return { kind: 'ok', pivotSize: n };
   // a matrix compared with a scalar is not a wrong claim, it is one that
   // cannot be read (review 4.4). A zero names the zero matrix (review 5.5).
   const realMatrix = (v: Val<number>): boolean => v.k === 'm' && !(v.m.r === 1 && v.m.c === 1);
@@ -326,7 +390,7 @@ export function runImplicationTrial(
   }
   // the broadcasts made the two sides comparable; the comparison decides,
   // not the shape
-  if (valuesEqual(field, cl, cr)) return { kind: 'ok' };
+  if (valuesEqual(field, cl, cr)) return { kind: 'ok', pivotSize: n };
   if ((realMatrix(cl) && cr.k === 's') || (cl.k === 's' && realMatrix(cr))) {
     return {
       kind: 'unknown',

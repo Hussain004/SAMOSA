@@ -62,6 +62,36 @@ export interface Counterexample {
 }
 
 
+/**
+ * Rule 2 of AGENTS.md, as a type guard: a checkmark carries a filled card.
+ *
+ * Every checkmark has the sizes and the trials it rests on. An exact or a
+ * quadrature checkmark also has the primes, the degree and a bound below
+ * one. A numeric one has no probability bound, and its card says so in the
+ * assumptions instead. `check` downgrades any checkmark that fails this, so
+ * an engine gap shows up as a question, never as a receipt with blanks.
+ */
+export function hasGuarantee(step: Pick<StepResult, 'verdict' | 'mode' | 'card'>): boolean {
+  if (step.verdict !== 'ok') return true;
+  const { card } = step;
+  if (card.sizes.length === 0 || !(card.trialsPerSize > 0)) return false;
+  if (step.mode === 'numeric') return true;
+  if (step.mode !== 'exact' && step.mode !== 'quadrature') return false;
+  return (
+    card.primes !== undefined &&
+    card.degree !== undefined &&
+    card.bound !== undefined &&
+    Number.isFinite(card.bound) &&
+    card.bound >= 0 &&
+    card.bound < 1
+  );
+}
+
+/** The message of a checkmark `check` withdrew for want of a guarantee. */
+export const NO_GUARANTEE =
+  'the two sides agreed, but the engine could not fill the guarantee for this step, so SAMOSA claims nothing here';
+
+
 export interface Fix {
   kind: 'mutation' | 'residual' | 'assumption' | 'shape';
   title: string;

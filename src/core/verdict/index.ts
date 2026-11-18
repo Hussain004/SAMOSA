@@ -42,6 +42,8 @@ import { checkProportionality } from './proportionality.ts';
 import {
   ENGINE_VERSION,
   DEFAULT_SEED,
+  hasGuarantee,
+  NO_GUARANTEE,
   type Verdict,
   type Mode,
   type Step,
@@ -59,6 +61,8 @@ import {
 export {
   ENGINE_VERSION,
   DEFAULT_SEED,
+  hasGuarantee,
+  NO_GUARANTEE,
   type Verdict,
   type Mode,
   type Step,
@@ -253,7 +257,12 @@ export function check(src: string, opts: CheckOptions = {}): Report {
   }
 
   for (const step of steps) {
-    const result = checkStep(step, ctx, defs, { seed, trials }, diagnostics);
+    let result = checkStep(step, ctx, defs, { seed, trials }, diagnostics);
+    // rule 2: a checkmark that reaches here without a filled card is an
+    // engine gap, and it leaves as a question rather than as a receipt
+    if (!hasGuarantee(result)) {
+      result = { ...result, verdict: 'inconclusive', message: NO_GUARANTEE, reason: NO_GUARANTEE };
+    }
     // every result carries the text of its row, so a caller can point at the
     // line of the file the step came from
     result.text ??= step.text;

@@ -10217,13 +10217,21 @@ function checkImplication(step, ctx, defs, opts, card) {
   const primes = [P1, P2];
   const sizes = [];
   const assumptions = collectAssumptions(ctx, step);
+  const ran = [];
   for (const setting of settings) {
     sizes.push(Object.fromEntries(setting));
+    const tally = { setting, p1: 0, p2: 0, pivotSize: 0 };
+    ran.push(tally);
     for (let trial = 0; trial < opts.trials; trial++) {
       for (const p of primes) {
         const rng = rngFor(opts.seed, step.id, settingKey(setting), trial, p);
         const outcome = runImplicationTrial(step, ctx, defs, setting, p, rng);
-        if (outcome.kind === "ok") continue;
+        if (outcome.kind === "ok") {
+          if (p === P1) tally.p1++;
+          else tally.p2++;
+          tally.pivotSize = Math.max(tally.pivotSize, outcome.pivotSize);
+          continue;
+        }
         if (outcome.kind === "unknown") {
           if (outcome.domain) {
             continue;
@@ -10274,6 +10282,41 @@ function checkImplication(step, ctx, defs, opts, card) {
       }
     }
   }
+  let worstDegree = 0;
+  let worstBound = 0;
+  let anyRan = false;
+  for (const { setting, p1, p2, pivotSize } of ran) {
+    if (p1 + p2 === 0) continue;
+    anyRan = true;
+    const errorsAt = ctx.errors.length;
+    const total = (d2) => d2.n + d2.d;
+    const pl = degreeOf(ctx, premise.lhs, setting, defs);
+    const pr = premise.rhs ? degreeOf(ctx, premise.rhs, setting, defs) : { n: 0, d: 0 };
+    const rr = degreeOf(ctx, conclusion.rhs, setting, defs);
+    ctx.errors.length = errorsAt;
+    const premiseDegree = Math.max(pl.n + pr.d, pr.n + pl.d, 1);
+    const solved = Math.max(1, pivotSize) * premiseDegree;
+    const d = solved * (1 + total(rr)) + 2 * premiseDegree;
+    worstDegree = Math.max(worstDegree, d);
+    worstBound = Math.max(worstBound, Math.pow(d / P1, p1) * Math.pow(d / P2, p2));
+  }
+  const symbols = /* @__PURE__ */ new Set();
+  collectSymbols(premise.lhs, symbols);
+  collectSymbols(conclusion.rhs, symbols);
+  if (!anyRan || !(worstBound < 1)) {
+    const message = anyRan ? "the implication held on every instance, but too few to bound the chance of a wrong step" : "every size was outside the domain of the premise, so nothing was checked";
+    return {
+      id: step.id,
+      row: step.row,
+      span: step.span,
+      relation: step.relation,
+      verdict: anyRan ? "inconclusive" : "unchecked",
+      card: { ...card, sizes, primes, assumptions },
+      message,
+      reason: message,
+      annotation: step.annotation
+    };
+  }
   return {
     id: step.id,
     row: step.row,
@@ -10283,7 +10326,14 @@ function checkImplication(step, ctx, defs, opts, card) {
     relation: step.relation,
     verdict: "ok",
     mode: "exact",
-    card: { ...card, sizes, primes, assumptions },
+    card: {
+      ...card,
+      sizes,
+      primes,
+      degree: symbols.size > 0 ? worstDegree : 0,
+      bound: worstBound,
+      assumptions
+    },
     message: "the implication holds at every size tested",
     annotation: step.annotation
   };
@@ -10374,7 +10424,7 @@ function runImplicationTrial(step, ctx, defs, setting, p, rng) {
   } catch {
     return { kind: "unknown", message: "could not evaluate the conclusion" };
   }
-  if (valuesEqual(field, cl, cr)) return { kind: "ok" };
+  if (valuesEqual(field, cl, cr)) return { kind: "ok", pivotSize: n };
   const realMatrix = (v) => v.k === "m" && !(v.m.r === 1 && v.m.c === 1);
   const zeroScalar = (v) => v.k === "s" && field.eq(v.v, field.zero);
   if (realMatrix(cl) && cr.k === "s" && zeroScalar(cr) && cl.k === "m") {
@@ -10383,7 +10433,7 @@ function runImplicationTrial(step, ctx, defs, setting, p, rng) {
   if (cl.k === "s" && realMatrix(cr) && zeroScalar(cl) && cr.k === "m") {
     cl = { k: "m", m: zeros(cr.m.r, cr.m.c, field.zero) };
   }
-  if (valuesEqual(field, cl, cr)) return { kind: "ok" };
+  if (valuesEqual(field, cl, cr)) return { kind: "ok", pivotSize: n };
   if (realMatrix(cl) && cr.k === "s" || cl.k === "s" && realMatrix(cr)) {
     return {
       kind: "unknown",
@@ -11897,6 +11947,15 @@ function guessProportionalityVariable(step, ctx) {
 // src/core/verdict/types.ts
 var ENGINE_VERSION = true ? "1.3.0" : "0.0.0-dev";
 var DEFAULT_SEED = 5910618;
+function hasGuarantee(step) {
+  if (step.verdict !== "ok") return true;
+  const { card } = step;
+  if (card.sizes.length === 0 || !(card.trialsPerSize > 0)) return false;
+  if (step.mode === "numeric") return true;
+  if (step.mode !== "exact" && step.mode !== "quadrature") return false;
+  return card.primes !== void 0 && card.degree !== void 0 && card.bound !== void 0 && Number.isFinite(card.bound) && card.bound >= 0 && card.bound < 1;
+}
+var NO_GUARANTEE = "the two sides agreed, but the engine could not fill the guarantee for this step, so SAMOSA claims nothing here";
 
 // src/core/verdict/index.ts
 function analyzeSource(src, opts) {
@@ -12036,7 +12095,10 @@ function check(src, opts = {}) {
     });
   }
   for (const step of steps) {
-    const result = checkStep(step, ctx, defs, { seed, trials }, diagnostics);
+    let result = checkStep(step, ctx, defs, { seed, trials }, diagnostics);
+    if (!hasGuarantee(result)) {
+      result = { ...result, verdict: "inconclusive", message: NO_GUARANTEE, reason: NO_GUARANTEE };
+    }
     result.text ??= step.text;
     results.push(result);
   }

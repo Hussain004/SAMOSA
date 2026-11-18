@@ -38,7 +38,9 @@
         "verdict": "ok",
         "mode": "exact",
         "message": "the implication holds at every size tested",
-        "relation": "=>"
+        "relation": "=>",
+        "bound": 1.074397321554114e-35,
+        "degree": 3190
       },
       {
         "row": 6,

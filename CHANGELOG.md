@@ -10,6 +10,8 @@ SAMOSA-Bench v0: the auditor's report card.
 
 ### Fixed
 
+- An implication's checkmark carried no degree and no bound. It is priced now, from the degree of the premise solved for the pivot by Cramer's rule, and the card shows both.
+- A checkmark without a filled guarantee card leaves `check` as a question, never as a receipt with blanks: `hasGuarantee` is the guard, and `tests/guarantee.test.ts` holds every corpus to it.
 - A product over an index was summed: `\prod_{i=1}^{n} x_i = \sum_{i=1}^{n} x_i` came back as a checkmark. A product multiplies its factors now, the empty product is one, and the degree of a product of m factors is m times the degree of one.
 
 ### Added
