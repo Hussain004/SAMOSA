@@ -1,7 +1,7 @@
 // SAMOSA's service worker: cache what the app needs, keep the network out.
 //
-// Cache-first for the assets and for /app/, so the installed app works on a
-// plane. Network-first for /, so the landing page is never stale. The CSP
+// Cache-first for the fingerprinted assets. Network-first for the pages, so
+// a deploy reaches everybody and the installed app still works on a plane. The CSP
 // already allows a same-origin worker and a same-origin manifest.
 
 var CACHE = 'samosa-v1';
@@ -35,8 +35,8 @@ self.addEventListener('fetch', function (event) {
   if (url.origin !== self.location.origin) return;
   if (event.request.method !== 'GET') return;
 
-  if (url.pathname.indexOf('/assets/') === 0 || url.pathname === '/app/' || url.pathname === '/app/index.html') {
-    // cache-first: these are fingerprinted, so a stale entry cannot exist
+  if (url.pathname.indexOf('/assets/') === 0) {
+    // cache-first: the assets are fingerprinted, so an entry is never stale
     event.respondWith(
       caches.open(CACHE).then(function (cache) {
         return cache.match(event.request).then(function (hit) {
@@ -51,15 +51,21 @@ self.addEventListener('fetch', function (event) {
     return;
   }
 
-  if (url.pathname === '/' || url.pathname === '/index.html') {
-    // network-first, with the cache as the offline answer
+  // The pages are not fingerprinted: a cache-first page would pin a visitor
+  // to the first engine they loaded, fixes and all, because this file does
+  // not change between deploys. So the pages are network-first, and the
+  // cache is the answer only when there is no network.
+  var pages = ['/', '/index.html', '/app', '/app/', '/app/index.html'];
+  if (pages.indexOf(url.pathname) !== -1) {
     event.respondWith(
       fetch(event.request)
         .then(function (response) {
-          var copy = response.clone();
-          caches.open(CACHE).then(function (cache) {
-            cache.put(event.request, copy);
-          });
+          if (response.ok) {
+            var copy = response.clone();
+            caches.open(CACHE).then(function (cache) {
+              cache.put(event.request, copy);
+            });
+          }
           return response;
         })
         .catch(function () {
