@@ -46,7 +46,7 @@
   --syn-operator: #b9ae9c;
   --syn-number: #8fd6a2;
   --syn-bracket: #8e8475;
-  --syn-layout: #6f675b;
+  --syn-layout: #857b6c;
   --syn-environment: #c9a2e4;
   --syn-declaration: #d8b66e;
   --syn-comment: #8b8172;
@@ -79,8 +79,8 @@ html[data-theme='light'] {
   --syn-script: #1b6b93;
   --syn-operator: #5f574c;
   --syn-number: #23743f;
-  --syn-bracket: #7a7064;
-  --syn-layout: #a19584;
+  --syn-bracket: #665d52;
+  --syn-layout: #7a7064;
   --syn-environment: #7b3fa0;
   --syn-declaration: #8a5a00;
   --syn-comment: #6b6257;

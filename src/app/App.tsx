@@ -551,11 +551,13 @@ export function App() {
         onPreset={applyPreset}
       />
 
-      <div className="min-h-[280px] flex-1 grid-cols-1 grid-rows-1 md:grid md:grid-cols-2">
+      {/* a column on a phone and a grid above it: either way the panes get a
+          definite height, so they scroll inside and stay above the footer */}
+      <div className="flex min-h-[280px] flex-1 flex-col md:grid md:grid-cols-2 md:grid-rows-1">
         <section
           className={`${
             mobilePane === 'source' ? 'flex' : 'hidden'
-          } min-h-0 border-b border-[var(--color-line)] md:flex md:border-b-0 md:border-r`}
+          } min-h-0 flex-1 border-b border-[var(--color-line)] md:flex md:border-b-0 md:border-r`}
           onDragOver={(event) => {
             // a .tex file dropped anywhere in the source pane loads into the editor
             event.preventDefault();
@@ -609,7 +611,7 @@ export function App() {
           </div>
         </section>
 
-        <section className={`${mobilePane === 'rendered' ? 'flex' : 'hidden'} min-h-0 flex-col md:flex`}>
+        <section className={`${mobilePane === 'rendered' ? 'flex' : 'hidden'} min-h-0 flex-1 flex-col md:flex`}>
           <div className="flex items-center justify-between px-3 py-1.5">
             <span className="pane-title">rendered</span>
             {busy && <span className="text-[0.625rem] text-[var(--color-saffron)]">checking…</span>}
