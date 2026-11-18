@@ -145,8 +145,14 @@ export function degreeInVar(node: Node, name: string): number {
       return Infinity;
     case 'expect':
       return Infinity;
-    case 'bigop':
-      return degreeInVar(node.body, name);
+    case 'bigop': {
+      const body = degreeInVar(node.body, name);
+      if (node.kind === 'sum' || body === 0) return body;
+      // a product of factors in the variable has a degree that grows with
+      // the number of factors, which is not known here: the quadrature rule
+      // chosen from a low degree would be inexact, so none is chosen
+      return Infinity;
+    }
     case 'block':
       return Infinity;
     case 'piecewise':

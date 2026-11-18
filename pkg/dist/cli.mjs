@@ -4498,8 +4498,12 @@ function degreeOf(ctx, node, sizes, defs) {
       if (node.op === "E") return body;
       return { n: 2 * body.n, d: 2 * body.d };
     }
-    case "bigop":
-      return degreeOf(ctx, node.body, sizes, defs);
+    case "bigop": {
+      const body = degreeOf(ctx, node.body, sizes, defs);
+      if (node.kind === "sum") return body;
+      const m = bigopTerms(ctx, node, sizes);
+      return { n: m * body.n, d: m * body.d };
+    }
     case "block": {
       let best = ZERO_DEG;
       for (const row of node.rows) {
@@ -4535,6 +4539,24 @@ function recipeDegree(ctx, name, props, sizes) {
   if (has("idem") || has("proj")) return { n: 2 * size, d: size };
   if (has("unit")) return { n: 2, d: 2 };
   return null;
+}
+var UNROLL_CAP = 1e3;
+function bigopTerms(ctx, node, sizes) {
+  const value = (b, fallback) => {
+    if (b === null) return fallback;
+    if (b.k === "num" && b.value.d === 1) return b.value.n;
+    if (b.k === "sym") {
+      if (sizes.has(b.name)) return sizes.get(b.name);
+      const root = ctx.dims.find(b.name);
+      if (ctx.pinned[root] !== void 0) return ctx.pinned[root];
+      if (sizes.has(root)) return sizes.get(root);
+    }
+    return null;
+  };
+  const lo = value(node.lo, 1);
+  const hi = value(node.hi, Number.NaN);
+  if (lo === null || hi === null || Number.isNaN(hi)) return UNROLL_CAP + 1;
+  return Math.max(0, hi - lo + 1);
 }
 function dimSize(ctx, d, sizes) {
   if (typeof d === "number") return d;
@@ -5034,8 +5056,11 @@ function degreeInVar(node, name) {
       return Infinity;
     case "expect":
       return Infinity;
-    case "bigop":
-      return degreeInVar(node.body, name);
+    case "bigop": {
+      const body = degreeInVar(node.body, name);
+      if (node.kind === "sum" || body === 0) return body;
+      return Infinity;
+    }
     case "block":
       return Infinity;
     case "piecewise":
@@ -6501,8 +6526,8 @@ function evalNode(f, node, env) {
         throw new EvalError("the range of the sum is not given");
       }
       const hi = bound(node.hi, "a sum bound");
-      const UNROLL_CAP = 1e3;
-      if (hi - lo > UNROLL_CAP) {
+      const UNROLL_CAP2 = 1e3;
+      if (hi - lo > UNROLL_CAP2) {
         throw new EvalError(`the sum from ${lo} to ${hi} is too long to unroll`);
       }
       if (hi < lo) {
@@ -6517,9 +6542,9 @@ function evalNode(f, node, env) {
         env.memo.delete(node.idx);
         if (saved) env.values.set(node.idx, saved);
         else env.values.delete(node.idx);
-        acc = acc === null ? term : evalOp(f, "add", [acc, term], env);
+        acc = acc === null ? term : evalOp(f, node.kind === "prod" ? "mul" : "add", [acc, term], env);
       }
-      if (!acc) return scalar(f.zero);
+      if (!acc) return scalar(node.kind === "prod" ? f.one : f.zero);
       return acc;
     }
     case "piecewise": {

@@ -2,7 +2,7 @@
 
 The plausible-but-false identities, and the checkmarks SAMOSA had not earned.
 
-## The 43 friends nobody wants
+## The 45 friends nobody wants
 
 These are the mistakes people actually write. None of them may ever come
 back ok: the structures test holds the engine to this list on every commit,
@@ -42,6 +42,8 @@ is missing, the step is unchecked, which is honest, never a checkmark.
 | two fractional powers do not multiply their exponents | `x^{1/3} x^{2/3} = x^{2/9}` |
 | the variance of an affine map is not taken on the other side | `\operatorname{Var}(A x) = A^\top \operatorname{Var}(x) A` |
 | the second moment of a Gaussian with a mean is not its covariance | `\mathbb{E}[x x^\top] = \Sigma` |
+| a product over an index is not the sum | `\prod_{i=1}^{n} x_i = \sum_{i=1}^{n} x_i` |
+| a product of equal factors is a power, not a multiple | `\prod_{i=1}^{3} a = 3 a` |
 | the cross product does not commute | `a \times b = b \times a` |
 | the cross product is not associative | `a \times (b \times c) = (a \times b) \times c` |
 | a reflection flips a cross product | `Q (a \times b) = (Q a) \times (Q b)` |
@@ -77,6 +79,12 @@ list cannot silently grow stale.
 **a shape assignment where the sizes happened to agree.**
 
 > A shape error carries the sizes that do not fit, never an assignment where the shapes happen to agree.
+
+### 2026-11-18 — unreleased
+
+**a product over an index that was summed.**
+
+> A product over an index was summed: `\prod_{i=1}^{n} x_i = \sum_{i=1}^{n} x_i` came back as a checkmark.
 
 
 ## The method

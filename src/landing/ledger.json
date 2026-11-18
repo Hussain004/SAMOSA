@@ -157,6 +157,16 @@
       "decls": "x ~ N(\\mu, \\Sigma); \\mu: n; \\Sigma: spd n"
     },
     {
+      "name": "a product over an index is not the sum",
+      "src": "\\prod_{i=1}^{n} x_i = \\sum_{i=1}^{n} x_i",
+      "decls": "x: n"
+    },
+    {
+      "name": "a product of equal factors is a power, not a multiple",
+      "src": "\\prod_{i=1}^{3} a = 3 a",
+      "decls": "a: scalar"
+    },
+    {
       "name": "the cross product does not commute",
       "src": "a \\times b = b \\times a",
       "decls": "a, b: 3"
@@ -235,6 +245,12 @@
       "version": "1.1.0",
       "title": "a shape assignment where the sizes happened to agree",
       "quote": "A shape error carries the sizes that do not fit, never an assignment where the shapes happen to agree."
+    },
+    {
+      "date": "2026-11-18",
+      "version": "unreleased",
+      "title": "a product over an index that was summed",
+      "quote": "A product over an index was summed: `\\prod_{i=1}^{n} x_i = \\sum_{i=1}^{n} x_i` came back as a checkmark."
     }
   ]
 }

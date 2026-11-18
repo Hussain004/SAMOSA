@@ -8,6 +8,10 @@ follows [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 SAMOSA-Bench v0: the auditor's report card.
 
+### Fixed
+
+- A product over an index was summed: `\prod_{i=1}^{n} x_i = \sum_{i=1}^{n} x_i` came back as a checkmark. A product multiplies its factors now, the empty product is one, and the degree of a product of m factors is m times the degree of one.
+
 ### Added
 
 - `bench/` — SAMOSA-Bench, the measurement companion to the Cookbook and

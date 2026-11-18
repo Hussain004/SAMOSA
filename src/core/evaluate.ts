@@ -230,9 +230,11 @@ export function evalNode<T>(f: Field<T>, node: Node, env: EvalEnv<T>): Val<T> {
         env.memo.delete(node.idx);
         if (saved) env.values.set(node.idx, saved);
         else env.values.delete(node.idx);
-        acc = acc === null ? term : evalOp(f, 'add', [acc, term], env);
+        // a product multiplies its factors in order, left to right
+        acc = acc === null ? term : evalOp(f, node.kind === 'prod' ? 'mul' : 'add', [acc, term], env);
       }
-      if (!acc) return scalar(f.zero);
+      // the empty sum is zero and the empty product is one
+      if (!acc) return scalar(node.kind === 'prod' ? f.one : f.zero);
       return acc;
     }
     case 'piecewise': {

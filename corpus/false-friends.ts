@@ -49,6 +49,8 @@ export const FALSE_FRIENDS: Array<FalseFriend> = [
   { name: 'two fractional powers do not multiply their exponents', src: String.raw`x^{1/3} x^{2/3} = x^{2/9}`, decls: 'x: pos', caught: true },
   { name: 'the variance of an affine map is not taken on the other side', src: String.raw`\operatorname{Var}(A x) = A^\top \operatorname{Var}(x) A`, decls: 'x ~ N(\\mu, \\Sigma); \\mu: n; \\Sigma: spd n; A: n×n', caught: true },
   { name: 'the second moment of a Gaussian with a mean is not its covariance', src: String.raw`\mathbb{E}[x x^\top] = \Sigma`, decls: 'x ~ N(\\mu, \\Sigma); \\mu: n; \\Sigma: spd n', caught: true },
+  { name: 'a product over an index is not the sum', src: String.raw`\prod_{i=1}^{n} x_i = \sum_{i=1}^{n} x_i`, decls: 'x: n', caught: true },
+  { name: 'a product of equal factors is a power, not a multiple', src: String.raw`\prod_{i=1}^{3} a = 3 a`, decls: 'a: scalar', caught: true },
   { name: 'the cross product does not commute', src: String.raw`a \times b = b \times a`, decls: 'a, b: 3', caught: true },
   { name: 'the cross product is not associative', src: String.raw`a \times (b \times c) = (a \times b) \times c`, decls: 'a, b, c: 3', caught: true },
   { name: 'a reflection flips a cross product', src: String.raw`Q (a \times b) = (Q a) \times (Q b)`, decls: 'Q: orth 3; a, b: 3', caught: true },

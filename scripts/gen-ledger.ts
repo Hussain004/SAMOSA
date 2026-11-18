@@ -39,6 +39,13 @@ const DATED: Array<{ date: string; version: string; title: string; quote: string
     quote:
       'A shape error carries the sizes that do not fit, never an assignment where the shapes happen to agree.',
   },
+  {
+    date: '2026-11-18',
+    version: 'unreleased',
+    title: 'a product over an index that was summed',
+    quote:
+      'A product over an index was summed: `\\prod_{i=1}^{n} x_i = \\sum_{i=1}^{n} x_i` came back as a checkmark.',
+  },
 ];
 
 const flatChangelog = changelog.replace(/\s+/g, ' ');

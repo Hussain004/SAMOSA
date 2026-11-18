@@ -1099,8 +1099,13 @@ export function degreeOf(
       // a variance or a covariance squares the body
       return { n: 2 * body.n, d: 2 * body.d };
     }
-    case 'bigop':
-      return degreeOf(ctx, node.body, sizes, defs);
+    case 'bigop': {
+      const body = degreeOf(ctx, node.body, sizes, defs);
+      if (node.kind === 'sum') return body;
+      // a product of m factors of degree k has degree m k
+      const m = bigopTerms(ctx, node, sizes);
+      return { n: m * body.n, d: m * body.d };
+    }
     case 'block': {
       // the degree of a block matrix is the largest over its cells
       let best = ZERO_DEG;
@@ -1141,6 +1146,34 @@ function recipeDegree(ctx: TypeContext, name: string, props: Prop[], sizes: Map<
   if (has('idem') || has('proj')) return { n: 2 * size, d: size };
   if (has('unit')) return { n: 2, d: 2 };
   return null;
+}
+
+/** The evaluator refuses to unroll more terms than this (`evaluate.ts`). */
+const UNROLL_CAP = 1000;
+
+/**
+ * The number of terms of a sum or a product at a size setting.
+ *
+ * A bound that is not a number or a dimension is a value the sampler draws,
+ * so the count is taken as the most the evaluator would unroll: the degree
+ * can only come out too high, never too low.
+ */
+function bigopTerms(ctx: TypeContext, node: Extract<Node, { k: 'bigop' }>, sizes: Map<string, number>): number {
+  const value = (b: Node | null, fallback: number): number | null => {
+    if (b === null) return fallback;
+    if (b.k === 'num' && b.value.d === 1) return b.value.n;
+    if (b.k === 'sym') {
+      if (sizes.has(b.name)) return sizes.get(b.name)!;
+      const root = ctx.dims.find(b.name);
+      if (ctx.pinned[root] !== undefined) return ctx.pinned[root];
+      if (sizes.has(root)) return sizes.get(root)!;
+    }
+    return null;
+  };
+  const lo = value(node.lo, 1);
+  const hi = value(node.hi, Number.NaN);
+  if (lo === null || hi === null || Number.isNaN(hi)) return UNROLL_CAP + 1;
+  return Math.max(0, hi - lo + 1);
 }
 
 function dimSize(ctx: TypeContext, d: Dim, sizes: Map<string, number>): number {
