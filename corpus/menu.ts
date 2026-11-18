@@ -78,7 +78,7 @@ export const MENU: MenuItem[] = [
     id: 'kalman',
     title: 'Kalman update',
     blurb: 'The measurement update, written the standard way.',
-    decls: 'x_t, \\bar\\mu_t, \\mu_t: n; z_t: m; C_t: m×n; Q_t: spd m; \\bar\\Sigma_t, \\Sigma_t: spd n; K_t: n×m',
+    decls: 'x_t, \\bar\\mu_t: n; z_t: m; C_t: m×n; Q_t: spd m; \\bar\\Sigma_t, \\Sigma_t: spd n; K_t: n×m',
     source: String.raw`\begin{align*}
 J_t &:= \tfrac12 (z_t - C_t x_t)^\top Q_t^{-1} (z_t - C_t x_t) + \tfrac12 (x_t - \bar\mu_t)^\top \bar\Sigma_t^{-1} (x_t - \bar\mu_t) \\
 \mathcal{N}(z_t; C_t x_t, Q_t)\,\mathcal{N}(x_t; \bar\mu_t, \bar\Sigma_t) &\propto_{x_t} \exp\{-J_t\} \\
@@ -116,7 +116,7 @@ K_t &= \bar\Sigma_t C_t^\top \left(C_t \bar\Sigma_t C_t^\top + Q_t\right)^{-1} \
     id: 'joseph',
     title: 'Joseph form',
     blurb: 'The numerically stable covariance update, with the noise term.',
-    decls: 'x: n; z: m; C_t: m×n; Q_t: spd m; \\bar\\Sigma_t, \\Sigma_t: spd n; K_t: n×m',
+    decls: 'C_t: m×n; Q_t: spd m; \\bar\\Sigma_t, \\Sigma_t: spd n; K_t: n×m',
     source: String.raw`\begin{align*}
 \Sigma_t &:= \left(C_t^\top Q_t^{-1} C_t + \bar\Sigma_t^{-1}\right)^{-1} \\
 K_t &:= \Sigma_t C_t^\top Q_t^{-1} \\
@@ -134,7 +134,7 @@ K_t &:= \Sigma_t C_t^\top Q_t^{-1} \\
     id: 'least-squares',
     title: 'Least squares',
     blurb: 'The normal equations, and the pseudo inverse that solves them.',
-    decls: 'X: n×p; y: n; w: p',
+    decls: 'X: n×p; y: n',
     source: String.raw`\begin{align*}
 w^\star &:= (X^\top X)^{-1}X^\top y \\
 X^\top X w^\star &= X^\top X (X^\top X)^{-1}X^\top y
@@ -148,7 +148,7 @@ X^\top X w^\star &= X^\top X (X^\top X)^{-1}X y
     id: 'ridge',
     title: 'Ridge regression',
     blurb: 'The normal equations with a penalty.',
-    decls: 'X: n×p; y: n; w: p; \\lambda: pos',
+    decls: 'X: n×p; y: n; \\lambda: pos',
     source: String.raw`\begin{align*}
 w^\star &:= (X^\top X + \lambda I)^{-1}X^\top y \\
 (X^\top X + \lambda I)w^\star &= X^\top y
@@ -190,7 +190,7 @@ L(z) &:= -y\log\sigma(z) - (1 - y)\log\left(1 - \sigma(z)\right) \\
     id: 'mlp',
     title: 'Two layer network',
     blurb: 'Backpropagation through one hidden layer.',
-    decls: 'x: d; W_1: h×d; b_1: h; h_1: h; W_2: k×h; b_2: k; y: k',
+    decls: 'x: d; W_1: h×d; b_1: h; h_1: h; W_2: k×h; b_2: k',
     source: String.raw`\begin{align*}
 h_1 &:= \sigma(W_1 x + b_1) \\
 \hat y &:= W_2 h_1 + b_2 \\
@@ -230,7 +230,7 @@ h_1 &:= \sigma(W_1 x + b_1) \\
     id: 'kl-gauss',
     title: 'The KL of two Gaussians',
     blurb: 'The formula everybody copies.',
-    decls: '\\mu: n; \\mu_p: n; \\mu_q: n; \\Sigma: spd n; \\Sigma_p: spd n; \\Sigma_q: spd n',
+    decls: '\\mu_p: n; \\mu_q: n; \\Sigma_p: spd n; \\Sigma_q: spd n',
     source: String.raw`\begin{align*}
 D &:= \frac{1}{2}\left(\operatorname{tr}(\Sigma_q^{-1}\Sigma_p) - \operatorname{tr}(\Sigma_q^{-1}\Sigma_q) + \log\frac{\det\Sigma_q}{\det\Sigma_p} + (\mu_p - \mu_q)^\top \Sigma_q^{-1}(\mu_p - \mu_q)\right) \\
 D - \frac{1}{2}(\mu_p - \mu_q)^\top \Sigma_q^{-1}(\mu_p - \mu_q) &= \frac{1}{2}\left(\operatorname{tr}(\Sigma_q^{-1}\Sigma_p) - \operatorname{tr}(\Sigma_q^{-1}\Sigma_q) + \log\frac{\det\Sigma_q}{\det\Sigma_p}\right)
@@ -244,7 +244,7 @@ D - \frac{1}{2}(\mu_p - \mu_q)^\top \Sigma_q^{-1}(\mu_p - \mu_q) &= \frac{1}{2}\
     id: 'lqr',
     title: 'The Riccati recursion',
     blurb: 'One step of the infinite horizon LQR.',
-    decls: 'A: n×n; B: n×m; Q: spd n; R: spd m; P: spd n; K: m×n',
+    decls: 'A: n×n; B: n×m; R: spd m; P: spd n; K: m×n',
     source: String.raw`\begin{align*}
 K &:= (R + B^\top P B)^{-1}B^\top P A \\
 (R + B^\top P B)K &= B^\top P A

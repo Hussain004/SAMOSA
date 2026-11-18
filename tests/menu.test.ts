@@ -19,6 +19,15 @@ describe('the menu', () => {
       expect(bad.map((s) => `row ${s.row}: ${s.message}`)).toEqual([]);
     });
 
+    it(`${item.id}: declares nothing it does not use`, () => {
+      // the app shows an unused declaration as a warning on its pill, and a
+      // Menu item is the first thing a visitor opens
+      const unused = check(item.source, { decls: item.decls })
+        .chips.filter((chip) => chip.id === 'unused-declaration')
+        .map((chip) => chip.symbol);
+      expect(unused).toEqual([]);
+    });
+
     if (item.bugSource) {
       it(`${item.id}: the planted bug is caught`, () => {
         const report = check(item.bugSource, { decls: item.decls });

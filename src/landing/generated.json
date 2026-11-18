@@ -81,8 +81,8 @@
     "fixEdit": "{\\left(I - {K_t C_t}\\right) \\bar\\Sigma_t} \\left(I - {K_t C_t}\\right)^\\top + {K_t Q_t} {K_t}^\\top",
     "counterexample": {
       "dims": {
-        "n": 1,
-        "m": 1
+        "m": 1,
+        "n": 1
       },
       "values": {
         "C_t": [
@@ -122,8 +122,8 @@
         "mode": "exact",
         "message": "holds at every size tested",
         "relation": "=",
-        "bound": 1.099025998641461e-46,
-        "degree": 47
+        "bound": 2.5280367184984027e-46,
+        "degree": 54
       },
       {
         "row": 4,
