@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef } from 'react';
 import katex from 'katex';
 import type { Report, StepResult } from '../core/index.ts';
-import { VERDICT_LABEL, VERDICT_ICON } from './verdicts.ts';
+import { VERDICT_LABEL } from './verdicts.ts';
+import { VerdictIcon } from './VerdictIcon.tsx';
 import { escapeHtml } from './tex.tsx';
 
 export interface RenderedProps {
@@ -195,7 +196,7 @@ function Row({
           default:
         }
       }}
-      className={`group flex cursor-pointer items-start gap-3 rounded-md border-l-2 px-2 py-2 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-gold)] ${
+      className={`group flex cursor-pointer items-start gap-3 rounded-r-md border-l-2 px-2 py-2 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-gold)] ${
         selected
           ? 'border-l-[var(--color-gold)] bg-[#e8b04b12]'
           : hovered
@@ -223,7 +224,7 @@ function Row({
         ) : (
           <>
             <span className={`badge badge-${badgeClass(step)}`}>
-              <span aria-hidden="true">{VERDICT_ICON[step.verdict]}</span>
+              <VerdictIcon verdict={step.verdict} />
               {VERDICT_LABEL[step.verdict]}
             </span>
             {step.mode && (

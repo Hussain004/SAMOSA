@@ -193,7 +193,7 @@ export function DeclarationsStrip({
               title={`${ORIGIN_TITLE[segment.origin]}. Click to edit.`}
               className={`rounded border px-1.5 py-0.5 font-mono text-[0.625rem] transition-colors ${
                 segment.unused
-                  ? 'border-[var(--color-tamarind)] text-[var(--color-tamarind)] underline decoration-wavy underline-offset-2'
+                  ? 'border-[var(--color-saffron)]/70 text-[var(--color-saffron)] underline decoration-wavy decoration-[var(--color-saffron)]/70 underline-offset-2'
                   : segment.origin === 'guessed'
                     ? 'border-dashed border-[var(--color-saffron)] text-[var(--color-saffron)] hover:border-[var(--color-gold)] hover:text-[var(--color-text)]'
                     : 'border-[var(--color-line)] text-[var(--color-muted)] hover:border-[var(--color-gold)] hover:text-[var(--color-text)]'

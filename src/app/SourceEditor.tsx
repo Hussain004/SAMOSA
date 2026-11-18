@@ -3,8 +3,8 @@ import { EditorState, StateEffect, StateField, Transaction } from '@codemirror/s
 import { EditorView, Decoration, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, type DecorationSet } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
 import { lintGutter, lintKeymap, setDiagnostics, type Diagnostic as CmDiagnostic } from '@codemirror/lint';
-import { StreamLanguage, bracketMatching, indentOnInput } from '@codemirror/language';
-import { stex } from '@codemirror/legacy-modes/mode/stex';
+import { bracketMatching, indentOnInput } from '@codemirror/language';
+import { latexMath } from './latex-mode.ts';
 import type { Report } from '../core/index.ts';
 import { samosaHighlight, samosaTheme } from './theme.ts';
 
@@ -86,7 +86,7 @@ export function SourceEditor({
         indentOnInput(),
         bracketMatching(),
         lintGutter(),
-        StreamLanguage.define(stex),
+        latexMath,
         samosaHighlight,
         samosaTheme,
         keymap.of([...defaultKeymap, ...historyKeymap, ...lintKeymap, indentWithTab]),
@@ -145,14 +145,16 @@ export function SourceEditor({
     });
   }, [value]);
 
-  // the diagnostics: one squiggle per step
+  // the diagnostics: a squiggle where a step needs the reader. A row that
+  // holds or defines gets none, so the source stays readable and the marks
+  // that are left mean something; its badge is in the rendered pane
   useEffect(() => {
     const v = view.current;
     if (!v) return;
     const length = v.state.doc.length;
     const diagnostics: CmDiagnostic[] = [];
     for (const step of hideDiagnostics ? [] : (report?.steps ?? [])) {
-      if (step.verdict === 'defined') continue;
+      if (step.verdict === 'defined' || step.verdict === 'ok') continue;
       const severity =
         step.verdict === 'wrong' || step.verdict === 'shape'
           ? 'error'

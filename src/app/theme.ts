@@ -53,21 +53,26 @@ export const samosaTheme = EditorView.theme(
   { dark: true },
 );
 
-/** The colours of the LaTeX, kept quiet on purpose. */
+/**
+ * The colours of the LaTeX, one per role a token plays in a derivation.
+ *
+ * The names stay plain, so the eye lands on what changes from row to row:
+ * the relation, the scripts, the commands. The layout marks (`&`, `\\`,
+ * spacing) and the brackets recede. The values live in `styles.css`, one
+ * set per theme.
+ */
 export const samosaHighlight = syntaxHighlighting(
   HighlightStyle.define([
-    { tag: tags.keyword, color: 'var(--color-gold)' },
-    { tag: tags.name, color: 'var(--color-text)' },
-    { tag: tags.variableName, color: 'var(--color-text)' },
-    { tag: tags.typeName, color: 'var(--color-saffron)' },
-    { tag: tags.function(tags.variableName), color: 'var(--color-saffron)' },
-    { tag: tags.number, color: 'var(--color-chutney)' },
-    { tag: tags.operator, color: 'var(--color-muted)' },
-    { tag: tags.punctuation, color: 'var(--color-faint)' },
-    { tag: tags.bracket, color: 'var(--color-faint)' },
-    { tag: tags.comment, color: 'var(--color-faint)', fontStyle: 'italic' },
-    { tag: tags.string, color: 'var(--color-chutney)' },
-    { tag: tags.definitionKeyword, color: 'var(--color-gold)' },
-    { tag: tags.labelName, color: 'var(--color-muted)' },
+    { tag: tags.variableName, color: 'var(--syn-name)' },
+    { tag: tags.function(tags.variableName), color: 'var(--syn-command)' },
+    { tag: tags.compareOperator, color: 'var(--syn-relation)', fontWeight: '600' },
+    { tag: tags.special(tags.operator), color: 'var(--syn-script)' },
+    { tag: tags.arithmeticOperator, color: 'var(--syn-operator)' },
+    { tag: tags.number, color: 'var(--syn-number)' },
+    { tag: tags.bracket, color: 'var(--syn-bracket)' },
+    { tag: tags.punctuation, color: 'var(--syn-layout)' },
+    { tag: tags.keyword, color: 'var(--syn-environment)' },
+    { tag: tags.meta, color: 'var(--syn-declaration)', fontStyle: 'italic' },
+    { tag: tags.comment, color: 'var(--syn-comment)', fontStyle: 'italic' },
   ]),
 );

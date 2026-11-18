@@ -12,6 +12,7 @@ import { exportJson, exportMarkdown, exportLatex } from './export.ts';
 import { MENU } from '../../corpus/menu.ts';
 import { PACKS } from '../../corpus/packs.ts';
 import { VERDICT_LABEL, seedText, parseSeed } from './verdicts.ts';
+import { VerdictIcon } from './VerdictIcon.tsx';
 import { FontSizeControl, applyFontScale, readFontScale, stepFontScale } from '../font-size.tsx';
 
 const HEADER_BUTTON =
@@ -360,7 +361,7 @@ export function App() {
   }, [counts, report?.steps.length]);
 
   return (
-    <main className="flex h-full flex-col overflow-y-auto bg-[var(--color-ink)] text-[var(--color-text)]">
+    <main className="flex h-full flex-col overflow-y-auto font-sans bg-[var(--color-ink)] text-[var(--color-text)]">
       <header className="flex shrink-0 items-center gap-3 border-b border-[var(--color-line)] px-4 py-2.5">
         <a href="/" className="flex items-center gap-2 text-sm text-[var(--color-gold)]">
           <span className="text-lg leading-none">∇</span>
@@ -401,10 +402,10 @@ export function App() {
         <div className="flex flex-wrap items-center gap-3 border-b border-[var(--color-line)] bg-[var(--color-panel)] px-4 py-2 text-[0.6875rem]">
           {revealed ? (
             <span className="text-[var(--color-chutney)]">
-              ✓ found it in {tries} {tries === 1 ? 'try' : 'tries'}
+              <VerdictIcon verdict="ok" /> found it in {tries} {tries === 1 ? 'try' : 'tries'}
             </span>
           ) : tries > 0 ? (
-            <span className="text-[var(--color-tamarind)]">✗ not that row, try again</span>
+            <span className="text-[var(--color-tamarind)]"><VerdictIcon verdict="wrong" /> not that row, try again</span>
           ) : (
             <span className="text-[var(--color-saffron)]">one row is wrong. click it.</span>
           )}
@@ -722,10 +723,10 @@ export function App() {
           <span className="text-[var(--color-saffron)]">find the wrong row</span>
         ) : (
           <>
-            {counts.ok > 0 && <span className="text-[var(--color-chutney)]">✓ {counts.ok}</span>}
-            {counts.wrong > 0 && <span className="text-[var(--color-tamarind)]">✗ {counts.wrong}</span>}
-            {counts.shape > 0 && <span className="text-[var(--color-tamarind)]">⊘ {counts.shape}</span>}
-            {counts.unchecked > 0 && <span className="text-[var(--color-slate)]">? {counts.unchecked}</span>}
+            {counts.ok > 0 && <span className="inline-flex items-center gap-1 text-[var(--color-chutney)]"><VerdictIcon verdict="ok" />{counts.ok}<span className="sr-only"> hold</span></span>}
+            {counts.wrong > 0 && <span className="inline-flex items-center gap-1 text-[var(--color-tamarind)]"><VerdictIcon verdict="wrong" />{counts.wrong}<span className="sr-only"> wrong</span></span>}
+            {counts.shape > 0 && <span className="inline-flex items-center gap-1 text-[var(--color-tamarind)]"><VerdictIcon verdict="shape" />{counts.shape}<span className="sr-only"> shape errors</span></span>}
+            {counts.unchecked > 0 && <span className="inline-flex items-center gap-1 text-[var(--color-slate)]"><VerdictIcon verdict="unchecked" />{counts.unchecked}<span className="sr-only"> not checked</span></span>}
           </>
         )}
         {report && (

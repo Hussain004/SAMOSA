@@ -4,7 +4,8 @@ import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import { readShareLink } from '../core/share.ts';
 import { check } from '../core/index.ts';
-import { VERDICT_ICON, VERDICT_LABEL, VERDICT_TITLE } from '../app/verdicts.ts';
+import { VERDICT_LABEL, VERDICT_TITLE } from '../app/verdicts.ts';
+import { VerdictIcon } from '../app/VerdictIcon.tsx';
 import type { StepResult } from '../core/index.ts';
 
 /**
@@ -46,7 +47,7 @@ function Row({ step }: { step: StepResult }) {
         className={`badge v-${step.verdict}`}
         title={`${VERDICT_TITLE[step.verdict] ?? step.verdict} · row ${step.row}`}
       >
-        {VERDICT_ICON[step.verdict]} {VERDICT_LABEL[step.verdict]}
+        <VerdictIcon verdict={step.verdict} /> {VERDICT_LABEL[step.verdict]}
       </span>
       <span className="math" dangerouslySetInnerHTML={{ __html: html }} />
     </div>

@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { mathBlocks } from '../core/index.ts';
-import type { Report, StepResult } from '../core/index.ts';
-import { VERDICT_ICON } from './verdicts.ts';
+import type { Report, StepResult, Verdict } from '../core/index.ts';
+import { VerdictIcon } from './VerdictIcon.tsx';
 
 /**
  * The outline of a document.
@@ -54,12 +54,13 @@ export function DocumentOutline({ source, report, onJump, selectedStep }: Outlin
         const summary = summarize(rows);
         const stepId = rows[0]?.id ?? `s${block.rowFrom - 1}`;
         const selected = rows.some((s) => s.id === selectedStep);
-        const parts: string[] = [];
-        if (summary.ok) parts.push(`${summary.ok} ${VERDICT_ICON.ok}`);
-        if (summary.wrong) parts.push(`${summary.wrong} ${VERDICT_ICON.wrong}`);
-        if (summary.shape) parts.push(`${summary.shape} ${VERDICT_ICON.shape}`);
-        if (summary.unchecked) parts.push(`${summary.unchecked} ${VERDICT_ICON.unchecked}`);
-        if (summary.other) parts.push(`${summary.other} ≡`);
+        const parts: Array<[number, Verdict, string]> = [
+          [summary.ok, 'ok', 'text-[var(--color-chutney)]'],
+          [summary.wrong, 'wrong', 'text-[var(--color-tamarind)]'],
+          [summary.shape, 'shape', 'text-[var(--color-tamarind)]'],
+          [summary.unchecked, 'unchecked', 'text-[var(--color-slate)]'],
+          [summary.other, 'defined', 'text-[var(--color-muted)]'],
+        ];
         const pending = report === null;
         return (
           <button
@@ -75,8 +76,17 @@ export function DocumentOutline({ source, report, onJump, selectedStep }: Outlin
           >
             <span className="font-mono text-[0.6875rem] text-[var(--color-gold)]">{block.env}</span>
             <span className="text-[0.625rem] text-[var(--color-faint)]">rows {block.rowFrom}–{block.rowTo}</span>
-            <span className="font-mono text-[0.6875rem] text-[var(--color-muted)]">
-              {pending ? '…' : parts.join(' ')}
+            <span className="flex items-center gap-2 font-mono text-[0.6875rem] text-[var(--color-muted)]">
+              {pending
+                ? '…'
+                : parts
+                    .filter(([count]) => count > 0)
+                    .map(([count, verdict, color]) => (
+                      <span key={verdict} className={`inline-flex items-center gap-0.5 ${color}`}>
+                        {count}
+                        <VerdictIcon verdict={verdict} />
+                      </span>
+                    ))}
             </span>
           </button>
         );

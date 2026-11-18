@@ -38,6 +38,18 @@
 :root {
   color-scheme: dark;
   --dot: #ffffff0d;
+  /* the LaTeX in the source pane, one colour per role (src/app/theme.ts) */
+  --syn-name: #ede6da;
+  --syn-command: #e2b45f;
+  --syn-relation: #ff9d47;
+  --syn-script: #7fbfdc;
+  --syn-operator: #b9ae9c;
+  --syn-number: #8fd6a2;
+  --syn-bracket: #8e8475;
+  --syn-layout: #6f675b;
+  --syn-environment: #c9a2e4;
+  --syn-declaration: #d8b66e;
+  --syn-comment: #8b8172;
 }
 
 /* The same terminal, printed on paper. The palette is the only thing that
@@ -61,6 +73,17 @@ html[data-theme='light'] {
   --color-wash: #00000008;
   --color-inset: #0000000a;
   --color-bar: #fbf8f1d9;
+  --syn-name: #221d17;
+  --syn-command: #8a5a00;
+  --syn-relation: #b34b00;
+  --syn-script: #1b6b93;
+  --syn-operator: #5f574c;
+  --syn-number: #23743f;
+  --syn-bracket: #7a7064;
+  --syn-layout: #a19584;
+  --syn-environment: #7b3fa0;
+  --syn-declaration: #8a5a00;
+  --syn-comment: #6b6257;
 }
 
 /*
@@ -138,6 +161,7 @@ body {
 }
 
 .pane-title {
+  font-family: var(--font-mono);
   font-size: 0.625rem;
   letter-spacing: 0.18em;
   text-transform: uppercase;
@@ -161,33 +185,39 @@ kbd {
   background: var(--color-panel-2);
 }
 
-/* the badges of the verdicts */
+/* the badges of the verdicts: a tinted pill with a drawn icon, in the
+   sans of the prose, so a verdict reads as a word and not as code */
 .badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
+  font-family: var(--font-sans);
   font-size: 0.6875rem;
+  font-weight: 560;
+  letter-spacing: 0.01em;
   line-height: 1;
-  padding: 4px 8px;
+  padding: 4px 9px 4px 7px;
   border-radius: 999px;
-  border: 1px solid currentColor;
+  border: 1px solid color-mix(in srgb, currentColor 40%, transparent);
+  background: color-mix(in srgb, currentColor 11%, transparent);
   white-space: nowrap;
+}
+.badge svg {
+  font-size: 0.8125rem;
 }
 
 .badge-ok {
   color: var(--color-chutney);
-  box-shadow: 0 0 6px #5bc27a40;
 }
 .badge-wrong {
   color: var(--color-tamarind);
-  box-shadow: 0 0 6px #e0533d40;
+  border-color: color-mix(in srgb, currentColor 70%, transparent);
 }
 .badge-shape {
   color: var(--color-tamarind);
 }
 .badge-warn {
   color: var(--color-saffron);
-  box-shadow: 0 0 6px #f28c2840;
 }
 .badge-unknown {
   color: var(--color-slate);
@@ -247,11 +277,23 @@ kbd {
   text-decoration: underline dotted var(--color-slate);
   text-underline-offset: 3px;
 }
-.cm-lint-marker-error,
-.cm-lint-marker-warning,
+/* the gutter marks are dots in the verdict colours, not the stock icons */
+.cm-lint-marker {
+  content: '' !important;
+  display: block;
+  width: 7px;
+  height: 7px;
+  margin: 0.55em auto 0;
+  border-radius: 999px;
+}
+.cm-lint-marker-error {
+  background: var(--color-tamarind);
+}
+.cm-lint-marker-warning {
+  background: var(--color-saffron);
+}
 .cm-lint-marker-info {
-  width: 8px;
-  height: 8px;
+  background: var(--color-slate);
 }
 .cm-tooltip {
   background: var(--color-panel-2);

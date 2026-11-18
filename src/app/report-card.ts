@@ -1,5 +1,6 @@
 import katex from 'katex';
-import { VERDICT_ICON, VERDICT_TITLE, guaranteeSentence, seedText } from './verdicts.ts';
+import { verdictIconSvg } from './VerdictIcon.tsx';
+import { VERDICT_TITLE, guaranteeSentence, seedText } from './verdicts.ts';
 import type { StepResult, ShrunkInstance } from '../core/index.ts';
 
 /**
@@ -166,7 +167,7 @@ export function reportCardSvg(input: ReportCardInput): string {
   </div>
   <div style="margin-top: 16px; border: 2px solid ${accent}; border-radius: 10px; padding: 14px 16px; background: ${PANEL};">
     <div style="display: flex; align-items: baseline; gap: 14px;">
-      <div style="font-size: 26px; color: ${accent};">${VERDICT_ICON[step.verdict]}</div>
+      <div style="align-self: center; display: flex;">${verdictIconSvg(step.verdict, 26, accent)}</div>
       <div style="font-size: 20px; font-weight: bold;">${escapeHtml(VERDICT_TITLE[step.verdict])}</div>
       <div style="font-size: 15px; color: ${FAINT};">row ${step.row}</div>
     </div>

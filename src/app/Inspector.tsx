@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import type { Report, StepResult } from '../core/index.ts';
 import { matrixLatex } from './matrix.ts';
-import { VERDICT_ICON, VERDICT_LABEL, VERDICT_TITLE, seedText, guaranteeSentence, whyTrustHref, formatBound, reportIssueUrl } from './verdicts.ts';
+import { VerdictIcon } from './VerdictIcon.tsx';
+import { VERDICT_LABEL, VERDICT_TITLE, seedText, guaranteeSentence, whyTrustHref, formatBound, reportIssueUrl } from './verdicts.ts';
 import { saveReportCardPng, plainTex } from './report-card.ts';
 import { Tex } from './tex.tsx';
 
@@ -42,17 +43,20 @@ export function Inspector({ step, report, explanation, onApplyFix, onCopy, onClo
     <div data-testid="inspector" className="h-full overflow-auto p-4">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="flex items-center gap-2 text-sm font-medium">
-            <span className={textColor(step.verdict)} aria-hidden="true">
-              {VERDICT_ICON[step.verdict]}
+          <h2 className="flex items-center gap-2 text-[0.9375rem] font-semibold tracking-[-0.01em]">
+            <span
+              className={`grid h-6 w-6 place-items-center rounded-full text-[0.8125rem] ${textColor(step.verdict)} bg-current/10`}
+              aria-hidden="true"
+            >
+              <VerdictIcon verdict={step.verdict} />
             </span>
             {VERDICT_TITLE[step.verdict]}
-            <span className="text-[var(--color-faint)]">· row {step.row}</span>
+            <span className="font-normal text-[var(--color-faint)]">· row {step.row}</span>
           </h2>
-          <p className="mt-1 text-xs text-[var(--color-muted)]">{step.message}</p>
           <p className="mt-2 text-sm text-[var(--color-text)]" data-testid="guarantee-sentence">
-            {guaranteeSentence(step)}
+            {withoutTitle(guaranteeSentence(step), VERDICT_TITLE[step.verdict])}
           </p>
+          <p className="mt-0.5 text-xs text-[var(--color-muted)]">{step.message}</p>
           {explanation?.ruleName && (
             <a
               href="/docs/COOKBOOK"
@@ -117,7 +121,7 @@ export function Inspector({ step, report, explanation, onApplyFix, onCopy, onClo
 
       <details className="mt-4" open>
         <summary className="cursor-pointer text-[0.6875rem] text-[var(--color-muted)]">the guarantee</summary>
-        <div className="mt-2 grid gap-2 text-xs sm:grid-cols-2">
+        <div className="mt-2.5 grid grid-cols-2 gap-x-5 gap-y-3 text-xs sm:grid-cols-3 lg:grid-cols-4">
           <Field label="mode" value={step.mode ?? VERDICT_LABEL[step.verdict]} />
           <Field label="seed" value={seedText(card.seed)} />
           <Field label="trials per size" value={String(card.trialsPerSize)} />
@@ -125,8 +129,8 @@ export function Inspector({ step, report, explanation, onApplyFix, onCopy, onClo
               the guarantee are only there when the step holds. */}
           {step.verdict === 'ok' && (
             <>
-              <div className="rounded border border-[var(--color-line)] bg-[var(--color-panel-2)] px-2 py-1.5 sm:col-span-2">
-                <div className="pane-title">sizes tested</div>
+              <div className="col-span-full min-w-0 border-l border-[var(--color-line)] pl-2.5">
+                <div className={FIELD_LABEL}>sizes tested</div>
                 <div className="mt-1 flex flex-wrap gap-1.5">
                   {card.sizes.map((size, i) => (
                     <span
@@ -336,13 +340,26 @@ function CounterexampleView({
   );
 }
 
+const FIELD_LABEL = 'font-mono text-[0.5625rem] uppercase tracking-[0.14em] text-[var(--color-faint)]';
+
+/** One number of the guarantee: a quiet label over a mono value, no box. */
 function Field({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded border border-[var(--color-line)] bg-[var(--color-panel-2)] px-2 py-1.5">
-      <div className="pane-title">{label}</div>
-      <div className="mt-0.5 break-words text-xs">{value}</div>
+    <div className="min-w-0 border-l border-[var(--color-line)] pl-2.5">
+      <div className={FIELD_LABEL}>{label}</div>
+      <div className="mt-0.5 break-words font-mono text-xs">{value}</div>
     </div>
   );
+}
+
+/**
+ * The sentence of the card, without the title it would repeat: the card
+ * already says "This step is wrong" in its heading. The saved image keeps
+ * the whole sentence, because there it stands on its own.
+ */
+function withoutTitle(sentence: string, title: string): string {
+  if (sentence.startsWith(`${title}. `)) return sentence.slice(title.length + 2);
+  return sentence;
 }
 
 function textColor(verdict: StepResult['verdict']): string {
