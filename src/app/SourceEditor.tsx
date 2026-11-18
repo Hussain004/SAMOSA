@@ -33,7 +33,10 @@ const hoverLineField = StateField.define<DecorationSet>({
     let next = tr.docChanged ? decos.map(tr.changes) : decos;
     for (const effect of tr.effects) {
       if (effect.is(setHoverLine)) {
-        next = effect.value === null ? Decoration.none : Decoration.set([hoverLine.range(effect.value)]);
+        next =
+          effect.value === null || effect.value > tr.state.doc.length
+            ? Decoration.none
+            : Decoration.set([hoverLine.range(tr.state.doc.lineAt(effect.value).from)]);
       }
     }
     return next;
@@ -186,8 +189,13 @@ export function SourceEditor({
     const v = view.current;
     if (!v) return;
     const step = reportRef.current?.steps.find((s) => s.id === hoverStep);
-    if (step && hoverStep) {
-      v.dispatch({ effects: setHoverLine.of(step.span.from) });
+    // the report can be older than the text: a Menu pick replaces the text
+    // before its report arrives, so a stale span may point past the end. A
+    // decoration out there crashes the next edit, so it is placed only on a
+    // line the document has
+    const doc = v.state.doc;
+    if (step && hoverStep && step.span.from <= doc.length) {
+      v.dispatch({ effects: setHoverLine.of(doc.lineAt(step.span.from).from) });
     } else {
       v.dispatch({ effects: setHoverLine.of(null) });
     }

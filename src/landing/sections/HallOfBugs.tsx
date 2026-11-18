@@ -1,4 +1,5 @@
 import { SectionHead, RENDERED } from './common.tsx';
+import { VerdictIcon } from '../../app/VerdictIcon.tsx';
 
 export function HallOfBugs() {
   return (
@@ -26,7 +27,7 @@ export function HallOfBugs() {
               key={i}
               className="flex shrink-0 items-center gap-3 rounded border border-[var(--color-line)] bg-[var(--color-panel)] px-5 py-4"
             >
-              <span className="text-[var(--color-tamarind)]">✗</span>
+              <VerdictIcon verdict="wrong" className="text-[var(--color-tamarind)]" />
               <span className="text-[0.9375rem]" dangerouslySetInnerHTML={{ __html: bug }} />
             </div>
           ))}

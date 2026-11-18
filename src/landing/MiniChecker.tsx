@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { VerdictIcon } from '../app/VerdictIcon.tsx';
 
 /**
  * The mini checker, in the hero.
@@ -90,20 +91,19 @@ export function MiniChecker() {
     };
   }, []);
 
+  // the same badge the app draws, so the hero and the checker agree
   const badge =
     verdict === 'ok'
-      ? { text: '✓ holds', tone: 'text-[var(--color-chutney)] border-[var(--color-chutney)]' }
+      ? { icon: 'ok' as const, text: 'holds', tone: 'badge-ok' }
       : verdict === 'wrong'
-        ? { text: '✗ wrong', tone: 'text-[var(--color-tamarind)] border-[var(--color-tamarind)]' }
+        ? { icon: 'wrong' as const, text: 'wrong', tone: 'badge-wrong' }
         : verdict === 'shape'
-          ? { text: '◌ shape', tone: 'text-[var(--color-saffron)] border-[var(--color-saffron)]' }
+          ? { icon: 'shape' as const, text: 'shape', tone: 'badge-shape' }
           : verdict === 'defined'
-            ? { text: '≡ defines', tone: 'text-[var(--color-muted)] border-[var(--color-line)]' }
+            ? { icon: 'defined' as const, text: 'defines', tone: 'badge-defined' }
             : verdict === 'unchecked'
-              ? { text: '? not checked', tone: 'text-[var(--color-muted)] border-[var(--color-line)]' }
-              : verdict === 'checking'
-                ? { text: '…', tone: 'text-[var(--color-faint)] border-[var(--color-line)]' }
-                : { text: '?', tone: 'text-[var(--color-faint)] border-[var(--color-line)]' };
+              ? { icon: 'unchecked' as const, text: 'not checked', tone: 'badge-unknown' }
+              : { icon: null, text: verdict === 'checking' ? 'checking…' : 'type a row', tone: 'badge-unknown' };
 
   return (
     <div className="mt-8 max-w-[520px] rounded border border-[var(--color-line)] bg-[var(--color-panel)] p-3">
@@ -123,10 +123,8 @@ export function MiniChecker() {
           className="min-w-0 flex-1 rounded border border-[var(--color-line)] bg-black/30 px-2 py-2 font-mono text-[0.8125rem] text-[var(--color-text)] outline-none focus:border-[var(--color-gold)]"
           aria-label="a derivation row to check"
         />
-        <span
-          aria-live="polite"
-          className={`shrink-0 rounded border px-2 py-2 font-mono text-[0.75rem] leading-none ${badge.tone}`}
-        >
+        <span aria-live="polite" className={`badge shrink-0 py-2 text-[0.75rem] ${badge.tone}`}>
+          {badge.icon && <VerdictIcon verdict={badge.icon} />}
           {badge.text}
         </span>
       </div>

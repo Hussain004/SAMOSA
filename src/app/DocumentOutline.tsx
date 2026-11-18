@@ -3,6 +3,15 @@ import { mathBlocks } from '../core/index.ts';
 import type { Report, StepResult, Verdict } from '../core/index.ts';
 import { VerdictIcon } from './VerdictIcon.tsx';
 
+/** The word a screen reader hears for each count; the icon is hidden from it. */
+const OUTLINE_WORD: Partial<Record<Verdict, string>> = {
+  ok: 'hold',
+  wrong: 'wrong',
+  shape: 'shape',
+  unchecked: 'not checked',
+  defined: 'other',
+};
+
 /**
  * The outline of a document.
  *
@@ -85,6 +94,7 @@ export function DocumentOutline({ source, report, onJump, selectedStep }: Outlin
                       <span key={verdict} className={`inline-flex items-center gap-0.5 ${color}`}>
                         {count}
                         <VerdictIcon verdict={verdict} />
+                        <span className="sr-only"> {OUTLINE_WORD[verdict]}</span>
                       </span>
                     ))}
             </span>

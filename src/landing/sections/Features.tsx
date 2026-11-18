@@ -1,5 +1,7 @@
 import { MOCKS } from '../demo-scripts.ts';
 import { SectionHead, RENDERED } from './common.tsx';
+import { VerdictIcon } from '../../app/VerdictIcon.tsx';
+import type { Verdict } from '../../core/index.ts';
 
 const FEATURES = [
   {
@@ -82,8 +84,8 @@ function CounterexampleMock() {
 
   return (
     <Mock>
-      <MockLine tone="bad">
-        ✗ row {MOCKS.counterexample.row} · the two sides are not equal
+      <MockLine tone="bad" icon="wrong">
+        row {MOCKS.counterexample.row} · the two sides are not equal
       </MockLine>
       <pre
         className="mt-2 whitespace-pre-wrap break-words text-[0.6875rem] leading-relaxed text-[var(--color-muted)]"
@@ -111,8 +113,8 @@ function FixMock() {
 function ShapeMock() {
   return (
     <Mock>
-      <MockLine tone="bad">
-        ⊘ row {MOCKS.shape.row} · {MOCKS.shape.message}
+      <MockLine tone="bad" icon="shape">
+        row {MOCKS.shape.row} · {MOCKS.shape.message}
       </MockLine>
       <pre className="mt-2 whitespace-pre-wrap break-words text-[0.6875rem] leading-relaxed text-[var(--color-muted)]">
         {`C_t is m by n
@@ -127,7 +129,7 @@ ${MOCKS.shape.fix ?? ''}`}
 function GradientMock() {
   return (
     <Mock>
-      <MockLine tone="bad">✗ row {MOCKS.layout.row} · the numerator layout</MockLine>
+      <MockLine tone="bad" icon="wrong">row {MOCKS.layout.row} · the numerator layout</MockLine>
       <pre className="mt-2 whitespace-pre-wrap break-words text-[0.6875rem] leading-relaxed text-[var(--color-muted)]">
         {`the gradient has the shape
 of the variable it is taken with
@@ -140,7 +142,7 @@ respect to. Transpose it.`}
 function GuaranteeMock() {
   return (
     <Mock>
-      <MockLine tone="ok">✓ row 11 · holds at every size tested</MockLine>
+      <MockLine tone="ok" icon="ok">row 11 · holds at every size tested</MockLine>
       <pre className="mt-2 whitespace-pre-wrap break-words text-[0.6875rem] leading-relaxed text-[var(--color-muted)]">
         {`sizes (3,2) (2,3) (4,3)
 6 trials each · 2 primes
@@ -167,10 +169,10 @@ function Mock({ children }: { children: React.ReactNode }) {
   return <div className="rounded border border-[var(--color-line)] bg-[var(--color-inset)] p-3">{children}</div>;
 }
 
-function MockLine({ children, tone }: { children: React.ReactNode; tone: 'ok' | 'bad' | 'plain' }) {
+function MockLine({ children, tone, icon }: { children: React.ReactNode; tone: 'ok' | 'bad' | 'plain'; icon?: Verdict }) {
   return (
     <div
-      className={`text-[0.6875rem] ${
+      className={`flex items-center gap-1.5 text-[0.6875rem] ${
         tone === 'ok'
           ? 'text-[var(--color-chutney)]'
           : tone === 'bad'
@@ -178,7 +180,8 @@ function MockLine({ children, tone }: { children: React.ReactNode; tone: 'ok' | 
             : 'text-[var(--color-muted)]'
       }`}
     >
-      {children}
+      {icon && <VerdictIcon verdict={icon} />}
+      <span>{children}</span>
     </div>
   );
 }

@@ -434,7 +434,7 @@ test('a paper with two blocks gets an outline, and the wrong row shows in it', a
   await expect(rail.getByText('rows 2–3')).toBeVisible();
 
   // the wrong row is marked in its block
-  await expect(rail.getByText('1 ✗')).toBeVisible();
+  await expect(rail.getByText('1 wrong')).toBeVisible();
   await expect(page.locator('[data-verdict="wrong"]')).toHaveCount(1);
 
   // jumping to the second block selects its first row

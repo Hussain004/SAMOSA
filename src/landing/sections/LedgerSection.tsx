@@ -1,4 +1,5 @@
 import { SectionHead } from './common.tsx';
+import { VerdictIcon } from '../../app/VerdictIcon.tsx';
 import LEDGER from '../ledger.json';
 
 /** The soundness ledger: the false friends, and the dated false-checkmark fixes. */
@@ -17,8 +18,9 @@ export function LedgerSection() {
               key={friend.name}
               className="flex flex-col rounded border border-[var(--color-line)] bg-[var(--color-panel)] px-3 py-2"
             >
-              <span className="text-[0.5625rem] uppercase tracking-widest text-[var(--color-tamarind)]">
-                ✗ never ok
+              <span className="inline-flex items-center gap-1.5 text-[0.5625rem] uppercase tracking-widest text-[var(--color-tamarind)]">
+                <VerdictIcon verdict="wrong" className="text-[0.75rem]" />
+                never ok
               </span>
               <code className="mt-1.5 block break-words font-mono text-[0.6875rem] leading-snug text-[var(--color-muted)]">
                 {friend.src}
